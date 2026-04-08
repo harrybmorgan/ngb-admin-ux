@@ -5,6 +5,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { LightModeBoundary } from '@/components/LightModeBoundary'
 
 const LoginPage = React.lazy(() => import('@/pages/LoginPage'))
+const MemberHandoffPage = React.lazy(() => import('@/pages/MemberHandoffPage'))
 const DashboardPage = React.lazy(() => import('@/pages/DashboardPage'))
 const SetupWizardPage = React.lazy(() => import('@/pages/setup/SetupWizardPage'))
 const EnrollmentPage = React.lazy(() => import('@/pages/EnrollmentPage'))
@@ -13,6 +14,7 @@ const ReportsPage = React.lazy(() => import('@/pages/ReportsPage'))
 const ContentPage = React.lazy(() => import('@/pages/ContentPage'))
 const CommunicationsPage = React.lazy(() => import('@/pages/CommunicationsPage'))
 const ThemingPage = React.lazy(() => import('@/pages/ThemingPage'))
+const SettingsPage = React.lazy(() => import('@/pages/SettingsPage'))
 
 function PageLoader() {
   return (
@@ -36,6 +38,7 @@ export function AppRoutes() {
       <ScrollToTop />
       <Routes>
         <Route path="login" element={withLight(<LoginPage />)} />
+        <Route path="member-handoff" element={withLight(<MemberHandoffPage />)} />
         <Route index element={withProtected(<DashboardPage />)} />
         <Route path="setup" element={withProtected(<SetupWizardPage />)} />
         <Route path="enrollment" element={withProtected(<EnrollmentPage />)} />
@@ -44,6 +47,7 @@ export function AppRoutes() {
         <Route path="content" element={withProtected(<ContentPage />)} />
         <Route path="communications" element={withProtected(<CommunicationsPage />)} />
         <Route path="theming" element={withProtected(<ThemingPage />)} />
+        <Route path="settings" element={withProtected(<SettingsPage />)} />
       </Routes>
     </React.Suspense>
   )

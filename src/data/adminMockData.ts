@@ -1,4 +1,4 @@
-/** Realistic dummy data for Shelly’s employer admin prototype (Summit Ridge Bakery Co.) */
+/** Realistic dummy data for the employer admin prototype (Summit Ridge Bakery Co.) */
 
 export const EMPLOYER = {
   name: 'Summit Ridge Bakery Co.',

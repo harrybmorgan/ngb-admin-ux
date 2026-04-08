@@ -19,7 +19,7 @@ createRoot(document.getElementById('root')!).render(
       <AppProviders
         defaultTheme="light"
         enableSystem={false}
-        storageKey="ben-ui-kit-theme-admin"
+        storageKey="ben-ui-kit-theme-ngb-admin"
       >
         <App />
         <Toaster />

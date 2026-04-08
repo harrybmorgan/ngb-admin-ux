@@ -22,13 +22,13 @@ export default function ContentPage() {
   const items = CONTENT_ITEMS.filter((c) => c.type === tab)
 
   return (
-    <div className="flex min-h-screen flex-col bg-muted/15">
+    <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
       <main className="mx-auto w-full max-w-[1000px] flex-1 space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Content management</h1>
           <p className="text-sm text-muted-foreground">
-            Documents, videos, and tutorials Shelly can publish to the employee portal.
+            Documents, videos, and tutorials you can publish to the employee portal.
           </p>
         </div>
 

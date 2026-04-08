@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   Button,
@@ -11,18 +11,36 @@ import {
   SheetContent,
   SheetTrigger,
 } from '@wexinc-healthbenefits/ben-ui-kit'
-import { Building2, ChevronDown, LayoutDashboard, LogOut, Menu, Search, User } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import {
+  BarChart3,
+  Building2,
+  ChevronDown,
+  CreditCard,
+  FolderOpen,
+  Home,
+  LogOut,
+  Mail,
+  Menu,
+  Palette,
+  Search,
+  Settings,
+  User,
+  Users,
+} from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { EMPLOYER } from '@/data/adminMockData'
 
-const mainNav = [
-  { to: '/', label: 'Home' },
-  { to: '/enrollment', label: 'Enrollment' },
-  { to: '/billing', label: 'Billing & Invoicing' },
-  { to: '/reports', label: 'Reporting & Analytics' },
-  { to: '/content', label: 'Content' },
-  { to: '/communications', label: 'Communications' },
-] as const
+type MainNavItem = { to: string; label: string; icon: LucideIcon }
+
+const mainNav: MainNavItem[] = [
+  { to: '/', label: 'Home', icon: Home },
+  { to: '/enrollment', label: 'People', icon: Users },
+  { to: '/billing', label: 'Billing & Invoicing', icon: CreditCard },
+  { to: '/reports', label: 'Reporting & Analytics', icon: BarChart3 },
+  { to: '/content', label: 'Content', icon: FolderOpen },
+  { to: '/communications', label: 'Communications', icon: Mail },
+]
 
 interface AdminNavigationProps {
   hideNav?: boolean
@@ -34,10 +52,6 @@ export function AdminNavigation({ hideNav = false }: AdminNavigationProps) {
   const { logout } = useAuth()
   const [open, setOpen] = useState(false)
   const wexLogoUrl = `${import.meta.env.BASE_URL}WEX_Logo_Red_Vector.svg`
-
-  useEffect(() => {
-    setOpen(false)
-  }, [location.pathname])
 
   const isActive = (to: string) => {
     if (to === '/') return location.pathname === '/' || location.pathname === ''
@@ -52,54 +66,41 @@ export function AdminNavigation({ hideNav = false }: AdminNavigationProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-4 px-4 sm:px-6 lg:px-8">
-        <Link to="/" className="flex shrink-0 items-center gap-2">
+        <Link to="/" className="flex shrink-0 items-center" aria-label="WEX Employer admin home">
           <img src={wexLogoUrl} alt="WEX" className="h-8 w-auto" />
-          <div className="hidden flex-col leading-tight sm:flex">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Employer admin
-            </span>
-            <span className="max-w-[200px] truncate text-sm font-medium text-foreground">
-              {EMPLOYER.name}
-            </span>
-          </div>
         </Link>
 
         {!hideNav && (
           <>
             <nav className="ml-2 hidden flex-1 flex-wrap items-center gap-1 lg:flex">
-              {mainNav.map(({ to, label }) => (
-                <Link
-                  key={to}
-                  to={to}
-                  className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                    isActive(to)
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }`}
-                >
-                  {label}
-                </Link>
-              ))}
-              <Link
-                to="/setup"
-                className={`ml-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive('/setup')
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-              >
-                Setup wizard
-              </Link>
-              <Link
-                to="/theming"
-                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive('/theming')
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-              >
-                Branding
-              </Link>
+              {mainNav.map(({ to, label, icon: Icon }) => {
+                const active = isActive(to)
+                return (
+                  <Link
+                    key={to}
+                    to={to}
+                    className={`relative flex min-h-11 flex-col justify-center rounded-md px-[17px] py-2 text-sm transition-colors hover:bg-black/5 ${
+                      active ? 'text-[#3958c3]' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Icon
+                        className={`h-4 w-4 shrink-0 ${active ? 'text-[#3958c3]' : 'text-muted-foreground'}`}
+                        aria-hidden
+                      />
+                      <span className={`leading-6 tracking-[-0.084px] ${active ? 'font-semibold' : 'font-normal'}`}>
+                        {label}
+                      </span>
+                    </div>
+                    {active ? (
+                      <span
+                        className="absolute bottom-0 left-[17px] right-[17px] h-0.5 rounded-sm bg-[#3958c3]"
+                        aria-hidden
+                      />
+                    ) : null}
+                  </Link>
+                )
+              })}
             </nav>
 
             <div className="ml-auto flex items-center gap-2">
@@ -125,34 +126,30 @@ export function AdminNavigation({ hideNav = false }: AdminNavigationProps) {
                     <Building2 className="h-5 w-5" />
                     Menu
                   </div>
-                  <nav className="flex flex-col gap-1">
-                    {mainNav.map(({ to, label }) => (
-                      <Link
-                        key={to}
-                        to={to}
-                        className={`rounded-md px-3 py-2.5 text-sm font-medium ${
-                          isActive(to) ? 'bg-primary/10 text-primary' : 'text-foreground'
-                        }`}
-                      >
-                        {label}
-                      </Link>
-                    ))}
-                    <Link
-                      to="/setup"
-                      className={`rounded-md px-3 py-2.5 text-sm font-medium ${
-                        isActive('/setup') ? 'bg-primary/10 text-primary' : 'text-foreground'
-                      }`}
-                    >
-                      Setup wizard
-                    </Link>
-                    <Link
-                      to="/theming"
-                      className={`rounded-md px-3 py-2.5 text-sm font-medium ${
-                        isActive('/theming') ? 'bg-primary/10 text-primary' : 'text-foreground'
-                      }`}
-                    >
-                      Branding
-                    </Link>
+                  <nav className="flex flex-col gap-1" onClick={() => setOpen(false)}>
+                    {mainNav.map(({ to, label, icon: Icon }) => {
+                      const active = isActive(to)
+                      return (
+                        <Link
+                          key={to}
+                          to={to}
+                          className={`relative flex flex-col rounded-md px-3 py-2.5 text-sm transition-colors hover:bg-muted/60 ${
+                            active ? 'text-[#3958c3]' : 'text-foreground'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Icon
+                              className={`h-4 w-4 shrink-0 ${active ? 'text-[#3958c3]' : 'text-foreground'}`}
+                              aria-hidden
+                            />
+                            <span className={active ? 'font-semibold' : 'font-medium'}>{label}</span>
+                          </div>
+                          {active ? (
+                            <span className="mt-1 h-0.5 w-full rounded-sm bg-[#3958c3]" aria-hidden />
+                          ) : null}
+                        </Link>
+                      )
+                    })}
                   </nav>
                 </SheetContent>
               </Sheet>
@@ -166,9 +163,13 @@ export function AdminNavigation({ hideNav = false }: AdminNavigationProps) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuItem onClick={() => navigate('/')}>
-                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                    Dashboard
+                  <DropdownMenuItem onClick={() => navigate('/settings')}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/theming')}>
+                    <Palette className="mr-2 h-4 w-4" />
+                    Branding studio
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>

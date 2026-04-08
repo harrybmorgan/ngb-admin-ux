@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react'
 
-export const SETUP_STORAGE_KEY = 'cxr_admin_employer_setup'
+export const SETUP_STORAGE_KEY = 'ngb_admin_employer_setup'
 
 export type EmployerSetupState = {
   onboardingComplete: boolean
@@ -14,29 +14,38 @@ const defaults: EmployerSetupState = {
   launchComplete: false,
 }
 
-function readSetup(): EmployerSetupState {
-  if (typeof window === 'undefined') return defaults
+/** Parse localStorage; reuse `defaults` when empty so callers get a stable reference. */
+function parseSetup(raw: string | null): EmployerSetupState {
+  if (!raw) return defaults
   try {
-    const raw = localStorage.getItem(SETUP_STORAGE_KEY)
-    if (!raw) return { ...defaults }
-    return { ...defaults, ...JSON.parse(raw) }
+    return { ...defaults, ...JSON.parse(raw) as Partial<EmployerSetupState> }
   } catch {
-    return { ...defaults }
+    return defaults
   }
 }
+
+let snapshotKey: string | null = null
+let snapshotState: EmployerSetupState = defaults
 
 function subscribe(callback: () => void) {
   if (typeof window === 'undefined') return () => {}
   window.addEventListener('storage', callback)
-  window.addEventListener('cxr-admin-setup', callback)
+  window.addEventListener('ngb-admin-setup', callback)
   return () => {
     window.removeEventListener('storage', callback)
-    window.removeEventListener('cxr-admin-setup', callback)
+    window.removeEventListener('ngb-admin-setup', callback)
   }
 }
 
 function getSnapshot(): EmployerSetupState {
-  return readSetup()
+  if (typeof window === 'undefined') return defaults
+  const raw = localStorage.getItem(SETUP_STORAGE_KEY)
+  const key = raw === null ? '' : raw
+  if (key !== snapshotKey) {
+    snapshotKey = key
+    snapshotState = parseSetup(raw)
+  }
+  return snapshotState
 }
 
 function getServerSnapshot(): EmployerSetupState {
@@ -44,11 +53,12 @@ function getServerSnapshot(): EmployerSetupState {
 }
 
 export function emitSetupChanged() {
-  window.dispatchEvent(new Event('cxr-admin-setup'))
+  window.dispatchEvent(new Event('ngb-admin-setup'))
 }
 
 export function writeEmployerSetup(partial: Partial<EmployerSetupState>) {
-  const next = { ...readSetup(), ...partial }
+  const raw = typeof window !== 'undefined' ? localStorage.getItem(SETUP_STORAGE_KEY) : null
+  const next = { ...parseSetup(raw), ...partial }
   localStorage.setItem(SETUP_STORAGE_KEY, JSON.stringify(next))
   emitSetupChanged()
 }

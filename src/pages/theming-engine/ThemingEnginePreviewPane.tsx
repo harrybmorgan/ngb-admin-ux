@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { Button } from "@wexinc-healthbenefits/ben-ui-kit";
 import { Moon, Sun } from "lucide-react";
@@ -35,6 +35,10 @@ function getHighlightStyle(activeColorKey: keyof BrandColors): string {
  * Tailwind rounded-* utility (rounded-sm/md/lg are all calc(var(--radius) ± Xpx)),
  * which would alter every component in the preview.
  */
+/** Logical width the dashboard is composed for; scale down when the pane is narrower. */
+const PREVIEW_REFERENCE_WIDTH_PX = 1040;
+const PREVIEW_HORIZONTAL_INSET_PX = 20;
+
 const PREVIEW_SCOPED_STYLE = `
   [data-theming-preview] [data-preview-card] {
     border-radius: var(--preview-card-radius, 8px) !important;
@@ -50,18 +54,38 @@ const PREVIEW_SCOPED_STYLE = `
   }
 `;
 
-export function ThemingEnginePreviewPane() {
+export function ThemingEnginePreviewPane({ embedded = false }: { embedded?: boolean }) {
   const { watch } = useFormContext<ThemingEngineFormValues>();
   const values = watch() as ThemingEngineFormValues | undefined;
   const { activeColorKey } = useThemingEngineHighlight();
   const [darkMode, setDarkMode] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [previewZoom, setPreviewZoom] = useState(1);
   const themeVars = values ? themeToCssVars(values, darkMode) : {};
-  const style = { ...themeVars } as React.CSSProperties;
+  const style = { ...themeVars, zoom: previewZoom } as React.CSSProperties;
   const showHighlight = activeColorKey != null;
 
+  useLayoutEffect(() => {
+    const node = viewportRef.current;
+    if (!node) return;
+
+    const update = () => {
+      const w = node.clientWidth;
+      if (w <= 0) return;
+      const available = Math.max(160, w - PREVIEW_HORIZONTAL_INSET_PX);
+      const z = Math.min(1, Math.max(0.48, available / PREVIEW_REFERENCE_WIDTH_PX));
+      setPreviewZoom(z);
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="shrink-0 flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-b border-border bg-background">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-border bg-background px-6 py-4">
         <h2 className="text-lg font-display font-semibold text-foreground">Preview</h2>
         <Button
           type="button"
@@ -76,17 +100,22 @@ export function ThemingEnginePreviewPane() {
         </Button>
       </div>
       <div
+        ref={viewportRef}
         className={cn(
-          "flex-1 min-h-0 overflow-auto transition-colors",
-          darkMode && "dark bg-zinc-900"
+          "box-border min-h-0 flex-1 overflow-x-hidden px-2.5 transition-colors",
+          embedded ? "overflow-y-auto" : "overflow-auto",
+          darkMode && "dark bg-zinc-900",
         )}
       >
         <div
           className={cn(
-            "min-h-full bg-background text-foreground",
-            darkMode && "bg-zinc-800 text-zinc-100"
+            "mx-auto box-border min-h-full min-w-0 bg-background text-foreground",
+            darkMode && "bg-zinc-800 text-zinc-100",
           )}
-          style={style}
+          style={{
+            ...style,
+            width: PREVIEW_REFERENCE_WIDTH_PX,
+          }}
           data-theming-preview
         >
           <style dangerouslySetInnerHTML={{ __html: PREVIEW_SCOPED_STYLE }} />

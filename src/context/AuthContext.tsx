@@ -9,7 +9,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const SESSION_STORAGE_KEY = 'cxr_admin_authenticated'
+const SESSION_STORAGE_KEY = 'ngb_admin_authenticated'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {

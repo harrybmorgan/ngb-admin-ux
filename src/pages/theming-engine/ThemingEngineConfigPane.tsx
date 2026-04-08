@@ -10,14 +10,20 @@ import { Upload } from "lucide-react";
 import type { ThemingEngineFormValues } from "./schema";
 import { BrandColorsTab } from "./BrandColorsTab";
 import { StylesTab } from "./StylesTab";
+import { cn } from "@/lib/utils";
 
 const LOGO_ACCEPT = "image/png,image/svg+xml,.png,.svg";
 
-export function ThemingEngineConfigPane() {
+export function ThemingEngineConfigPane({ embedded = false }: { embedded?: boolean }) {
   const { control } = useFormContext<ThemingEngineFormValues>();
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto px-6 py-5 space-y-4">
+    <div
+      className={cn(
+        "flex min-w-0 flex-col space-y-4 overflow-y-auto px-6 py-5",
+        embedded ? "h-full min-h-0 flex-1" : "h-full",
+      )}
+    >
       <p className="text-sm text-muted-foreground">
         Customize the application appearance.
       </p>

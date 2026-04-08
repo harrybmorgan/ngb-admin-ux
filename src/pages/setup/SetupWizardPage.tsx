@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { EmbeddedThemingStudio } from '@/pages/theming-engine/EmbeddedThemingStudio'
 import {
   Badge,
   Button,
@@ -10,8 +11,6 @@ import {
   CardTitle,
   Checkbox,
   FloatLabel,
-  Progress,
-  Separator,
   Sheet,
   SheetContent,
   SheetHeader,
@@ -23,13 +22,14 @@ import {
   TableHeader,
   TableRow,
 } from '@wexinc-healthbenefits/ben-ui-kit'
-import { ChevronLeft, ChevronRight, Save, SkipForward } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, SkipForward } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import { CONNECTORS, EMPLOYER, PRODUCT_OPTIONS } from '@/data/adminMockData'
 import { emitSetupChanged, writeEmployerSetup } from '@/hooks/useEmployerSetup'
 
-const WIZARD_DRAFT_KEY = 'cxr_admin_wizard_draft'
+const WIZARD_DRAFT_KEY = 'ngb_admin_wizard_draft'
 
 const STEP_LABELS = [
   'Company profile',
@@ -39,7 +39,7 @@ const STEP_LABELS = [
   'Plans & rates',
   'Eligibility rules',
   'Data integrations',
-  'Branding note',
+  'Branding',
   'Review & launch',
 ] as const
 
@@ -83,7 +83,6 @@ export default function SetupWizardPage() {
 
   const stepIndex = draft.stepIndex
   const totalSteps = STEP_LABELS.length
-  const progressPct = Math.round(((stepIndex + 1) / totalSteps) * 100)
 
   const go = useCallback((delta: number) => {
     setDraft((d) => {
@@ -123,38 +122,29 @@ export default function SetupWizardPage() {
         return (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Pulled automatically from your broker file and IRS records. Shelly can correct details with one support
-              ticket if anything looks off.
+              Pulled automatically from your broker file and IRS records. You can correct details with one support ticket
+              if anything looks off.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <FloatLabel label="Company name">
-                <input
-                  readOnly
-                  className="w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm"
-                  value={EMPLOYER.name}
-                />
-              </FloatLabel>
-              <FloatLabel label="Federal Tax ID (EIN)">
-                <input
-                  readOnly
-                  className="w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm"
-                  value={EMPLOYER.ein}
-                />
-              </FloatLabel>
-              <FloatLabel label="Payroll frequency">
-                <input
-                  readOnly
-                  className="w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm"
-                  value={EMPLOYER.payrollFrequency}
-                />
-              </FloatLabel>
-              <FloatLabel label="Total employees">
-                <input
-                  readOnly
-                  className="w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm"
-                  value={String(EMPLOYER.employeeCount)}
-                />
-              </FloatLabel>
+              <FloatLabel
+                label="Company name"
+                readOnly
+                className="bg-muted/50"
+                value={EMPLOYER.name}
+              />
+              <FloatLabel label="Federal Tax ID (EIN)" readOnly className="bg-muted/50" value={EMPLOYER.ein} />
+              <FloatLabel
+                label="Payroll frequency"
+                readOnly
+                className="bg-muted/50"
+                value={EMPLOYER.payrollFrequency}
+              />
+              <FloatLabel
+                label="Total employees"
+                readOnly
+                className="bg-muted/50"
+                value={String(EMPLOYER.employeeCount)}
+              />
             </div>
           </div>
         )
@@ -381,19 +371,18 @@ export default function SetupWizardPage() {
         )
       case 7:
         return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              High-impact customization for the employee portal: site-wide colors, typography, logo, hero imagery, and
-              navigation labels. Use the same studio Shelly’s broker previewed (Elizabeth’s flow).
-            </p>
-            <Button asChild>
-              <Link to="/theming">Open branding studio</Link>
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              When you’re done in the studio, return here and continue to Review & launch. This step can be skipped and
-              finished later.
-            </p>
-          </div>
+          <>
+            <div className="shrink-0 space-y-2 px-6 pt-1 pb-3">
+              <p className="text-sm text-muted-foreground">
+                High-impact customization for the employee portal: site-wide colors, typography, logo, hero imagery, and
+                navigation labels. Adjust below or use <strong className="font-medium text-foreground">Skip for now</strong>{' '}
+                to finish later — the same studio is available anytime from your account menu.
+              </p>
+            </div>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col border-t border-border">
+              <EmbeddedThemingStudio variant="embedded" />
+            </div>
+          </>
         )
       case 8:
         return (
@@ -401,7 +390,7 @@ export default function SetupWizardPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Pre-launch checklist</CardTitle>
-                <CardDescription>Shelly confirms the essentials before employees receive invites.</CardDescription>
+                <CardDescription>You confirm the essentials before employees receive invites.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <label className="flex items-center gap-2">
@@ -438,72 +427,121 @@ export default function SetupWizardPage() {
   })()
 
   return (
-    <div className="flex min-h-screen flex-col bg-muted/20">
+    <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-6 space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">Guided employer setup</h1>
-            <Badge intent="info">
-              Step {stepIndex + 1} of {totalSteps}
-            </Badge>
-          </div>
-          <Progress value={progressPct} className="h-2" />
-          <p className="text-sm text-muted-foreground">{STEP_LABELS[stepIndex]}</p>
-        </div>
+      <main
+        className={cn(
+          'mx-auto w-full flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8',
+          stepIndex === 7
+            ? 'flex max-w-none min-h-0 flex-col'
+            : 'max-w-6xl lg:max-w-7xl',
+        )}
+      >
+        <header className={cn('mb-6 lg:mb-8', stepIndex === 7 && 'mb-4 shrink-0 lg:mb-5')}>
+          <h1 className="text-2xl font-bold tracking-tight">Guided employer setup</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Step {stepIndex + 1} of {totalSteps} · {STEP_LABELS[stepIndex]}
+          </p>
+        </header>
 
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>{STEP_LABELS[stepIndex]}</CardTitle>
-            <CardDescription>Progress saves automatically in this browser.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">{stepBody}</CardContent>
-        </Card>
+        <div
+          className={cn(
+            'flex flex-col gap-8 lg:flex-row lg:gap-10',
+            stepIndex === 7 ? 'min-h-0 flex-1 lg:items-stretch' : 'lg:items-start',
+          )}
+        >
+          <aside className={cn('order-2 shrink-0 lg:order-1 lg:w-52 xl:w-56', stepIndex === 7 && 'lg:w-48 xl:w-52')}>
+            <nav aria-label="Setup steps" className="lg:sticky lg:top-24">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Steps</p>
+              <ol className="scrollbar-hide flex flex-nowrap gap-1 overflow-x-auto pb-1 lg:flex-col lg:flex-wrap lg:gap-0 lg:overflow-visible lg:pb-0">
+                {STEP_LABELS.map((label, i) => {
+                  const done = i < stepIndex
+                  const current = i === stepIndex
+                  return (
+                    <li key={label} className="shrink-0 lg:w-full lg:shrink">
+                      <button
+                        type="button"
+                        onClick={() => setDraft((d) => ({ ...d, stepIndex: i }))}
+                        className={cn(
+                          'flex w-full items-center gap-2.5 rounded-md py-1.5 text-left text-[13px] leading-tight transition-colors lg:border-l-2 lg:border-transparent lg:py-2 lg:pl-3 lg:pr-2',
+                          current &&
+                            'bg-primary/8 font-medium text-foreground lg:border-primary lg:bg-primary/[0.06]',
+                          done && !current && 'text-muted-foreground hover:text-foreground',
+                          !done && !current && 'text-muted-foreground/80 hover:text-muted-foreground',
+                        )}
+                        aria-current={current ? 'step' : undefined}
+                      >
+                        <span
+                          className={cn(
+                            'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums lg:h-5 lg:w-5 lg:text-[9px]',
+                            current && 'bg-primary text-primary-foreground',
+                            done && !current && 'bg-emerald-600/90 text-white',
+                            !done && !current && 'bg-muted/80 text-muted-foreground',
+                          )}
+                          aria-hidden
+                        >
+                          {done ? <Check className="h-3 w-3" strokeWidth={2.5} /> : i + 1}
+                        </span>
+                        <span className="min-w-[8rem] max-w-[12rem] truncate sm:max-w-none lg:whitespace-normal lg:leading-snug">
+                          {label}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ol>
+            </nav>
+          </aside>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" disabled={stepIndex === 0} onClick={() => go(-1)} className="gap-1">
-              <ChevronLeft className="h-4 w-4" />
-              Back
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={stepIndex >= totalSteps - 1}
-              onClick={() => go(1)}
-              className="gap-1"
+          <div
+            className={cn(
+              'order-1 min-w-0 flex-1',
+              stepIndex === 7 ? 'flex min-h-0 flex-col gap-4' : 'space-y-5',
+            )}
+          >
+            <Card className={cn('shadow-sm', stepIndex === 7 && 'flex min-h-0 flex-1 flex-col overflow-hidden')}>
+              <CardHeader className={cn('pb-4', stepIndex === 7 && 'shrink-0 px-6 pb-3')}>
+                <CardTitle className="text-xl">{STEP_LABELS[stepIndex]}</CardTitle>
+                <CardDescription>Progress saves automatically in this browser.</CardDescription>
+              </CardHeader>
+              <CardContent
+                className={cn(
+                  stepIndex === 7 ? 'flex min-h-0 flex-1 flex-col space-y-0 p-0' : 'space-y-6',
+                )}
+              >
+                {stepBody}
+              </CardContent>
+            </Card>
+
+            <div
+              className={cn(
+                'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between',
+                stepIndex === 7 && 'shrink-0',
+              )}
             >
-              Next
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="ghost" className="gap-1 text-muted-foreground" onClick={() => saveDraft(draft)}>
-              <Save className="h-4 w-4" />
-              Saved
-            </Button>
-            <Button type="button" variant="outline" className="gap-1" onClick={skip} disabled={stepIndex >= totalSteps - 1}>
-              <SkipForward className="h-4 w-4" />
-              Skip for now
-            </Button>
+              <div className="flex flex-wrap gap-2">
+                {stepIndex > 0 ? (
+                  <Button type="button" variant="outline" onClick={() => go(-1)} className="gap-1">
+                    <ChevronLeft className="h-4 w-4" />
+                    Back
+                  </Button>
+                ) : null}
+              </div>
+              {stepIndex < totalSteps - 1 ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="ghost" className="gap-1 text-muted-foreground" onClick={skip}>
+                    <SkipForward className="h-4 w-4" />
+                    Skip for now
+                  </Button>
+                  <Button type="button" variant="outline" className="gap-1" onClick={() => go(1)}>
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
-
-        <Separator className="my-8" />
-        <nav aria-label="Setup steps" className="flex flex-wrap gap-2">
-          {STEP_LABELS.map((label, i) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => setDraft((d) => ({ ...d, stepIndex: i }))}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                i === stepIndex ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'
-              }`}
-            >
-              {i + 1}. {label}
-            </button>
-          ))}
-        </nav>
       </main>
       <AdminFooter />
     </div>

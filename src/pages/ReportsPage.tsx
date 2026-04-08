@@ -21,7 +21,7 @@ import { AdminFooter } from '@/components/layout/AdminFooter'
 import { REPORT_LIBRARY } from '@/data/adminMockData'
 
 const kpis = [
-  { service: 'Overview', label: 'Enrollment completion', value: '94%', detail: 'OE 2026 cohort' },
+  { service: 'Overview', label: 'Roster completion', value: '94%', detail: 'OE 2026 cohort' },
   { service: 'BenAdmin', label: 'Pending life events', value: '12', detail: 'Avg age 3.2 days' },
   { service: 'COBRA & Direct Bill', label: 'COBRA pay rate', value: '98.1%', detail: 'Last 90 days' },
   { service: 'Accounts Payments', label: 'HSA / FSA funding', value: '$182k', detail: 'This pay cycle' },
@@ -31,13 +31,13 @@ export default function ReportsPage() {
   const [nl, setNl] = useState('')
 
   return (
-    <div className="flex min-h-screen flex-col bg-muted/15">
+    <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
       <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-8 px-4 py-8 sm:px-6 lg:px-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Reporting & analytics</h1>
           <p className="text-sm text-muted-foreground">
-            Natural language report ideas, Shelly’s service dashboard, and a searchable report library.
+            Natural language report ideas, your service dashboard, and a searchable report library.
           </p>
         </div>
 

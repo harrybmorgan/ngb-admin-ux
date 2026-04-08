@@ -1,4 +1,4 @@
-# cxr-admin-ux
+# ngb-admin-ux
 
 WEX-branded **employer admin** prototype that pairs with the consumer experience in [cxr-ux](../cxr-ux). Primary persona: **Shelly**, an HR admin at a small/mid-market employer (Summit Ridge Bakery Co. demo data).
 
@@ -23,14 +23,14 @@ WEX-branded **employer admin** prototype that pairs with the consumer experience
 ## What’s included
 
 - **Login**: First-time flow (username + temporary password → create new password).
-- **Dashboard**: CXR-style hero, onboarding CTA, gated “frequent tasks,” launch status (localStorage).
+- **Dashboard**: Consumer-style hero, onboarding CTA, gated “frequent tasks,” launch status (localStorage).
 - **Setup wizard**: Company profile, employees, products, plan framework, rates decoupling, eligibility, integrations + mapping wizard sheet, branding handoff, review & launch.
 - **Enrollment**: Searchable/paginated roster, quick-add menu, person detail sheet with tabs.
 - **Billing & invoicing**: Tabs for marketplace financials, reconciliation, payment methods, COBRA counts, accounting tools.
 - **Reporting & analytics**: NL prompt, service KPI cards, report library.
 - **Content**: Documents / videos / tutorials + drag-drop placeholder.
 - **Communications**: Builder, delivery settings, employee prefs, provisioning templates.
-- **Branding**: Full theming engine (same module set as cxr-ux “Elizabeth” / partner appearance studio).
+- **Branding**: Full theming engine (same module set as `cxr-ux` “Elizabeth” / partner appearance studio).
 
 ## Related repo
 

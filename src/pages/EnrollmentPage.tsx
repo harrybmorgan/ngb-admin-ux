@@ -12,7 +12,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   FloatLabel,
-  Input,
   Select,
   SelectContent,
   SelectItem,
@@ -59,11 +58,11 @@ export default function EnrollmentPage() {
   const slice = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
 
   return (
-    <div className="flex min-h-screen flex-col bg-muted/15">
+    <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
       <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Enrollment & life events</h1>
+          <h1 className="text-2xl font-bold tracking-tight">People</h1>
           <p className="text-sm text-muted-foreground">
             Search people, open profiles, and use quick adds — all census fields in one prototype workspace.
           </p>
@@ -103,9 +102,15 @@ export default function EnrollmentPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-              <FloatLabel label="Search" className="min-w-[200px] flex-1">
-                <Input value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} placeholder="Name or plan" />
-              </FloatLabel>
+              <FloatLabel
+                label="Search"
+                containerClassName="min-w-[200px] flex-1"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value)
+                  setPage(0)
+                }}
+              />
               <div className="w-full min-w-[160px] sm:w-48">
                 <span className="mb-1 block text-xs font-medium text-muted-foreground">Status</span>
                 <Select value={status} onValueChange={(v) => { setStatus(v); setPage(0); }}>

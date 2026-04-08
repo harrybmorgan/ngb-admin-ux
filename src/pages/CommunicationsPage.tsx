@@ -16,7 +16,7 @@ import { AdminFooter } from '@/components/layout/AdminFooter'
 
 export default function CommunicationsPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-muted/15">
+    <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
       <main className="mx-auto w-full max-w-[1100px] flex-1 space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         <div>
@@ -78,7 +78,7 @@ export default function CommunicationsPage() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Button type="button">Send test to Shelly</Button>
+                  <Button type="button">Send yourself a test</Button>
                   <Button type="button" variant="outline">
                     Schedule send
                   </Button>

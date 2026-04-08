@@ -9,7 +9,7 @@ import { defaultThemingEngineValues, themingEngineImportSchema } from "./schema"
 const EDITING_THEME_FOR = "Acme Corp (Employer Instance)";
 const THEME_EXPORT_FILENAME = "theme-export.json";
 
-export function ThemingEngineTopBar() {
+export function ThemingEngineTopBar({ embedded = false }: { embedded?: boolean }) {
   const { handleSubmit, reset, getValues } = useFormContext<ThemingEngineFormValues>();
   const navigate = useNavigate();
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -121,14 +121,11 @@ export function ThemingEngineTopBar() {
           <Separator orientation="vertical" className="mx-1 h-5" />
 
           {/* Primary navigation actions */}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(-1)}
-          >
-            Cancel
-          </Button>
+          {!embedded && (
+            <Button type="button" variant="outline" size="sm" onClick={() => navigate(-1)}>
+              Cancel
+            </Button>
+          )}
           <Button type="submit" size="sm" onClick={handleSubmit(onSubmit)}>
             Publish Theme
           </Button>

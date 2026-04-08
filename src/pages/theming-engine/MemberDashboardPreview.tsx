@@ -96,7 +96,7 @@ export function MemberDashboardPreview() {
 
       {/* ─── Banner Placeholder ──────────────────────────────── */}
       <section
-        className="px-6 py-8 flex items-center justify-between gap-6"
+        className="flex items-center justify-between gap-5 px-5 py-7 min-w-0"
         style={{ backgroundColor: "var(--theme-page-bg)" }}
         data-theme-token="pageBg"
       >
@@ -115,7 +115,7 @@ export function MemberDashboardPreview() {
 
       {/* ─── Bento Box Grid ──────────────────────────────────── */}
       <div
-        className="flex-1 px-6 pb-6 grid grid-cols-2 gap-4 items-start"
+        className="grid flex-1 grid-cols-2 items-start gap-4 px-5 pb-6 min-w-0"
         style={{ backgroundColor: "var(--theme-page-bg)" }}
       >
 
@@ -146,7 +146,7 @@ export function MemberDashboardPreview() {
         </Card>
 
         {/* Recent Transactions */}
-        <Card data-preview-card>
+        <Card data-preview-card className="min-w-0">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base font-semibold">Recent Transactions</CardTitle>
             <button className="text-xs font-medium flex items-center gap-0.5" style={{ color: "var(--theme-primary)" }} data-theme-token="primary">
