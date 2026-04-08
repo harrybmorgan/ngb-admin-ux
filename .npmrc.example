@@ -1,0 +1,4 @@
+# Copy to `.npmrc` and add your Artifactory token for @wexinc-healthbenefits packages.
+# Example (replace with your org’s registry host and auth):
+# @wexinc-healthbenefits:registry=https://usartifactorywexinc.jfrog.io/artifactory/api/npm/benefits-npm/
+# //usartifactorywexinc.jfrog.io/artifactory/api/npm/benefits-npm/:_authToken=<YOUR_TOKEN>
