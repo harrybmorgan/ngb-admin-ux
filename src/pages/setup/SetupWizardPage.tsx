@@ -892,7 +892,7 @@ export default function SetupWizardPage() {
                   </TableBody>
                 </Table>
                 <Button type="button" variant="outline" size="sm">
-                  Adjust role matrix
+                  Add new person
                 </Button>
               </CardContent>
             </Card>
@@ -1889,7 +1889,7 @@ export default function SetupWizardPage() {
             stepIndex === PREVIEW_EMPLOYEE_TASK_INDEX ? 'min-h-0 flex-1 lg:items-stretch' : 'lg:items-start',
           )}
         >
-          <aside className="order-2 shrink-0 lg:order-1 lg:w-[17.5rem] xl:w-[18.5rem]">
+          <aside className="order-2 min-w-0 shrink-0 lg:order-1 lg:w-[18.5rem] xl:w-[20rem]">
             <nav aria-labelledby="setup-steps-heading" className="lg:sticky lg:top-24">
               <p
                 id="setup-steps-heading"
@@ -1956,8 +1956,10 @@ export default function SetupWizardPage() {
                           ) : null}
                         </span>
                         <span className="min-w-0 flex-1 pt-0.5">
-                          <span className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-sm font-semibold leading-snug text-foreground">{wizardStep.title}</span>
+                          <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+                            <span className="min-w-0 max-w-full break-words text-sm font-semibold leading-snug text-foreground">
+                              {wizardStep.title}
+                            </span>
                             {isConnectSystemsStep ? (
                               <Badge
                                 intent="outline"
@@ -1979,11 +1981,13 @@ export default function SetupWizardPage() {
                             ) : null}
                           </span>
                           {!stepRowSelected ? (
-                            <span className="mt-0.5 block text-xs tabular-nums leading-snug text-muted-foreground">
+                            <span className="mt-0.5 block break-words text-xs tabular-nums leading-snug text-muted-foreground">
                               {reqSummaryShort}
                             </span>
                           ) : (
-                            <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{wizardStep.navHint}</span>
+                            <span className="mt-0.5 block break-words text-xs leading-snug text-muted-foreground">
+                              {wizardStep.navHint}
+                            </span>
                           )}
                         </span>
                       </button>
@@ -2009,7 +2013,7 @@ export default function SetupWizardPage() {
                                     type="button"
                                     onClick={() => goToTask(taskIdx)}
                                     className={cn(
-                                      'flex w-full items-center gap-2 rounded-r-md py-2 pl-2.5 pr-2 text-left text-sm leading-tight transition-colors',
+                                      'flex w-full min-w-0 items-start gap-2 rounded-r-md py-2 pl-2.5 pr-2 text-left text-sm leading-snug transition-colors',
                                       current &&
                                         !blocked &&
                                         'border-l-[3px] border-primary bg-primary/10 font-medium text-primary',
@@ -2021,10 +2025,12 @@ export default function SetupWizardPage() {
                                     aria-current={current ? 'step' : undefined}
                                     aria-label={`${label}, ${showOptionalTaskBadge ? 'Optional. ' : CONNECT_SYSTEMS_TASK_IDS.has(taskIdx) ? 'Part of optional Connect Systems step. ' : ''}${TASK_STATUS_LABEL[navStatus]}${blocked ? '. You can open this to preview; finish earlier steps to complete it.' : ''}`}
                                   >
-                                    <TaskStatusGlyph status={navStatus} taskNumber={taskOrd + 1} />
+                                    <span className="shrink-0 self-start pt-px">
+                                      <TaskStatusGlyph status={navStatus} taskNumber={taskOrd + 1} />
+                                    </span>
                                     <span
                                       className={cn(
-                                        'min-w-0 flex-1 truncate',
+                                        'min-w-0 flex-1 break-words',
                                         current && !blocked && 'text-primary',
                                         navStatus === 'skipped' && 'text-amber-900 line-through decoration-amber-700/50 dark:text-amber-200',
                                         navStatus === 'waiting_on_others' && 'text-sky-900 dark:text-sky-100',
