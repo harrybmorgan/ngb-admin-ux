@@ -1,0 +1,82 @@
+# Build and deploy the Vite app to GitHub Pages (project site: /<repo>/).
+#
+# One-time repo setup:
+#   Settings → Pages → Build and deployment → Source: GitHub Actions
+#   Settings → Secrets and variables → Actions → repository secrets:
+#     ARTIFACTORY_NPM_TOKEN     — JFrog identity / access token (npm “password”)
+#     ARTIFACTORY_NPM_USERNAME  — optional: your Artifactory email (or username). If E401 persists
+#                                 with token-only auth, add this so CI uses _auth = base64(user:token)
+#                                 (same as `npm login` to JFrog).
+#
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      # JFrog npm auth: many WEX setups expect Basic _auth (email:identityToken), not bare _authToken.
+      # Default registry stays npmjs so public deps are not sent to Artifactory without credentials.
+      - name: Install dependencies
+        env:
+          ARTIFACTORY_NPM_TOKEN: ${{ secrets.ARTIFACTORY_NPM_TOKEN }}
+          ARTIFACTORY_NPM_USERNAME: ${{ secrets.ARTIFACTORY_NPM_USERNAME }}
+        run: |
+          if [ -z "$ARTIFACTORY_NPM_TOKEN" ]; then
+            echo "::error::Add repository secret ARTIFACTORY_NPM_TOKEN (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          REGISTRY_URL='https://usartifactorywexinc.jfrog.io/artifactory/api/npm/benefits-npm'
+          AUTH_PREFIX='//usartifactorywexinc.jfrog.io/artifactory/api/npm/benefits-npm/'
+          {
+            echo 'registry=https://registry.npmjs.org/'
+            echo "@wexinc-healthbenefits:registry=${REGISTRY_URL}/"
+            if [ -n "${ARTIFACTORY_NPM_USERNAME:-}" ]; then
+              AUTH=$(printf '%s:%s' "$ARTIFACTORY_NPM_USERNAME" "$ARTIFACTORY_NPM_TOKEN" | base64 -w0)
+              echo "${AUTH_PREFIX}:_auth=${AUTH}"
+              echo "${AUTH_PREFIX}:email=${ARTIFACTORY_NPM_USERNAME}"
+            else
+              printf '%s:_authToken=%s\n' "$AUTH_PREFIX" "$ARTIFACTORY_NPM_TOKEN"
+            fi
+            echo "${AUTH_PREFIX}:always-auth=true"
+          } > .npmrc
+          npm ci --ignore-scripts
+
+      - name: Build
+        env:
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+        run: npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
