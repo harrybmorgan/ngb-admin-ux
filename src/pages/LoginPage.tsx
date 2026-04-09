@@ -80,7 +80,8 @@ export default function LoginPage() {
     }
     setCodeError(false)
     setSelectedPersona(null)
-    setStep('selectAccount')
+    setPasswordSubmitAttempted(false)
+    setStep('resetPassword')
   }
 
   const onSelectAccountContinue = () => {
@@ -92,8 +93,8 @@ export default function LoginPage() {
       navigate('/member-handoff', { replace: true })
       return
     }
-    setPasswordSubmitAttempted(false)
-    setStep('resetPassword')
+    login()
+    navigate('/', { replace: true })
   }
 
   const onResetComplete = (e: React.FormEvent) => {
@@ -103,8 +104,8 @@ export default function LoginPage() {
     if (!passwordMinLengthMet || !passwordsMatchMet) {
       return
     }
-    login()
-    navigate('/', { replace: true })
+    setSelectedPersona('admin')
+    setStep('selectAccount')
   }
 
   const handleResendMfa = () => {
@@ -120,18 +121,18 @@ export default function LoginPage() {
       ? 'Welcome'
       : step === 'mfa'
         ? 'Verify your identity'
-        : step === 'selectAccount'
-          ? 'Select an account'
-          : 'Create your password'
+        : step === 'resetPassword'
+          ? 'Set your new password'
+          : 'Select an account'
 
   const headerSubtitle =
     step === 'credentials'
       ? 'Please enter your username and temporary password to get started.'
       : step === 'mfa'
         ? "We've sent an email with your code to the address you have on file."
-        : step === 'selectAccount'
-          ? "Please select which account you'd like to access."
-          : `Choose a strong password for ${username.trim() || 'your account'}.`
+        : step === 'resetPassword'
+          ? 'Choose a strong password to secure your account.'
+          : "Please select which account you'd like to access."
 
   return (
     <div className="login-portal-bg flex min-h-screen flex-col">
@@ -307,69 +308,56 @@ export default function LoginPage() {
                     <p className="text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {EMPLOYER.name}
                     </p>
-                    <div
-                      className="flex flex-col gap-2"
-                      role="radiogroup"
-                      aria-label="Choose how you want to sign in"
-                    >
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={selectedPersona === 'admin'}
-                        onClick={() => setSelectedPersona('admin')}
-                        className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                          selectedPersona === 'admin'
-                            ? 'border-[hsl(var(--wex-primary))] bg-[hsl(var(--wex-primary))]/5'
-                            : 'border-border hover:border-muted-foreground/40 hover:bg-muted/30'
-                        }`}
+                    <div className="flex flex-col gap-2">
+                      <div role="radiogroup" aria-label="Choose how you want to sign in">
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={selectedPersona === 'admin'}
+                          onClick={() => setSelectedPersona('admin')}
+                          className={`w-full rounded-lg border p-4 text-left transition-colors ${
+                            selectedPersona === 'admin'
+                              ? 'border-[hsl(var(--wex-primary))] bg-[hsl(var(--wex-primary))]/5'
+                              : 'border-border hover:border-muted-foreground/40 hover:bg-muted/30'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`flex h-4 w-4 shrink-0 rounded-full border-2 ${
+                                selectedPersona === 'admin'
+                                  ? 'border-[hsl(var(--wex-primary))] bg-[hsl(var(--wex-primary))]'
+                                  : 'border-muted-foreground/50'
+                              }`}
+                              aria-hidden
+                            />
+                            <Building2 className="h-5 w-5 text-foreground" aria-hidden />
+                            <div>
+                              <p className="text-[16px] font-semibold leading-6 text-foreground">Admin</p>
+                              <p className="text-[13px] leading-5 text-muted-foreground">
+                                Plans, people, billing, and reporting for your organization
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      </div>
+                      <div
+                        className="rounded-lg border border-dashed border-border bg-muted/30 p-4 text-left"
+                        aria-disabled="true"
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 opacity-70">
                           <span
-                            className={`flex h-4 w-4 shrink-0 rounded-full border-2 ${
-                              selectedPersona === 'admin'
-                                ? 'border-[hsl(var(--wex-primary))] bg-[hsl(var(--wex-primary))]'
-                                : 'border-muted-foreground/50'
-                            }`}
+                            className="flex h-4 w-4 shrink-0 rounded-full border-2 border-muted-foreground/35"
                             aria-hidden
                           />
-                          <Building2 className="h-5 w-5 text-foreground" aria-hidden />
-                          <div>
-                            <p className="text-[16px] font-semibold leading-6 text-foreground">Employer admin</p>
+                          <User className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+                          <div className="min-w-0">
+                            <p className="text-[16px] font-semibold leading-6 text-muted-foreground">Employee</p>
                             <p className="text-[13px] leading-5 text-muted-foreground">
-                              Plans, people, billing, and reporting for your organization
+                              Medical, spending, and claims in the member portal.
                             </p>
                           </div>
                         </div>
-                      </button>
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={selectedPersona === 'employee'}
-                        onClick={() => setSelectedPersona('employee')}
-                        className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                          selectedPersona === 'employee'
-                            ? 'border-[hsl(var(--wex-primary))] bg-[hsl(var(--wex-primary))]/5'
-                            : 'border-border hover:border-muted-foreground/40 hover:bg-muted/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`flex h-4 w-4 shrink-0 rounded-full border-2 ${
-                              selectedPersona === 'employee'
-                                ? 'border-[hsl(var(--wex-primary))] bg-[hsl(var(--wex-primary))]'
-                                : 'border-muted-foreground/50'
-                            }`}
-                            aria-hidden
-                          />
-                          <User className="h-5 w-5 text-foreground" aria-hidden />
-                          <div>
-                            <p className="text-[16px] font-semibold leading-6 text-foreground">Employee</p>
-                            <p className="text-[13px] leading-5 text-muted-foreground">
-                              Medical, spending, and claims in the member portal
-                            </p>
-                          </div>
-                        </div>
-                      </button>
+                      </div>
                     </div>
 
                     <button
@@ -392,12 +380,9 @@ export default function LoginPage() {
                         type="button"
                         variant="outline"
                         className="h-10 w-full rounded-lg text-[14px] font-medium"
-                        onClick={() => {
-                          issueMfaCode()
-                          setStep('mfa')
-                        }}
+                        onClick={() => setStep('resetPassword')}
                       >
-                        Cancel
+                        Back
                       </Button>
                     </div>
                   </div>
@@ -493,13 +478,13 @@ export default function LoginPage() {
                         className="h-10 flex-1 rounded-lg"
                         onClick={() => {
                           setPasswordSubmitAttempted(false)
-                          setStep('selectAccount')
+                          setStep('mfa')
                         }}
                       >
                         Back
                       </Button>
                       <Button type="submit" className="h-10 flex-1 rounded-lg text-[14px] font-medium">
-                        Save & sign in
+                        Continue
                       </Button>
                     </div>
                   </form>

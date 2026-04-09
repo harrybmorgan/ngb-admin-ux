@@ -5,7 +5,7 @@ export const EMPLOYER = {
   ein: '84-1029384',
   payrollFrequency: 'Bi-weekly (26)',
   employeeCount: 48,
-  hrAdminName: 'Shelly Nguyen',
+  hrAdminName: 'Shelly Hamilton',
   hrAdminEmail: 'shelly.nguyen@summitridgebakery.com',
 }
 
@@ -114,7 +114,7 @@ export const REPORT_LIBRARY = [
   {
     id: 'r2',
     name: 'COBRA notice delivery log',
-    author: 'Shelly Nguyen',
+    author: 'Shelly Hamilton',
     service: 'COBRA & Direct Bill',
     updated: '2026-03-29',
   },

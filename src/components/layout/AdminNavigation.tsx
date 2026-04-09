@@ -23,8 +23,8 @@ import {
   Mail,
   Menu,
   Palette,
-  Search,
   Settings,
+  Ticket,
   User,
   Users,
 } from 'lucide-react'
@@ -72,7 +72,10 @@ export function AdminNavigation({ hideNav = false }: AdminNavigationProps) {
 
         {!hideNav && (
           <>
-            <nav className="ml-2 hidden flex-1 flex-wrap items-center gap-1 lg:flex">
+            {/* Push primary nav + account controls to the right (away from logo) */}
+            <div className="min-w-0 flex-1" aria-hidden="true" />
+
+            <nav className="hidden shrink-0 flex-wrap items-center gap-1 lg:flex">
               {mainNav.map(({ to, label, icon: Icon }) => {
                 const active = isActive(to)
                 return (
@@ -103,18 +106,7 @@ export function AdminNavigation({ hideNav = false }: AdminNavigationProps) {
               })}
             </nav>
 
-            <div className="ml-auto flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="hidden gap-2 sm:inline-flex"
-                onClick={() => navigate('/enrollment')}
-              >
-                <Search className="h-4 w-4" />
-                Find person
-              </Button>
-
+            <div className="flex shrink-0 items-center gap-2">
               <Sheet open={open} onOpenChange={setOpen}>
                 <SheetTrigger asChild>
                   <Button type="button" variant="ghost" size="icon" className="lg:hidden" aria-label="Open menu">
@@ -166,6 +158,10 @@ export function AdminNavigation({ hideNav = false }: AdminNavigationProps) {
                   <DropdownMenuItem onClick={() => navigate('/settings')}>
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/tickets')}>
+                    <Ticket className="mr-2 h-4 w-4" />
+                    Tickets
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/theming')}>
                     <Palette className="mr-2 h-4 w-4" />

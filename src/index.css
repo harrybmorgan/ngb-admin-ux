@@ -452,3 +452,9 @@ button[role="checkbox"][data-state="indeterminate"] svg {
 .wex-ai-gradient-send:hover {
   background: linear-gradient(135deg, #2e0550 0%, #4c1d95 42%, #831843 78%, #9f1239 100%);
 }
+
+/* Dashboard welcome hero CTA: keep gradient + white label over router link defaults */
+a.dashboard-welcome-cta.wex-ai-gradient-send,
+a.dashboard-welcome-cta.wex-ai-gradient-send:visited {
+  color: #fff;
+}
