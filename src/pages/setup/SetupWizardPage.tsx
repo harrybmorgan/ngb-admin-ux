@@ -431,10 +431,8 @@ export default function SetupWizardPage() {
       <AdminNavigation />
       <main
         className={cn(
-          'mx-auto w-full flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8',
-          stepIndex === 7
-            ? 'flex max-w-none min-h-0 flex-col'
-            : 'max-w-6xl lg:max-w-7xl',
+          'mx-auto flex w-full max-w-none flex-1 flex-col px-4 py-6 sm:px-6 sm:py-8 lg:px-8',
+          stepIndex === 7 && 'min-h-0',
         )}
       >
         <header className={cn('mb-6 lg:mb-8', stepIndex === 7 && 'mb-4 shrink-0 lg:mb-5')}>
@@ -446,11 +444,11 @@ export default function SetupWizardPage() {
 
         <div
           className={cn(
-            'flex flex-col gap-8 lg:flex-row lg:gap-10',
-            stepIndex === 7 ? 'min-h-0 flex-1 lg:items-stretch' : 'lg:items-start',
+            'flex flex-col gap-8 lg:flex-row lg:gap-10 lg:items-stretch',
+            stepIndex === 7 && 'min-h-0 flex-1',
           )}
         >
-          <aside className={cn('order-2 shrink-0 lg:order-1 lg:w-52 xl:w-56', stepIndex === 7 && 'lg:w-48 xl:w-52')}>
+          <aside className="order-2 shrink-0 lg:order-1 lg:w-52 xl:w-56">
             <nav aria-label="Setup steps" className="lg:sticky lg:top-24">
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Steps</p>
               <ol className="scrollbar-hide flex flex-nowrap gap-1 overflow-x-auto pb-1 lg:flex-col lg:flex-wrap lg:gap-0 lg:overflow-visible lg:pb-0">
@@ -500,7 +498,7 @@ export default function SetupWizardPage() {
             )}
           >
             <Card className={cn('shadow-sm', stepIndex === 7 && 'flex min-h-0 flex-1 flex-col overflow-hidden')}>
-              <CardHeader className={cn('pb-4', stepIndex === 7 && 'shrink-0 px-6 pb-3')}>
+              <CardHeader className={cn('px-6 pb-4', stepIndex === 7 && 'shrink-0 pb-3')}>
                 <CardTitle className="text-xl">{STEP_LABELS[stepIndex]}</CardTitle>
                 <CardDescription>Progress saves automatically in this browser.</CardDescription>
               </CardHeader>

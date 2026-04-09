@@ -1,25 +1,9 @@
 import { Link } from 'react-router-dom'
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@wexinc-healthbenefits/ben-ui-kit'
-import {
-  ArrowRight,
-  ClipboardCheck,
-  CreditCard,
-  FileSpreadsheet,
-  Palette,
-  Rocket,
-  Users,
-} from 'lucide-react'
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@wexinc-healthbenefits/ben-ui-kit'
+import { ClipboardCheck, CreditCard, FileSpreadsheet, Palette, Rocket, Users } from 'lucide-react'
+import { EmployerDashboardHero } from '@/components/dashboard/EmployerDashboardHero'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
-import { EMPLOYER } from '@/data/adminMockData'
 import { useEmployerSetup } from '@/hooks/useEmployerSetup'
 import { cn } from '@/lib/utils'
 
@@ -61,70 +45,13 @@ const secondaryTasks = [
 
 export default function DashboardPage() {
   const { onboardingComplete, planReady, launchComplete } = useEmployerSetup()
-  const shelly = EMPLOYER.hrAdminName.split(' ')[0]
 
   return (
     <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
 
       <main className="mx-auto w-full max-w-[1200px] flex-1 space-y-10 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-        <section className="space-y-4">
-          <div className="space-y-2">
-            <Badge intent="info" className="w-fit rounded-full border-0 bg-[#eef2ff] px-3 py-1 text-[12px] font-semibold text-[#3958c3]">
-              {EMPLOYER.name}
-            </Badge>
-            <h1 className="text-3xl font-bold tracking-tight text-[#14182c] sm:text-4xl">
-              Welcome, {shelly}
-            </h1>
-          </div>
-        </section>
-
-        <section>
-          <Card className={cn(cardSurface, 'hover:shadow-md')}>
-            <CardHeader className="space-y-4 px-6 pb-2 pt-6">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3]">
-                  <Rocket className="h-5 w-5" />
-                </div>
-                <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg font-bold leading-6 text-[#14182c]">Finish guided setup</CardTitle>
-                    <CardDescription className="text-sm leading-5 text-[#5f6a94]">
-                      Low-touch steps to go live with plans, eligibility, integrations, and branding. Save anytime and
-                      return later.
-                    </CardDescription>
-                  </div>
-                  {onboardingComplete ? (
-                    <Badge intent="success" className="shrink-0 rounded-full">
-                      Setup complete
-                    </Badge>
-                  ) : (
-                    <Badge intent="warning" className="shrink-0 rounded-full">
-                      In progress
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 px-6 pb-6 pt-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <Button
-                asChild
-                size="lg"
-                className="gap-2 rounded-xl border-0 bg-[#3958c3] px-6 text-[15px] font-medium text-white hover:bg-[#2d4699]"
-              >
-                <Link to="/setup" className="inline-flex items-center gap-2">
-                  {onboardingComplete ? 'Review setup wizard' : 'Continue setup wizard'}
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-              {!planReady && (
-                <p className="text-sm leading-5 text-[#5f6a94]">
-                  Complete plan design to unlock billing reconciliation shortcuts.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </section>
+        <EmployerDashboardHero />
 
         <section className="space-y-4">
           <h2 className={sectionEyebrow}>Frequent tasks</h2>

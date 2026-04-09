@@ -9,7 +9,7 @@ WEX-branded **employer admin** prototype that pairs with the consumer experience
 
 ## Setup
 
-1. Copy `.npmrc.example` to `.npmrc` and add your registry token (same pattern as `cxr-ux`).
+1. Ensure `.npmrc` is configured (repo includes a template using `ARTIFACTORY_NPM_TOKEN`, same pattern as `cxr-ux`). Before install, run `export ARTIFACTORY_NPM_TOKEN="…"` with your Artifactory npm token.
 2. Install dependencies. If `patch-package` errors appear during `@wexinc-healthbenefits/ben-ui-kit` postinstall, use:
    ```bash
    npm install --ignore-scripts
