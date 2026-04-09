@@ -88,21 +88,20 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-4">
                   <div className="space-y-1">
-                    <CardTitle className="text-lg font-bold leading-6 text-[#14182c]">Finish guided setup</CardTitle>
+                    <CardTitle className="text-lg font-bold leading-6 text-[#14182c]">
+                      {onboardingComplete ? 'Guided employer setup' : 'Start guided setup'}
+                    </CardTitle>
                     <CardDescription className="text-sm leading-5 text-[#5f6a94]">
-                      Low-touch steps to go live with plans, eligibility, integrations, and branding. Save anytime and
-                      return later.
+                      {onboardingComplete
+                        ? 'You can revisit any step or adjust branding from your profile menu. Launch status is below.'
+                        : 'First time here? Walk through low-touch steps for plans, eligibility, integrations, and branding. Save anytime and pick up later.'}
                     </CardDescription>
                   </div>
-                  {onboardingComplete ? (
-                    <Badge intent="success" className="shrink-0 rounded-full">
-                      Setup complete
-                    </Badge>
-                  ) : (
+                  {!onboardingComplete ? (
                     <Badge intent="warning" className="shrink-0 rounded-full">
                       In progress
                     </Badge>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </CardHeader>
@@ -113,7 +112,7 @@ export default function DashboardPage() {
                 className="gap-2 rounded-xl border-0 bg-[#3958c3] px-6 text-[15px] font-medium text-white hover:bg-[#2d4699]"
               >
                 <Link to="/setup" className="inline-flex items-center gap-2">
-                  {onboardingComplete ? 'Review setup wizard' : 'Continue setup wizard'}
+                  {onboardingComplete ? 'Get started' : 'Start setup wizard'}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
@@ -189,7 +188,9 @@ export default function DashboardPage() {
             <CardContent className="space-y-0 px-6 pb-6 pt-2">
               <div className="flex justify-between border-b border-[#e3e7f4] py-3 text-sm">
                 <span className="text-[#5f6a94]">Guided setup</span>
-                <span className="font-semibold text-[#14182c]">{onboardingComplete ? 'Complete' : 'Not complete'}</span>
+                <span className="font-semibold text-[#14182c]">
+                  {onboardingComplete ? 'Wizard finished' : 'In progress'}
+                </span>
               </div>
               <div className="flex justify-between border-b border-[#e3e7f4] py-3 text-sm">
                 <span className="text-[#5f6a94]">Plan framework ready</span>
