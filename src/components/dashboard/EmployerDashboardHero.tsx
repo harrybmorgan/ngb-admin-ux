@@ -88,53 +88,58 @@ export function EmployerDashboardHero() {
                 </div>
               </div>
 
-              <form className="relative max-w-xl pt-0.5" role="search" aria-label="Ask the assistant" onSubmit={(e) => e.preventDefault()}>
-                  <label htmlFor="employer-hero-ai-input" className="sr-only">
-                    Ask the assistant
-                  </label>
-                  <div className="flex h-10 items-center gap-1 rounded-full border border-[#dfe3ec] bg-white pl-3.5 pr-1 focus-within:border-[#c5cce0] focus-within:ring-1 focus-within:ring-[#3958c3]/20">
-                    <input
-                      id="employer-hero-ai-input"
-                      type="search"
-                      placeholder="Ask me… how to document a qualifying life event"
-                      className="min-w-0 flex-1 border-0 bg-transparent py-0 text-[13px] leading-tight text-[#14182c] placeholder:text-[#9aa3bc] placeholder:italic focus:outline-none focus:ring-0"
-                    />
-                    <button
-                      type="button"
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3] transition-colors hover:bg-[#e4e9fc]"
-                      aria-label="Voice input"
-                    >
-                      <Mic className="h-3.5 w-3.5" strokeWidth={2} />
-                    </button>
-                    <button
-                      type="submit"
-                      className={cn(
-                        'flex size-[35px] shrink-0 items-center justify-center rounded-[28px] border border-solid border-[#25146f]',
-                        '[background-image:linear-gradient(133.5deg,rgba(37,20,111,0.1)_2.46%,rgba(200,16,46,0.1)_100%)]',
-                        'hover:[background-image:linear-gradient(133.5deg,rgba(37,20,111,0.16)_2.46%,rgba(200,16,46,0.16)_100%)]',
-                        'transition-[background-image,box-shadow] duration-150',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-1',
-                      )}
-                      aria-label="Send"
-                    >
-                      <Send className="size-[14px] text-[#25146f]" strokeWidth={2} aria-hidden />
-                    </button>
-                  </div>
-                </form>
+              <form
+                className="relative max-w-xl pt-0.5"
+                role="search"
+                aria-label="Ask the assistant"
+                onSubmit={(e) => e.preventDefault()}
+              >
+                <label htmlFor="employer-hero-ai-input" className="sr-only">
+                  Ask the assistant
+                </label>
+                <div className="flex h-10 items-center gap-1 rounded-full border border-[#dfe3ec] bg-white pl-3.5 pr-1 focus-within:border-[#c5cce0] focus-within:ring-1 focus-within:ring-[#3958c3]/20">
+                  <input
+                    id="employer-hero-ai-input"
+                    type="search"
+                    placeholder="Ask me… how to document a qualifying life event"
+                    className="min-w-0 flex-1 border-0 bg-transparent py-0 text-[13px] leading-tight text-[#14182c] placeholder:text-[#9aa3bc] placeholder:italic focus:outline-none focus:ring-0"
+                  />
+                  <button
+                    type="button"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3] transition-colors hover:bg-[#e4e9fc]"
+                    aria-label="Voice input"
+                  >
+                    <Mic className="h-3.5 w-3.5" strokeWidth={2} />
+                  </button>
+                  <button
+                    type="submit"
+                    className={cn(
+                      'flex size-[35px] shrink-0 items-center justify-center rounded-[28px] border border-solid border-[#25146f]',
+                      '[background-image:linear-gradient(133.5deg,rgba(37,20,111,0.1)_2.46%,rgba(200,16,46,0.1)_100%)]',
+                      'hover:[background-image:linear-gradient(133.5deg,rgba(37,20,111,0.16)_2.46%,rgba(200,16,46,0.16)_100%)]',
+                      'transition-[background-image,box-shadow] duration-150',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-1',
+                    )}
+                    aria-label="Send"
+                  >
+                    <Send className="size-[14px] text-[#25146f]" strokeWidth={2} aria-hidden />
+                  </button>
+                </div>
+              </form>
 
-                <div className="space-y-2 pt-0.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a8b0c4]">Based on your workflow</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {quickChips.map(({ label, icon: Icon, to }) => (
-                      <Link key={to} to={to} className={chipBase}>
-                        <Icon className="h-3.5 w-3.5 shrink-0 text-[#a8b0c4]" aria-hidden />
-                        {label}
-                      </Link>
-                    ))}
-                  </div>
+              <div className="space-y-2 pt-0.5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a8b0c4]">Based on your workflow</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {quickChips.map(({ label, icon: Icon, to }) => (
+                    <Link key={to} to={to} className={chipBase}>
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-[#a8b0c4]" aria-hidden />
+                      {label}
+                    </Link>
+                  ))}
                 </div>
               </div>
             </div>
+          </div>
 
           {/* Figma vertical rule */}
           <div className="hidden h-auto w-px shrink-0 bg-[#e3e7f4] lg:block lg:w-[1.5px]" aria-hidden />

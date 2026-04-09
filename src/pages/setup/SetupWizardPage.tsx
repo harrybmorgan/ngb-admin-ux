@@ -372,7 +372,7 @@ export default function SetupWizardPage() {
       case 7:
         return (
           <>
-            <div className="shrink-0 space-y-2 px-6 pt-1 pb-3">
+            <div className="shrink-0 space-y-2 px-6 pb-3 pt-0">
               <p className="text-sm text-muted-foreground">
                 High-impact customization for the employee portal: site-wide colors, typography, logo, hero imagery, and
                 navigation labels. Adjust below or use <strong className="font-medium text-foreground">Skip for now</strong>{' '}
@@ -435,7 +435,7 @@ export default function SetupWizardPage() {
           stepIndex === 7 && 'min-h-0',
         )}
       >
-        <header className={cn('mb-6 lg:mb-8', stepIndex === 7 && 'mb-4 shrink-0 lg:mb-5')}>
+        <header className="mb-6 shrink-0 lg:mb-8">
           <h1 className="text-2xl font-bold tracking-tight">Guided employer setup</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Step {stepIndex + 1} of {totalSteps} · {STEP_LABELS[stepIndex]}
@@ -444,8 +444,8 @@ export default function SetupWizardPage() {
 
         <div
           className={cn(
-            'flex flex-col gap-8 lg:flex-row lg:gap-10 lg:items-stretch',
-            stepIndex === 7 && 'min-h-0 flex-1',
+            'flex flex-col gap-8 lg:flex-row lg:gap-10',
+            stepIndex === 7 ? 'min-h-0 flex-1 lg:items-stretch' : 'lg:items-start',
           )}
         >
           <aside className="order-2 shrink-0 lg:order-1 lg:w-52 xl:w-56">
@@ -493,12 +493,12 @@ export default function SetupWizardPage() {
 
           <div
             className={cn(
-              'order-1 min-w-0 flex-1',
-              stepIndex === 7 ? 'flex min-h-0 flex-col gap-4' : 'space-y-5',
+              'order-1 min-w-0 flex-1 space-y-5',
+              stepIndex === 7 && 'flex min-h-0 flex-col',
             )}
           >
             <Card className={cn('shadow-sm', stepIndex === 7 && 'flex min-h-0 flex-1 flex-col overflow-hidden')}>
-              <CardHeader className={cn('px-6 pb-4', stepIndex === 7 && 'shrink-0 pb-3')}>
+              <CardHeader className={cn('px-6 pb-4', stepIndex === 7 && 'shrink-0')}>
                 <CardTitle className="text-xl">{STEP_LABELS[stepIndex]}</CardTitle>
                 <CardDescription>Progress saves automatically in this browser.</CardDescription>
               </CardHeader>
