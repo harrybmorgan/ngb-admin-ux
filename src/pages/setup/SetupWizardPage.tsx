@@ -1,7 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { EmbeddedThemingStudio } from '@/pages/theming-engine/EmbeddedThemingStudio'
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+  Alert,
   Badge,
   Button,
   Card,
@@ -11,6 +16,8 @@ import {
   CardTitle,
   Checkbox,
   FloatLabel,
+  ScrollArea,
+  Separator,
   Sheet,
   SheetContent,
   SheetHeader,
@@ -24,15 +31,18 @@ import {
 } from '@wexinc-healthbenefits/ben-ui-kit'
 import {
   AlertCircle,
+  Building2,
   Check,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
-  Info,
+  HeartPulse,
+  Link2,
   Lock,
   Minus,
+  Rocket,
   SkipForward,
+  Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
@@ -40,96 +50,102 @@ import { AdminFooter } from '@/components/layout/AdminFooter'
 import { CONNECTORS, EMPLOYER, PRODUCT_OPTIONS } from '@/data/adminMockData'
 import { emitSetupChanged, writeEmployerSetup } from '@/hooks/useEmployerSetup'
 
-/** v2: 5 phases × granular tasks (JTBD-aligned); bump key so legacy 9-step drafts are not mixed. */
-const WIZARD_DRAFT_KEY = 'ngb_admin_wizard_draft_v2'
+/** v7: Shared default benefit dates + optional per-plan overrides in Configure plans. */
+const WIZARD_DRAFT_KEY = 'ngb_admin_wizard_draft_v7'
 
-/** Linear task order across all phases (28 tasks). */
+/** Linear task order (18 tasks). */
 const TASK_LABELS = [
   'Company basics',
-  'Plan year / dates',
-  'Employer users',
-  'Roles & permissions',
-  'Core structure reused across products',
-  'Benefits offered',
+  'Employer users & roles / permissions',
+  'Add employees',
+  'Define employee groups / divisions / classes',
+  'Define waiting periods',
+  'Choose benefits to offer',
+  'Set default benefit dates',
+  'Configure plans',
   'Marketplace',
-  'Contribution model',
-  'Employer / employee contributions',
-  'Eligibility rules',
-  'Waiting periods',
-  'Tax scenarios',
-  'Advanced lifecycle rules',
-  'Payroll / HRIS',
-  'Banking / funding',
-  'Carrier feeds',
-  'Technical contacts',
-  'Data mappings',
+  'Connect employee system',
+  'Connect benefit/provider system',
+  'Enable EDI',
+  'Configure carrier feeds',
+  'Review connected systems status',
+  'Verify rules and calculations in a safe environment',
   'Preview employee experience',
-  'Spot-check imported employees',
-  'Validate rate logic',
-  'Validate eligibility logic',
-  'Verify setup in sandbox',
-  'Final blockers',
-  'Final approvals',
-  'First employee access confirmed',
-  'Go to admin home',
-  'Ongoing updates / next steps',
+  'Spot-check migrated/imported data',
+  'Review launch status',
 ] as const
 
 /** Full-bleed embedded theming / preview surface. */
-const PREVIEW_EMPLOYEE_TASK_INDEX = 18
+const PREVIEW_EMPLOYEE_TASK_INDEX = 15
 
-/** Waiting-on-others toggle lives on data mappings (external feeds / mappings). */
-const DATA_MAPPINGS_TASK_INDEX = 17
+/** Waiting-on-others for vendor / feed work while reviewing connections. */
+const CONNECT_STATUS_REVIEW_TASK_INDEX = 13
 
-type PhaseDef = {
+type WizardStepDef = {
   title: string
+  /** Fuller step context in the main task card (not the step list). */
   description: string
-  /** Global task indices (0-based) belonging to this phase */
+  /** Single scannable line when this step is expanded in the sidebar. */
+  navHint: string
+  /** Global task indices (0-based) in this top-level step */
   taskIndices: readonly number[]
 }
 
-const PHASES: readonly PhaseDef[] = [
+const WIZARD_STEPS: readonly WizardStepDef[] = [
   {
-    title: 'Company & Access',
-    description: 'Company, plan timing, people, roles, and shared structure you reuse across products.',
-    taskIndices: [0, 1, 2, 3, 4],
+    title: 'Company basics',
+    description: 'Legal profile and who can administer benefits in your organization.',
+    navHint: 'Entity details, employer users, roles, and optional SSO.',
+    taskIndices: [0, 1],
   },
   {
-    title: 'Benefits & Rules',
-    description: 'Offerings, optional Marketplace add-ons, money, eligibility, timing, tax, and lifecycle rules.',
-    taskIndices: [5, 6, 7, 8, 9, 10, 11, 12],
+    title: 'Employee setup',
+    description:
+      'Add employees with payroll, CSV, or manual entry, then define classes, divisions, and waiting periods so eligibility lines up with payroll and carriers.',
+    navHint: 'Add people, then groups/classes, then waiting periods.',
+    taskIndices: [2, 3, 4],
+  },
+  {
+    title: 'Benefits',
+    description:
+      'Pick products, set shared benefit timing defaults, then configure each plan in one place—dates can follow defaults or override per plan (e.g. FSA calendar year). Marketplace stays optional.',
+    navHint: 'Products, shared dates, per-plan setup—Marketplace optional.',
+    taskIndices: [5, 6, 7, 8],
   },
   {
     title: 'Connect Systems',
-    description: 'Payroll, banking, carriers, technical contacts, and field mappings.',
-    taskIndices: [13, 14, 15, 16, 17],
+    description:
+      'Optional deeper integrations and health checks—skip or confirm if you already connected during Employee setup or while configuring plans.',
+    navHint: 'Optional integrations—skip if you already linked payroll or carriers.',
+    taskIndices: [9, 10, 11, 12, 13],
   },
   {
-    title: 'Test & Verify',
-    description: 'Preview, spot-check data, validate logic, and confirm sandbox behavior.',
-    taskIndices: [18, 19, 20, 21, 22],
-  },
-  {
-    title: 'Launch & Handoff',
-    description: 'Blockers, approvals, first live access, and transition to day-to-day admin.',
-    taskIndices: [23, 24, 25, 26, 27],
+    title: 'Test & Launch',
+    description:
+      'Verify rules in a safe environment first, then optional employee preview and data spot-check, then confirm launch readiness.',
+    navHint: 'Verify in a safe environment, then preview, spot-check, launch.',
+    taskIndices: [14, 15, 16, 17],
   },
 ] as const
 
-const CONNECT_START = 13
-const CONNECT_END = 17
-const VERIFY_START = 18
-const VERIFY_END = 22
+/** Line icons for top-level steps (API-docs–style nav). */
+const WIZARD_STEP_NAV_ICONS: readonly ComponentType<{ className?: string; strokeWidth?: number }>[] = [
+  Building2,
+  Users,
+  HeartPulse,
+  Link2,
+  Rocket,
+]
 
-function phaseIndexForTask(taskIndex: number): number {
-  const i = PHASES.findIndex((p) => p.taskIndices.includes(taskIndex))
+function stepGroupIndexForTask(taskIndex: number): number {
+  const i = WIZARD_STEPS.findIndex((p) => p.taskIndices.includes(taskIndex))
   return i >= 0 ? i : 0
 }
 
-function taskOrdinalInPhase(taskIndex: number): { phase: PhaseDef; indexInPhase: number; phaseSize: number } {
-  const phase = PHASES[phaseIndexForTask(taskIndex)]
-  const indexInPhase = phase.taskIndices.indexOf(taskIndex)
-  return { phase, indexInPhase: indexInPhase >= 0 ? indexInPhase : 0, phaseSize: phase.taskIndices.length }
+function taskOrdinalInStepGroup(taskIndex: number): { step: WizardStepDef; indexInStep: number; stepSize: number } {
+  const step = WIZARD_STEPS[stepGroupIndexForTask(taskIndex)]
+  const indexInStep = step.taskIndices.indexOf(taskIndex)
+  return { step, indexInStep: indexInStep >= 0 ? indexInStep : 0, stepSize: step.taskIndices.length }
 }
 
 /** Persisted per-task outcome. Blocked / in progress / not started are derived for UI. */
@@ -138,75 +154,42 @@ type StoredTaskOutcome = 'pending' | 'complete' | 'skipped' | 'waiting_on_others
 const TASK_COUNT = TASK_LABELS.length
 
 /**
- * Optional tasks: skipped does not block the required chain.
- * Marketplace — third-party add-ons (e.g. pet, legal); not required before launch by default.
+ * Optional: Marketplace (8); Connect Systems (9–13); employee preview (15); spot-check (16). Skipped never counts as complete.
  */
-const OPTIONAL_TASK_IDS = new Set<number>([6])
+const OPTIONAL_TASK_IDS = new Set<number>([8, 9, 10, 11, 12, 13, 15, 16])
 
-/** Linear prerequisites within a section; skipped never satisfies `complete`. */
+/** Connect Systems tasks stay optional for progress; the nav shows one “optional step” label instead of per-task badges. */
+const CONNECT_SYSTEMS_TASK_IDS = new Set(
+  WIZARD_STEPS.find((s) => s.title === 'Connect Systems')?.taskIndices ?? [],
+)
+
+/**
+ * Light in-step ordering only. Connect Systems tasks have no mutual blockers.
+ */
 const TASK_BLOCKER: Partial<Record<number, number>> = {
   1: 0,
-  2: 1,
   3: 2,
   4: 3,
-  7: 5,
+  6: 5,
+  7: 6,
   8: 7,
-  9: 8,
-  10: 9,
-  11: 10,
-  12: 11,
-  14: 13,
+  /** Test & Launch: verify (14) first; optional preview / spot-check after; launch (17) after verify. */
   15: 14,
-  16: 15,
-  17: 16,
-  19: 18,
-  20: 19,
-  21: 20,
-  22: 21,
-  24: 23,
-  25: 24,
-  26: 25,
-  27: 26,
+  16: 14,
+  17: 14,
 }
 
 function isTaskRequired(taskIndex: number): boolean {
   return !OPTIONAL_TASK_IDS.has(taskIndex)
 }
 
-function firstIncompleteRequiredInRange(
-  outcomes: readonly StoredTaskOutcome[],
-  start: number,
-  end: number,
-): number | undefined {
-  for (let i = start; i <= end; i++) {
-    if (!isTaskRequired(i)) continue
-    if (outcomes[i] !== 'complete') return i
-  }
-  return undefined
-}
-
-/** Phase gates: Test & Verify opens after Connect required work; Launch after Verify required work. */
-function phaseGatePrereqIndex(taskIndex: number, outcomes: readonly StoredTaskOutcome[]): number | undefined {
-  if (taskIndex >= VERIFY_START && taskIndex <= VERIFY_END) {
-    return firstIncompleteRequiredInRange(outcomes, CONNECT_START, CONNECT_END)
-  }
-  if (taskIndex >= 23) {
-    return firstIncompleteRequiredInRange(outcomes, VERIFY_START, VERIFY_END)
-  }
-  return undefined
-}
-
 function isTaskBlocked(taskIndex: number, outcomes: readonly StoredTaskOutcome[]): boolean {
-  const gatePrereq = phaseGatePrereqIndex(taskIndex, outcomes)
-  if (gatePrereq !== undefined) return true
   const prereq = TASK_BLOCKER[taskIndex]
   if (prereq === undefined) return false
   return outcomes[prereq] !== 'complete'
 }
 
-function blockerPrereqIndex(taskIndex: number, outcomes: readonly StoredTaskOutcome[]): number | undefined {
-  const gate = phaseGatePrereqIndex(taskIndex, outcomes)
-  if (gate !== undefined) return gate
+function blockerPrereqIndex(taskIndex: number): number | undefined {
   return TASK_BLOCKER[taskIndex]
 }
 
@@ -234,52 +217,21 @@ function resolveTaskNavStatus(
   return 'not_started'
 }
 
-function phaseRequiredIndices(phase: PhaseDef): number[] {
-  return phase.taskIndices.filter(isTaskRequired)
+function stepRequiredIndices(step: WizardStepDef): number[] {
+  return step.taskIndices.filter(isTaskRequired)
 }
 
-function phaseOptionalIndices(phase: PhaseDef): number[] {
-  return phase.taskIndices.filter((i) => OPTIONAL_TASK_IDS.has(i))
-}
-
-/** Required tasks only: complete counts toward phase/setup progress; skipped does not. */
-function phaseRequiredProgress(
-  phase: PhaseDef,
+/** Required tasks only: complete counts toward step/setup progress; skipped does not. */
+function stepRequiredProgress(
+  step: WizardStepDef,
   outcomes: readonly StoredTaskOutcome[],
 ): { complete: number; total: number } {
-  const req = phaseRequiredIndices(phase)
+  const req = stepRequiredIndices(step)
   const complete = req.filter((i) => outcomes[i] === 'complete').length
   return { complete, total: req.length }
 }
 
-function phaseOptionalSummary(
-  phase: PhaseDef,
-  outcomes: readonly StoredTaskOutcome[],
-): { complete: number; skipped: number; open: number; total: number } {
-  const opt = phaseOptionalIndices(phase)
-  let complete = 0
-  let skipped = 0
-  let open = 0
-  for (const i of opt) {
-    const o = outcomes[i]
-    if (o === 'complete') complete++
-    else if (o === 'skipped') skipped++
-    else open++
-  }
-  return { complete, skipped, open, total: opt.length }
-}
-
-function formatOptionalSummaryLine(summary: { complete: number; skipped: number; open: number; total: number }): string | null {
-  if (summary.total === 0) return null
-  const parts: string[] = []
-  if (summary.complete > 0) parts.push(`${summary.complete} done`)
-  if (summary.skipped > 0) parts.push(`${summary.skipped} skipped`)
-  if (summary.open > 0) parts.push(`${summary.open} not started`)
-  if (parts.length === 0) return null
-  return `Optional: ${parts.join(' · ')}`
-}
-
-/** Employer-wide required task completion (optional tasks excluded from numerator and denominator). */
+/** All required tasks in the wizard (optional indices excluded). */
 function globalRequiredProgress(outcomes: readonly StoredTaskOutcome[]): { complete: number; total: number } {
   let complete = 0
   let total = 0
@@ -291,8 +243,82 @@ function globalRequiredProgress(outcomes: readonly StoredTaskOutcome[]): { compl
   return { complete, total }
 }
 
+/** Optional tasks only — separate from required bar. */
+function globalOptionalProgress(outcomes: readonly StoredTaskOutcome[]): { complete: number; total: number } {
+  let complete = 0
+  let total = 0
+  for (let i = 0; i < TASK_COUNT; i++) {
+    if (!OPTIONAL_TASK_IDS.has(i)) continue
+    total++
+    if (outcomes[i] === 'complete') complete++
+  }
+  return { complete, total }
+}
+
 function defaultTaskOutcomes(): StoredTaskOutcome[] {
   return Array.from({ length: TASK_COUNT }, () => 'pending')
+}
+
+/** Employer-wide timing defaults; most plans inherit unless overridden per plan. */
+type DefaultBenefitDatesState = {
+  planYearStart: string
+  planYearEnd: string
+  openEnrollment: string
+  firstDeduction: string
+}
+
+/** Per selected product: inherit defaults or supply plan-specific dates / notes. */
+type PlanBenefitDateSettings = {
+  useDefaultDates: boolean
+  overrideStart: string
+  overrideEnd: string
+  overrideTimingNote: string
+}
+
+const DEFAULT_BENEFIT_DATES: DefaultBenefitDatesState = {
+  planYearStart: 'January 1, 2026',
+  planYearEnd: 'December 31, 2026',
+  openEnrollment: 'November 1 – November 30, 2025',
+  firstDeduction: 'January 15, 2026',
+}
+
+function defaultPlanDateEntry(): PlanBenefitDateSettings {
+  return {
+    useDefaultDates: true,
+    overrideStart: 'January 1, 2026',
+    overrideEnd: 'December 31, 2026',
+    overrideTimingNote: '',
+  }
+}
+
+function mergePlanDateSettings(
+  selectedProductIds: readonly string[],
+  existing: Record<string, PlanBenefitDateSettings> | undefined,
+): Record<string, PlanBenefitDateSettings> {
+  const out: Record<string, PlanBenefitDateSettings> = {}
+  for (const id of selectedProductIds) {
+    const prev = existing?.[id]
+    out[id] = prev
+      ? {
+          useDefaultDates: typeof prev.useDefaultDates === 'boolean' ? prev.useDefaultDates : true,
+          overrideStart: typeof prev.overrideStart === 'string' ? prev.overrideStart : defaultPlanDateEntry().overrideStart,
+          overrideEnd: typeof prev.overrideEnd === 'string' ? prev.overrideEnd : defaultPlanDateEntry().overrideEnd,
+          overrideTimingNote: typeof prev.overrideTimingNote === 'string' ? prev.overrideTimingNote : '',
+        }
+      : defaultPlanDateEntry()
+  }
+  return out
+}
+
+function normalizeDefaultBenefitDates(raw: unknown): DefaultBenefitDatesState {
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_BENEFIT_DATES }
+  const o = raw as Record<string, unknown>
+  return {
+    planYearStart: typeof o.planYearStart === 'string' ? o.planYearStart : DEFAULT_BENEFIT_DATES.planYearStart,
+    planYearEnd: typeof o.planYearEnd === 'string' ? o.planYearEnd : DEFAULT_BENEFIT_DATES.planYearEnd,
+    openEnrollment: typeof o.openEnrollment === 'string' ? o.openEnrollment : DEFAULT_BENEFIT_DATES.openEnrollment,
+    firstDeduction: typeof o.firstDeduction === 'string' ? o.firstDeduction : DEFAULT_BENEFIT_DATES.firstDeduction,
+  }
 }
 
 type Draft = {
@@ -301,6 +327,14 @@ type Draft = {
   selectedProducts: string[]
   eligibilityNotes: string
   mappingStep: number
+  /** Payroll/HRIS link initiated from Employee setup → data source (optional path). */
+  linkedPayrollFromEmployeeSetup: boolean
+  /** Benefit/provider link initiated from Configure plans (optional path). */
+  linkedBenefitFeedsFromBenefits: boolean
+  /** Shared effective / plan-year style defaults for most benefits. */
+  defaultBenefitDates: DefaultBenefitDatesState
+  /** Per-product date behavior inside Configure plans. */
+  planBenefitDateSettings: Record<string, PlanBenefitDateSettings>
 }
 
 const defaultDraft: Draft = {
@@ -310,6 +344,10 @@ const defaultDraft: Draft = {
   eligibilityNotes:
     'IF employment type is full-time AND hire date is more than 60 days ago THEN eligible for medical on the first of next month.\nIF average hours are under 30 THEN offer limited medical only.',
   mappingStep: 0,
+  linkedPayrollFromEmployeeSetup: false,
+  linkedBenefitFeedsFromBenefits: false,
+  defaultBenefitDates: { ...DEFAULT_BENEFIT_DATES },
+  planBenefitDateSettings: mergePlanDateSettings(['medical', 'dental', 'hsa'], undefined),
 }
 
 function normalizeDraft(parsed: Partial<Draft> & { stepIndex?: number }): Draft {
@@ -318,6 +356,13 @@ function normalizeDraft(parsed: Partial<Draft> & { stepIndex?: number }): Draft 
     merged.taskOutcomes = defaultTaskOutcomes()
   }
   merged.stepIndex = Math.min(Math.max(0, merged.stepIndex), TASK_COUNT - 1)
+  if (typeof merged.linkedPayrollFromEmployeeSetup !== 'boolean') merged.linkedPayrollFromEmployeeSetup = false
+  if (typeof merged.linkedBenefitFeedsFromBenefits !== 'boolean') merged.linkedBenefitFeedsFromBenefits = false
+  merged.defaultBenefitDates = normalizeDefaultBenefitDates(merged.defaultBenefitDates)
+  merged.planBenefitDateSettings = mergePlanDateSettings(
+    merged.selectedProducts,
+    merged.planBenefitDateSettings as Record<string, PlanBenefitDateSettings> | undefined,
+  )
   return merged
 }
 
@@ -395,104 +440,135 @@ function TaskStatusGlyph({ status, taskNumber }: { status: TaskNavStatus; taskNu
   }
 }
 
-function SetupPhasesHelpPanel({ id, className }: { id: string; className?: string }) {
+/** Progressive disclosure for progress rules—default is one line only. */
+function SetupProgressHelpDisclosure({ id, className }: { id: string; className?: string }) {
   const legendRow = (glyph: ReactNode, text: string) => (
-    <li className="flex gap-2.5">
+    <li className="flex gap-2">
       <span className="mt-0.5 shrink-0">{glyph}</span>
-      <span className="min-w-0 text-[11px] leading-snug text-muted-foreground">{text}</span>
+      <span className="min-w-0 text-[10px] leading-snug text-muted-foreground">{text}</span>
     </li>
   )
 
   return (
-    <div
-      id={id}
-      role="region"
-      aria-label="How setup phases and task status work"
-      className={cn(
-        'mb-3 rounded-lg border border-border bg-muted/25 px-3 py-2.5 shadow-sm dark:bg-muted/15',
-        className,
-      )}
-    >
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Progress is based on <strong className="font-medium text-foreground">required</strong> tasks you finish (not
-        visits or skips). Optional tasks are tracked on their own and never fill the required bar. The phase you’re
-        working in expands when you change steps. Tap any phase to see only that phase’s tasks. A lock means you can
-        preview that task, but you’ll need earlier required work done before it can count as complete.
-      </p>
-      <p className="mb-1.5 mt-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Task icons</p>
-      <ul className="space-y-2">
-        {legendRow(
-          <TaskStatusGlyph status="complete" taskNumber={1} />,
-          'Complete — required tasks count toward phase and overall required progress.',
-        )}
-        {legendRow(
-          <TaskStatusGlyph status="skipped" taskNumber={1} />,
-          'Skipped — stays visible; does not count as done for required progress.',
-        )}
-        {legendRow(
-          <TaskStatusGlyph status="needs_review" taskNumber={1} />,
-          'Needs review — finish review before it can count as complete.',
-        )}
-        {legendRow(
-          <TaskStatusGlyph status="waiting_on_others" taskNumber={1} />,
-          'Waiting on others — paused until someone outside your team moves, or you clear the flag.',
-        )}
-        {legendRow(
-          <TaskStatusGlyph status="blocked" taskNumber={1} />,
-          'Needs earlier step — open for preview; complete prerequisite tasks first.',
-        )}
-        {legendRow(
-          <TaskStatusGlyph status="in_progress" taskNumber={1} />,
-          'In progress — the task you’re on right now.',
-        )}
-        {legendRow(
-          <TaskStatusGlyph status="not_started" taskNumber={3} />,
-          'To do — step number until you start or finish.',
-        )}
-      </ul>
-      <p className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-border/60 pt-2 text-[11px] leading-snug text-muted-foreground">
-        <span className="shrink-0 rounded bg-muted/80 px-1.5 py-px text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Optional
-        </span>
-        <span>
-          Optional tasks never count toward required progress. Marketplace covers optional third-party add-ons (pet,
-          legal, and similar)—skip if you do not offer them; they are not required before launch by default.
-        </span>
-      </p>
+    <div className={cn('mb-2 space-y-2 pb-2', className)}>
+      <p className="text-[11px] leading-snug text-muted-foreground">Only required tasks count toward progress.</p>
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="setup-progress-help" className="border-0">
+          <AccordionTrigger
+            id={`${id}-trigger`}
+            aria-controls={id}
+            className="py-2 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:no-underline [&>svg]:text-muted-foreground"
+          >
+            How progress works
+          </AccordionTrigger>
+          <AccordionContent className="pb-1 pt-0">
+            <div
+              id={id}
+              role="region"
+              aria-labelledby={`${id}-trigger`}
+              aria-label="Progress rules: task states"
+              className="border-l border-border pl-2.5 pt-0.5"
+            >
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Task states</p>
+              <ul className="space-y-1.5">
+                {legendRow(
+                  <TaskStatusGlyph status="complete" taskNumber={1} />,
+                  'Complete — counts toward required progress.',
+                )}
+                {legendRow(
+                  <TaskStatusGlyph status="skipped" taskNumber={1} />,
+                  'Skipped — visible, not counted as done.',
+                )}
+                {legendRow(
+                  <TaskStatusGlyph status="needs_review" taskNumber={1} />,
+                  'Needs review — resolve before it can complete.',
+                )}
+                {legendRow(
+                  <TaskStatusGlyph status="waiting_on_others" taskNumber={1} />,
+                  'Waiting on others — paused until external work clears.',
+                )}
+                {legendRow(
+                  <TaskStatusGlyph status="blocked" taskNumber={1} />,
+                  'Blocked — preview allowed; finish earlier tasks in the step to complete.',
+                )}
+                {legendRow(
+                  <TaskStatusGlyph status="in_progress" taskNumber={1} />,
+                  'In progress — current task.',
+                )}
+                {legendRow(
+                  <TaskStatusGlyph status="not_started" taskNumber={3} />,
+                  'Not started — number is order in this step.',
+                )}
+              </ul>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+      <Separator className="bg-border/60" />
     </div>
   )
 }
 
-type PhaseBadgeMode = 'all_complete' | 'partial_skipped' | 'active' | 'upcoming' | 'behind'
+/**
+ * Step header ornaments: derived only from required-task stored outcomes + blockers.
+ * Optional tasks never satisfy “required complete”; optional-only steps never show required-success.
+ */
+function wizardStepRequiredIndicators(
+  step: WizardStepDef,
+  outcomes: readonly StoredTaskOutcome[],
+  currentTaskIndex: number,
+): {
+  /** Emerald check: every required task is `complete`, none skipped / waiting / needs review. */
+  showRequiredSuccess: boolean
+  /** Amber: any required task skipped, waiting on others, or needs review. */
+  showRequiredAttention: boolean
+  /** Dot: some but not all required tasks complete; no attention flags above. */
+  showRequiredInProgress: boolean
+  /** Subtle focus: this step contains the task currently open in the main column. */
+  showActiveStepRing: boolean
+  /** Cursor is past this step’s last task (orientation only; does not imply completion). */
+  isPastStep: boolean
+} {
+  const requiredIdx = step.taskIndices.filter(isTaskRequired)
+  const hasRequired = requiredIdx.length > 0
+  const reqTotal = requiredIdx.length
+  const reqComplete = requiredIdx.filter((i) => outcomes[i] === 'complete').length
+  const reqSkipped = requiredIdx.some((i) => outcomes[i] === 'skipped')
+  const reqWaiting = requiredIdx.some((i) => outcomes[i] === 'waiting_on_others')
+  const reqReview = requiredIdx.some((i) => outcomes[i] === 'needs_review')
 
-function phaseBadgeMode(phase: PhaseDef, outcomes: readonly StoredTaskOutcome[], stepIndex: number): PhaseBadgeMode {
-  const indices = phase.taskIndices
-  const { complete: reqComplete, total: reqTotal } = phaseRequiredProgress(phase, outcomes)
-  const requiredSatisfied = reqTotal === 0 || reqComplete === reqTotal
-  const anyOptionalOrOpen = indices.some((i) => {
-    const o = outcomes[i]
-    return o !== 'complete' && o !== 'skipped'
-  })
-  const hasSkipped = indices.some((i) => outcomes[i] === 'skipped')
+  const requiredSuccess =
+    hasRequired &&
+    reqComplete === reqTotal &&
+    !reqSkipped &&
+    !reqWaiting &&
+    !reqReview
 
-  if (requiredSatisfied && !anyOptionalOrOpen) {
-    return hasSkipped ? 'partial_skipped' : 'all_complete'
+  const requiredAttention = hasRequired && (reqSkipped || reqWaiting || reqReview)
+
+  const requiredInProgress =
+    hasRequired &&
+    !requiredSuccess &&
+    !requiredAttention &&
+    reqComplete > 0 &&
+    reqComplete < reqTotal
+
+  const last = step.taskIndices[step.taskIndices.length - 1]!
+  const containsCurrent = step.taskIndices.includes(currentTaskIndex)
+  const isPastStep = currentTaskIndex > last
+  const showActiveStepRing = containsCurrent && !isPastStep
+
+  return {
+    showRequiredSuccess: requiredSuccess,
+    showRequiredAttention: requiredAttention,
+    showRequiredInProgress: requiredInProgress,
+    showActiveStepRing,
+    isPastStep,
   }
-
-  if (indices.includes(stepIndex)) return 'active'
-
-  const lastInPhase = indices[indices.length - 1]!
-  if (stepIndex > lastInPhase) {
-    return 'behind'
-  }
-
-  if (stepIndex < indices[0]!) return 'upcoming'
-
-  return 'upcoming'
 }
 
-function phaseHasWaitingOnOthers(phase: PhaseDef, outcomes: readonly StoredTaskOutcome[]): boolean {
-  return phase.taskIndices.some((i) => outcomes[i] === 'waiting_on_others')
+function stepHasWaitingOnOthers(step: WizardStepDef, outcomes: readonly StoredTaskOutcome[]): boolean {
+  return step.taskIndices.some((i) => outcomes[i] === 'waiting_on_others')
 }
 
 /** Tasks you can open and finish right now (not blocked, not already marked done). */
@@ -505,36 +581,8 @@ function availableOpenTasks(outcomes: readonly StoredTaskOutcome[]): { index: nu
 function unlockGuidanceForPrereq(prereqIndex: number, outcomes: readonly StoredTaskOutcome[]): string {
   const name = TASK_LABELS[prereqIndex]
   const o = outcomes[prereqIndex]
-  if (prereqIndex >= CONNECT_START && prereqIndex <= CONNECT_END) {
-    const gateNote =
-      'Test & Verify stays gated until every required Connect Systems task is marked complete (skips don’t count). '
-    if (o === 'skipped') {
-      return `${gateNote}Finish ${name} for real, or mark it complete when ready—skipped work doesn’t unlock the next section.`
-    }
-    if (o === 'waiting_on_others') {
-      return `${gateNote}We’re waiting on ${name}—clear the waiting flag or finish that work so you can move into testing.`
-    }
-    if (o === 'needs_review') {
-      return `${gateNote}Resolve the review on ${name}, then continue.`
-    }
-    return `${gateNote}Complete ${name} and use Next when you’re done.`
-  }
-  if (prereqIndex >= VERIFY_START && prereqIndex <= VERIFY_END) {
-    const gateNote =
-      'Launch & Handoff opens after every required task in Test & Verify is complete (skips don’t count). '
-    if (o === 'skipped') {
-      return `${gateNote}Wrap up ${name}—skipped tasks don’t satisfy this gate.`
-    }
-    if (o === 'waiting_on_others') {
-      return `${gateNote}Clear waiting or finish ${name} before go-live tasks.`
-    }
-    if (o === 'needs_review') {
-      return `${gateNote}Finish review on ${name} first.`
-    }
-    return `${gateNote}Complete ${name} when you’re ready.`
-  }
   if (o === 'skipped') {
-    return `This step turns on after ${name} is finished. You skipped it earlier—open ${name} and work through it, or mark it done when you’re ready.`
+    return `This task opens after ${name} is finished. You skipped it earlier—open ${name} and work through it, or mark it done when you’re ready.`
   }
   if (o === 'waiting_on_others') {
     return `We’re holding this step until ${name} is no longer waiting on someone outside your team—or you clear that waiting note.`
@@ -548,8 +596,7 @@ function unlockGuidanceForPrereq(prereqIndex: number, outcomes: readonly StoredT
 export default function SetupWizardPage() {
   const [draft, setDraft] = useState<Draft>(() => loadDraft())
   const [mappingOpen, setMappingOpen] = useState(false)
-  const [selectedPhaseIndex, setSelectedPhaseIndex] = useState(() => phaseIndexForTask(loadDraft().stepIndex))
-  const [phasesHelpOpen, setPhasesHelpOpen] = useState(false)
+  const [selectedStepIndex, setSelectedStepIndex] = useState(() => stepGroupIndexForTask(loadDraft().stepIndex))
 
   useEffect(() => {
     saveDraft(draft)
@@ -557,26 +604,13 @@ export default function SetupWizardPage() {
 
   const stepIndex = draft.stepIndex
   const totalTasks = TASK_LABELS.length
-  const phaseMeta = taskOrdinalInPhase(stepIndex)
+  const stepMeta = taskOrdinalInStepGroup(stepIndex)
   const taskOutcomes = draft.taskOutcomes
+  const overallRequired = useMemo(() => globalRequiredProgress(taskOutcomes), [taskOutcomes])
+  const overallOptional = useMemo(() => globalOptionalProgress(taskOutcomes), [taskOutcomes])
   useEffect(() => {
-    setSelectedPhaseIndex(phaseIndexForTask(stepIndex))
+    setSelectedStepIndex(stepGroupIndexForTask(stepIndex))
   }, [stepIndex])
-
-  const { complete: finishedRequiredCount, total: totalRequiredTasks } = useMemo(
-    () => globalRequiredProgress(taskOutcomes),
-    [taskOutcomes],
-  )
-
-  const currentPhaseRequired = useMemo(
-    () => phaseRequiredProgress(phaseMeta.phase, taskOutcomes),
-    [phaseMeta.phase, taskOutcomes],
-  )
-
-  const currentPhaseOptionalLine = useMemo(
-    () => formatOptionalSummaryLine(phaseOptionalSummary(phaseMeta.phase, taskOutcomes)),
-    [phaseMeta.phase, taskOutcomes],
-  )
 
   const goBack = useCallback(() => {
     setDraft((d) => ({ ...d, stepIndex: Math.max(0, d.stepIndex - 1) }))
@@ -618,7 +652,12 @@ export default function SetupWizardPage() {
       const set = new Set(d.selectedProducts)
       if (set.has(id)) set.delete(id)
       else set.add(id)
-      return { ...d, selectedProducts: [...set] }
+      const selected = [...set]
+      return {
+        ...d,
+        selectedProducts: selected,
+        planBenefitDateSettings: mergePlanDateSettings(selected, d.planBenefitDateSettings),
+      }
     })
   }
 
@@ -636,7 +675,7 @@ export default function SetupWizardPage() {
   }
 
   const currentBlocked = isTaskBlocked(stepIndex, taskOutcomes)
-  const prereqForCurrent = blockerPrereqIndex(stepIndex, taskOutcomes)
+  const prereqForCurrent = blockerPrereqIndex(stepIndex)
 
   const mappingSteps = useMemo(
     () => ['Connect to ADP', 'Authorize WEX secure handshake', 'Preview field mapping', 'Activate sync'],
@@ -651,6 +690,35 @@ export default function SetupWizardPage() {
     () => CONNECTORS.filter((c) => /carrier|eligibility/i.test(c.category) || /eligibility/i.test(c.name)),
     [],
   )
+
+  const benefitPlansForConfig = useMemo(() => {
+    const nameById: Record<string, string> = {
+      medical: 'Summit PPO Gold',
+      dental: 'Bright Smile PPO',
+      vision: 'Clear View Select',
+      hsa: 'HSA election (CDH)',
+      lpfsa: 'Limited purpose FSA',
+      commuter: 'Commuter pre-tax',
+      voluntary: 'Voluntary supplemental bundle',
+    }
+    return draft.selectedProducts
+      .map((pid) => {
+        const opt = PRODUCT_OPTIONS.find((p) => p.id === pid)
+        if (!opt) return null
+        return {
+          productId: pid,
+          benefitType: opt.label,
+          planName: nameById[pid] ?? `${opt.label} plan`,
+        }
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+  }, [draft.selectedProducts])
+
+  const [benefitsActivePlanIndex, setBenefitsActivePlanIndex] = useState(0)
+
+  useEffect(() => {
+    setBenefitsActivePlanIndex((i) => Math.min(i, Math.max(0, benefitPlansForConfig.length - 1)))
+  }, [benefitPlansForConfig.length])
 
   const stepBody = (() => {
     const mappingSheet = (
@@ -705,7 +773,7 @@ export default function SetupWizardPage() {
     const waitingOnMappingsToggle = (
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2 border-t border-border/60 pt-3">
         <span className="text-xs text-muted-foreground">Waiting on a vendor or file feed?</span>
-        {draft.taskOutcomes[DATA_MAPPINGS_TASK_INDEX] === 'waiting_on_others' ? (
+        {draft.taskOutcomes[CONNECT_STATUS_REVIEW_TASK_INDEX] === 'waiting_on_others' ? (
           <Button
             type="button"
             variant="ghost"
@@ -714,7 +782,7 @@ export default function SetupWizardPage() {
             onClick={() =>
               setDraft((d) => {
                 const next = [...d.taskOutcomes]
-                next[DATA_MAPPINGS_TASK_INDEX] = 'pending'
+                next[CONNECT_STATUS_REVIEW_TASK_INDEX] = 'pending'
                 return { ...d, taskOutcomes: next }
               })
             }
@@ -730,7 +798,7 @@ export default function SetupWizardPage() {
             onClick={() =>
               setDraft((d) => {
                 const next = [...d.taskOutcomes]
-                next[DATA_MAPPINGS_TASK_INDEX] = 'waiting_on_others'
+                next[CONNECT_STATUS_REVIEW_TASK_INDEX] = 'waiting_on_others'
                 return { ...d, taskOutcomes: next }
               })
             }
@@ -774,28 +842,14 @@ export default function SetupWizardPage() {
         )
       case 1:
         return (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <p className="text-sm text-muted-foreground">
-              Align plan years, renewals, and key effective dates so benefits, contributions, and payroll stay in sync.
-            </p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FloatLabel label="Plan year start" readOnly className="bg-muted/50" value="January 1" />
-              <FloatLabel label="Plan year end" readOnly className="bg-muted/50" value="December 31" />
-              <FloatLabel label="Open enrollment window" readOnly className="bg-muted/50" value="Nov 1 – Nov 30" />
-              <FloatLabel label="First deduction date" readOnly className="bg-muted/50" value="Jan 15, 2026" />
-            </div>
-          </div>
-        )
-      case 2:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Employer users are the people who administer benefits in your organization—separate from employees who
-              only enroll.
+              Employer users administer benefits in WEX—separate from employees who only enroll. Pair each person with a
+              role so permissions stay auditable.
             </p>
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Invite admins</CardTitle>
+                <CardTitle className="text-base">Users & invites</CardTitle>
                 <CardDescription>HR, finance, and broker partners who need secure access.</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
@@ -807,8 +861,45 @@ export default function SetupWizardPage() {
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">SSO / directory (optional)</CardTitle>
-                <CardDescription>Connect IdP later without blocking your first pass.</CardDescription>
+                <CardTitle className="text-base">Roles & permissions</CardTitle>
+                <CardDescription>Who can change plans, approve enrollments, view billing, and manage integrations.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Scope</TableHead>
+                      <TableHead>Typical owner</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">Benefits administrator</TableCell>
+                      <TableCell>Full product setup</TableCell>
+                      <TableCell>HR lead</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Payroll liaison</TableCell>
+                      <TableCell>Deductions & census</TableCell>
+                      <TableCell>Payroll manager</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Read-only auditor</TableCell>
+                      <TableCell>Reports</TableCell>
+                      <TableCell>Finance</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+                <Button type="button" variant="outline" size="sm">
+                  Adjust role matrix
+                </Button>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">SSO / directory</CardTitle>
+                <CardDescription>Optional—connect an IdP later without blocking your first pass.</CardDescription>
               </CardHeader>
               <CardContent>
                 <Button type="button" variant="outline" size="sm">
@@ -818,40 +909,94 @@ export default function SetupWizardPage() {
             </Card>
           </div>
         )
+      case 2:
+        return (
+          <div className="space-y-6">
+            <p className="text-sm text-muted-foreground">
+              Add employees with payroll, CSV, or manual entry—any path is valid. Connecting ADP / Workday here carries
+              forward to Connect Systems so you are not asked to start over.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-1">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Connect ADP / Workday</CardTitle>
+                  <CardDescription>Bi-directional payroll / HRIS—recommended when you have a supported vendor.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setMappingOpen(true)
+                      setDraft((d) => ({ ...d, linkedPayrollFromEmployeeSetup: true }))
+                    }}
+                  >
+                    Start connection
+                  </Button>
+                  {draft.linkedPayrollFromEmployeeSetup ? (
+                    <Badge intent="default" className="text-[11px] font-normal">
+                      Linked from this task
+                    </Badge>
+                  ) : null}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Upload CSV</CardTitle>
+                  <CardDescription>Bulk import with name, hire date, job title, and work email.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline">
+                    Download template
+                  </Button>
+                  <Button type="button">Upload CSV</Button>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Enter manually</CardTitle>
+                  <CardDescription>For one-off hires or corrections before your HRIS sync is live.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button type="button" variant="outline">
+                    Open quick add employee
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+            {mappingSheet}
+          </div>
+        )
       case 3:
         return (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Define who can change plans, approve enrollments, view billing, and manage integrations.
+              Classes and divisions drive eligibility, contributions, and reporting—keep them aligned with payroll and
+              carrier contracts.
             </p>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Scope</TableHead>
-                  <TableHead>Typical owner</TableHead>
+                  <TableHead>Group</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Notes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 <TableRow>
-                  <TableCell className="font-medium">Benefits administrator</TableCell>
-                  <TableCell>Full product setup</TableCell>
-                  <TableCell>HR lead</TableCell>
+                  <TableCell className="font-medium">Full-time</TableCell>
+                  <TableCell>Eligibility class</TableCell>
+                  <TableCell>30+ hrs / week</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell className="font-medium">Payroll liaison</TableCell>
-                  <TableCell>Deductions & census</TableCell>
-                  <TableCell>Payroll manager</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Read-only auditor</TableCell>
-                  <TableCell>Reports</TableCell>
-                  <TableCell>Finance</TableCell>
+                  <TableCell className="font-medium">Northeast region</TableCell>
+                  <TableCell>Division</TableCell>
+                  <TableCell>Reporting only</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
             <Button type="button" variant="outline" size="sm">
-              Adjust role matrix
+              Add group or division
             </Button>
           </div>
         )
@@ -859,68 +1004,479 @@ export default function SetupWizardPage() {
         return (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Configure the plan <em>framework</em> once—names, carriers, networks, effective dates—then reuse it across
-              medical, dental, vision, and CDH without duplicating shells.
+              Waiting periods control when coverage starts after hire or life events—keep them consistent with SPD and
+              carrier contracts.
             </p>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Plan name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Carrier</TableHead>
-                  <TableHead>Effective</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="font-medium">Summit PPO Gold</TableCell>
-                  <TableCell>Medical PPO</TableCell>
-                  <TableCell>UHC</TableCell>
-                  <TableCell>Jan 1, 2026</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Bright Smile PPO</TableCell>
-                  <TableCell>Dental</TableCell>
-                  <TableCell>Guardian</TableCell>
-                  <TableCell>Jan 1, 2026</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">HSA election</TableCell>
-                  <TableCell>CDH</TableCell>
-                  <TableCell>WEX</TableCell>
-                  <TableCell>Jan 1, 2026</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+            <div className="flex flex-wrap gap-2">
+              {['First of month after DOH', '60-day benefits wait', '90-day probation', 'Rehire rules'].map((label) => (
+                <Badge key={label} intent="default" className="cursor-default">
+                  {label}
+                </Badge>
+              ))}
+            </div>
             <Button type="button" variant="outline" size="sm">
-              Add plan row
+              Open waiting-period editor
             </Button>
           </div>
         )
       case 5:
         return (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {PRODUCT_OPTIONS.map((p) => (
-              <label
-                key={p.id}
-                className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted/40"
-              >
-                <Checkbox
-                  checked={draft.selectedProducts.includes(p.id)}
-                  onCheckedChange={() => toggleProduct(p.id)}
-                />
-                <span className="text-sm font-medium">{p.label}</span>
-              </label>
-            ))}
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Select every benefit category you offer. Each selection becomes a plan you configure in{' '}
+              <strong className="font-medium text-foreground">Configure plans</strong>—you can add more categories later.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {PRODUCT_OPTIONS.map((p) => (
+                <label
+                  key={p.id}
+                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted/40"
+                >
+                  <Checkbox
+                    checked={draft.selectedProducts.includes(p.id)}
+                    onCheckedChange={() => toggleProduct(p.id)}
+                  />
+                  <span className="text-sm font-medium">{p.label}</span>
+                </label>
+              ))}
+            </div>
           </div>
         )
       case 6:
         return (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
+              Set timing defaults most plans will share—medical, dental, vision, and similar lines typically follow the same
+              plan year and enrollment window. In <strong className="font-medium text-foreground">Configure plans</strong>,
+              you can opt out per plan (for example, an FSA on a calendar year while medical follows your fiscal plan year)
+              without retyping dates everywhere.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FloatLabel
+                label="Default coverage / plan year start"
+                className="bg-background"
+                value={draft.defaultBenefitDates.planYearStart}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    defaultBenefitDates: { ...d.defaultBenefitDates, planYearStart: e.target.value },
+                  }))
+                }
+              />
+              <FloatLabel
+                label="Default coverage / plan year end"
+                className="bg-background"
+                value={draft.defaultBenefitDates.planYearEnd}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    defaultBenefitDates: { ...d.defaultBenefitDates, planYearEnd: e.target.value },
+                  }))
+                }
+              />
+              <FloatLabel
+                label="Default open enrollment window"
+                className="bg-background sm:col-span-2"
+                value={draft.defaultBenefitDates.openEnrollment}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    defaultBenefitDates: { ...d.defaultBenefitDates, openEnrollment: e.target.value },
+                  }))
+                }
+              />
+              <FloatLabel
+                label="Default first deduction date"
+                className="bg-background sm:col-span-2"
+                value={draft.defaultBenefitDates.firstDeduction}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    defaultBenefitDates: { ...d.defaultBenefitDates, firstDeduction: e.target.value },
+                  }))
+                }
+              />
+            </div>
+          </div>
+        )
+      case 7: {
+        if (benefitPlansForConfig.length === 0) {
+          return (
+            <div className="space-y-4 rounded-lg border border-dashed border-border bg-muted/15 px-4 py-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                No benefit categories selected yet. Choose at least one in{' '}
+                <strong className="font-medium text-foreground">Choose benefits to offer</strong>, then return here.
+              </p>
+              <Button type="button" variant="outline" onClick={() => goToTask(5)}>
+                Go to choose benefits
+              </Button>
+            </div>
+          )
+        }
+        const plan = benefitPlansForConfig[benefitsActivePlanIndex]!
+        const carrierLabel =
+          plan.productId === 'medical'
+            ? 'UHC'
+            : plan.productId === 'dental'
+              ? 'Guardian'
+              : plan.productId === 'vision'
+                ? 'VSP'
+                : plan.productId === 'hsa' || plan.productId === 'lpfsa'
+                  ? 'WEX (CDH)'
+                  : plan.productId === 'commuter'
+                    ? 'Commuter vendor'
+                    : 'Carrier TBD'
+        const cobraName = `cobra-${plan.productId}`
+        const planDates =
+          draft.planBenefitDateSettings[plan.productId] ?? defaultPlanDateEntry()
+        const def = draft.defaultBenefitDates
+        return (
+          <div className="space-y-5">
+            <p className="text-sm text-muted-foreground">
+              Configure one plan at a time. Dates follow your employer defaults unless you turn off “Use default benefit
+              dates” for an exception (for example, calendar-year FSA vs plan-year medical).
+            </p>
+            <div
+              className="flex flex-wrap gap-2 border-b border-border pb-3"
+              role="tablist"
+              aria-label="Plans to configure"
+            >
+              {benefitPlansForConfig.map((p, i) => (
+                <button
+                  key={p.productId}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === benefitsActivePlanIndex}
+                  onClick={() => setBenefitsActivePlanIndex(i)}
+                  className={cn(
+                    'rounded-md border px-3 py-2 text-left text-xs transition-colors',
+                    i === benefitsActivePlanIndex
+                      ? 'border-primary bg-primary/10 font-medium text-foreground'
+                      : 'border-transparent bg-muted/35 text-muted-foreground hover:bg-muted/60',
+                  )}
+                >
+                  <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {p.benefitType}
+                  </span>
+                  <span className="block">{p.planName}</span>
+                </button>
+              ))}
+            </div>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">1 · Basic plan information</CardTitle>
+                <CardDescription>
+                  Benefit type, plan name, carrier, and whether this plan follows shared default dates or uses its own.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <FloatLabel label="Benefit type" readOnly className="bg-muted/50" value={plan.benefitType} />
+                  <FloatLabel label="Plan name" readOnly className="bg-muted/50" value={plan.planName} />
+                  <FloatLabel label="Carrier / provider" readOnly className="bg-muted/50 sm:col-span-2" value={carrierLabel} />
+                </div>
+
+                <div className="rounded-lg border border-border bg-muted/15 px-3 py-3">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <Checkbox
+                      checked={planDates.useDefaultDates}
+                      onCheckedChange={(checked) =>
+                        setDraft((d) => ({
+                          ...d,
+                          planBenefitDateSettings: {
+                            ...d.planBenefitDateSettings,
+                            [plan.productId]: {
+                              ...planDates,
+                              useDefaultDates: checked === true,
+                            },
+                          },
+                        }))
+                      }
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="text-sm font-medium text-foreground">Use default benefit dates</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Inherit the employer defaults from <strong className="font-medium text-foreground">Set default benefit dates</strong>.
+                        Turn off only when this plan needs different effective or plan-year timing.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
+                {planDates.useDefaultDates ? (
+                  <div
+                    className="rounded-md border border-border/80 bg-muted/25 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground"
+                    role="status"
+                  >
+                    <p className="font-medium text-foreground">Using employer defaults for this plan</p>
+                    <p className="mt-1">
+                      <span className="text-muted-foreground">Coverage period:</span>{' '}
+                      <span className="text-foreground">{def.planYearStart}</span> –{' '}
+                      <span className="text-foreground">{def.planYearEnd}</span>
+                    </p>
+                    <p className="mt-1">
+                      <span className="text-muted-foreground">Open enrollment:</span>{' '}
+                      <span className="text-foreground">{def.openEnrollment}</span>
+                    </p>
+                    <p className="mt-1">
+                      <span className="text-muted-foreground">First deduction:</span>{' '}
+                      <span className="text-foreground">{def.firstDeduction}</span>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 rounded-md border border-amber-500/25 bg-amber-500/[0.06] px-3 py-3">
+                    <p className="text-xs font-medium text-foreground">Plan-specific dates (override)</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Only this plan uses the values below; other plans can still follow defaults.
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <FloatLabel
+                        label="Start date"
+                        className="bg-background"
+                        value={planDates.overrideStart}
+                        onChange={(e) =>
+                          setDraft((d) => ({
+                            ...d,
+                            planBenefitDateSettings: {
+                              ...d.planBenefitDateSettings,
+                              [plan.productId]: { ...planDates, overrideStart: e.target.value },
+                            },
+                          }))
+                        }
+                      />
+                      <FloatLabel
+                        label="End date"
+                        className="bg-background"
+                        value={planDates.overrideEnd}
+                        onChange={(e) =>
+                          setDraft((d) => ({
+                            ...d,
+                            planBenefitDateSettings: {
+                              ...d.planBenefitDateSettings,
+                              [plan.productId]: { ...planDates, overrideEnd: e.target.value },
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor={`plan-timing-${plan.productId}`} className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                        Plan timing / exception notes (optional)
+                      </label>
+                      <textarea
+                        id={`plan-timing-${plan.productId}`}
+                        rows={2}
+                        placeholder="e.g. Calendar-year FSA; OE Dec 1–15 only for this product"
+                        value={planDates.overrideTimingNote}
+                        onChange={(e) =>
+                          setDraft((d) => ({
+                            ...d,
+                            planBenefitDateSettings: {
+                              ...d.planBenefitDateSettings,
+                              [plan.productId]: { ...planDates, overrideTimingNote: e.target.value },
+                            },
+                          }))
+                        }
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <p className="mb-2 text-xs text-muted-foreground">Feeds & handshakes (optional—ties to Connect Systems)</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {(carrierFeedConnectors.length ? carrierFeedConnectors : CONNECTORS.slice(2, 4)).map((c) => (
+                      <Button
+                        key={c.id}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-auto justify-start py-2 text-left"
+                        onClick={() => {
+                          setMappingOpen(true)
+                          setDraft((d) => ({ ...d, linkedBenefitFeedsFromBenefits: true }))
+                        }}
+                      >
+                        <span className="block text-xs font-medium">{c.name}</span>
+                        <span className="block text-[10px] font-normal text-muted-foreground">
+                          {c.category} · {c.direction}
+                        </span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                {draft.linkedBenefitFeedsFromBenefits ? (
+                  <p className="text-xs text-muted-foreground">
+                    Provider connection recorded for this demo—you can extend it under Connect Systems when ready.
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">2 · Plan requirements</CardTitle>
+                <CardDescription>Plan-specific rules, MEC / ACA posture, and funding where applicable.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <label className="flex items-center gap-2">
+                  <Checkbox defaultChecked />
+                  Network and tier rules documented for this plan
+                </label>
+                <label className="flex items-center gap-2">
+                  <Checkbox defaultChecked={plan.productId === 'medical'} />
+                  MEC / ACA minimum value considered (medical-style products)
+                </label>
+                <label className="flex items-center gap-2">
+                  <Checkbox />
+                  Affordability / safe harbor checks documented
+                </label>
+                <p className="text-xs font-medium text-foreground">Funding type</p>
+                <div className="flex flex-wrap gap-2">
+                  {(['Fully insured', 'Level-funded', 'Self-funded', 'Pre-tax only (CDH)'] as const).map((ft) => (
+                    <Badge key={ft} intent="default" className="cursor-default font-normal">
+                      {ft}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">3 · Coverage eligibility</CardTitle>
+                <CardDescription>Who can enroll under this plan and dependent rules.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <fieldset>
+                  <legend className="mb-2 text-xs font-medium text-muted-foreground">Coverage tiers offered</legend>
+                  <div className="space-y-2 text-muted-foreground">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name={`tier-${plan.productId}`} defaultChecked className="accent-primary" />
+                      Employee only
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name={`tier-${plan.productId}`} className="accent-primary" />
+                      Employee + family (tiers: EE / EE+children / family)
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name={`tier-${plan.productId}`} className="accent-primary" />
+                      Employee + one dependent level only
+                    </label>
+                  </div>
+                </fieldset>
+                <div>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Dependent options</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Children to age 26', 'Disabled dependents', 'Domestic partners'].map((label) => (
+                      <Badge key={label} intent="default" className="cursor-default font-normal">
+                        {label}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Eligibility notes (SPD-aligned)</p>
+                  <textarea
+                    rows={4}
+                    value={draft.eligibilityNotes}
+                    onChange={(e) => setDraft((d) => ({ ...d, eligibilityNotes: e.target.value }))}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">4 · COBRA eligibility</CardTitle>
+                <CardDescription>How this plan treats continuation coverage.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <label className="flex items-center gap-2">
+                  <input type="radio" name={cobraName} className="accent-primary" />
+                  Not COBRA eligible
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name={cobraName}
+                    defaultChecked={['medical', 'dental', 'vision'].includes(plan.productId)}
+                    className="accent-primary"
+                  />
+                  COBRA eligible — standard 102% rate
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="radio" name={cobraName} className="accent-primary" />
+                  COBRA eligible — custom rates (administrative + tier overrides)
+                </label>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">5 · Plan costs & contributions</CardTitle>
+                <CardDescription>Model, employer / employee share, and group-specific logic.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  {['% of premium', 'Flat per tier', 'Defined contribution', 'EE-only (CDH)'].map((m) => (
+                    <Badge key={m} intent="default" className="cursor-default font-normal">
+                      {m}
+                    </Badge>
+                  ))}
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee group</TableHead>
+                      <TableHead>Employer</TableHead>
+                      <TableHead>Employee</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">Full-time</TableCell>
+                      <TableCell>75% core tier</TableCell>
+                      <TableCell>25% + dependents</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Part-time (25+ hrs)</TableCell>
+                      <TableCell>Buy-up schedule B</TableCell>
+                      <TableCell>Remainder</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    writeEmployerSetup({ planReady: true })
+                    setDraft((d) => {
+                      const next = [...d.taskOutcomes]
+                      next[7] = 'needs_review'
+                      return { ...d, taskOutcomes: next }
+                    })
+                  }}
+                >
+                  Mark contribution setup ready for review (demo)
+                </Button>
+              </CardContent>
+            </Card>
+            {mappingSheet}
+          </div>
+        )
+      }
+      case 8:
+        return (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
               <strong className="font-medium text-foreground">Optional.</strong> Marketplace is for third-party add-ons
-              such as pet insurance, legal plans, identity protection, and similar partner offerings—not core medical or
-              dental. Skip this task if you do not sell these products.
+              (pet, legal, identity, and similar)—not core medical or dental. Skip if you do not offer these products.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               {[
@@ -943,157 +1499,19 @@ export default function SetupWizardPage() {
             </div>
           </div>
         )
-      case 7:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Choose how employer dollars flow—percent of premium, flat amount, tiered by coverage level, or defined
-              contribution. This drives what employees see before you enter rate tables.
-            </p>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Model</CardTitle>
-                <CardDescription>Demo selection only; production supports blended models per product.</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                <Badge intent="default" className="cursor-default">
-                  % of premium (medical)
-                </Badge>
-                <Badge intent="default" className="cursor-default">
-                  Flat HSA seed (annual)
-                </Badge>
-              </CardContent>
-            </Card>
-          </div>
-        )
-      case 8:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Rates and eligibility classes attach to your plan framework so contribution tiers stay consistent.
-            </p>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Plan shell</TableHead>
-                  <TableHead>Rate table</TableHead>
-                  <TableHead>Eligibility class</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell>Summit PPO Gold</TableCell>
-                  <TableCell>2026 EE-only / EE+children / family</TableCell>
-                  <TableCell>Full-time</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Summit PPO Gold</TableCell>
-                  <TableCell>2026 part-time buy-up</TableCell>
-                  <TableCell>Part-time (25+ hrs)</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                writeEmployerSetup({ planReady: true })
-                setDraft((d) => {
-                  const next = [...d.taskOutcomes]
-                  next[8] = 'needs_review'
-                  return { ...d, taskOutcomes: next }
-                })
-              }}
-            >
-              Mark contribution tables ready (demo)
-            </Button>
-          </div>
-        )
       case 9:
         return (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Plain-English rules with presets for employment types, dependents, and domestic partners.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {['Full-time (30+ hrs)', 'Part-time carve-out', 'Dependents to age 26', 'Domestic partners'].map(
-                (label) => (
-                  <Badge key={label} intent="default" className="cursor-default">
-                    {label}
-                  </Badge>
-                ),
-              )}
-            </div>
-            <textarea
-              rows={8}
-              value={draft.eligibilityNotes}
-              onChange={(e) => setDraft((d) => ({ ...d, eligibilityNotes: e.target.value }))}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm"
-            />
-          </div>
-        )
-      case 10:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Waiting periods control when coverage starts after hire or life events—keep them consistent with SPD and
-              carrier contracts.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {['First of month after DOH', '60-day benefits wait', '90-day probation', 'Rehire rules'].map((label) => (
-                <Badge key={label} intent="default" className="cursor-default">
-                  {label}
-                </Badge>
-              ))}
-            </div>
-            <Button type="button" variant="outline" size="sm">
-              Open waiting-period editor
-            </Button>
-          </div>
-        )
-      case 11:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Capture Section 125, imputed income, HSA eligibility, and commuter or other pre-tax programs in one place.
-            </p>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Tax posture (demo)</CardTitle>
-                <CardDescription>Full-time medical is pre-tax; voluntary life over $50k imputed.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button type="button" variant="outline" size="sm">
-                  Review tax assumptions
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )
-      case 12:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              COBRA, leave of absence, rehire, and age-out automations reduce manual clean-up after go-live.
-            </p>
-            <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
-              <li>LOA → benefits suspension with reinstatement rules</li>
-              <li>COBRA offer timing tied to qualifying events</li>
-              <li>Domestic partner attestations and annual re-certification</li>
-            </ul>
-            <Button type="button" variant="outline" size="sm">
-              Configure lifecycle triggers
-            </Button>
-          </div>
-        )
-      case 13:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Payroll / HRIS is the system of record for jobs, compensation, and deductions—connect it before you trust
-              census or enrollment feeds.
-            </p>
+            {draft.linkedPayrollFromEmployeeSetup ? (
+              <div className="rounded-lg border border-emerald-600/30 bg-emerald-600/5 px-3 py-2 text-sm text-foreground">
+                <strong className="font-medium">Already in progress:</strong> you started payroll / HRIS from Employee
+                setup. Use this task to extend mappings or confirm production cutover—no need to repeat the same setup.
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Optional deep-dive for payroll / HRIS. Connect here if you did not use ADP or Workday during Employee setup.
+              </p>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
               {(payrollHrisConnectors.length ? payrollHrisConnectors : CONNECTORS.slice(0, 2)).map((c) => (
                 <Card key={c.id}>
@@ -1105,7 +1523,7 @@ export default function SetupWizardPage() {
                   </CardHeader>
                   <CardContent>
                     <Button type="button" variant="outline" size="sm" onClick={() => setMappingOpen(true)}>
-                      Configure
+                      {draft.linkedPayrollFromEmployeeSetup ? 'Review / extend' : 'Configure'}
                     </Button>
                   </CardContent>
                 </Card>
@@ -1114,26 +1532,65 @@ export default function SetupWizardPage() {
             {mappingSheet}
           </div>
         )
-      case 14:
+      case 10:
         return (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Link funding accounts and premium remittance preferences so carrier and vendor payments reconcile cleanly.
-            </p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FloatLabel label="Primary operating account" readOnly className="bg-muted/50" value="•••• 4821 (demo)" />
-              <FloatLabel label="Premium remittance" readOnly className="bg-muted/50" value="ACH — 3-day settlement" />
+            {draft.linkedBenefitFeedsFromBenefits ? (
+              <div className="rounded-lg border border-emerald-600/30 bg-emerald-600/5 px-3 py-2 text-sm text-foreground">
+                <strong className="font-medium">Already in progress:</strong> you configured a benefit or carrier feed
+                while configuring plans. Confirm or extend those connections here instead of starting from scratch.
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Optional—link healthcare and ancillary carriers or broker feeds if you did not connect them while configuring plans.
+              </p>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(carrierFeedConnectors.length ? carrierFeedConnectors : CONNECTORS.slice(2, 4)).map((c) => (
+                <Card key={c.id}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">{c.name}</CardTitle>
+                    <CardDescription>
+                      {c.category} · {c.direction}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setMappingOpen(true)}>
+                      {draft.linkedBenefitFeedsFromBenefits ? 'Review / extend' : 'Configure'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-            <Button type="button" variant="outline" size="sm">
-              Add funding instructions
-            </Button>
+            {mappingSheet}
           </div>
         )
-      case 15:
+      case 11:
         return (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Carrier feeds carry enrollment, tier changes, and terminations—coordinate timing with payroll deductions.
+              Turn on file-based eligibility and census delivery where your vendors support EDI or WEX unified files.
+            </p>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">WEX unified EDI</CardTitle>
+                <CardDescription>Census & eligibility · Inbound / Outbound</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button type="button" variant="outline" size="sm" onClick={() => setMappingOpen(true)}>
+                  Enable EDI lane
+                </Button>
+              </CardContent>
+            </Card>
+            {mappingSheet}
+          </div>
+        )
+      case 12:
+        return (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Schedule and test carrier eligibility files—timing should match payroll deductions and your plan effective
+              dates.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               {(carrierFeedConnectors.length ? carrierFeedConnectors : CONNECTORS.slice(2, 4)).map((c) => (
@@ -1146,7 +1603,7 @@ export default function SetupWizardPage() {
                   </CardHeader>
                   <CardContent>
                     <Button type="button" variant="outline" size="sm" onClick={() => setMappingOpen(true)}>
-                      Configure
+                      Open feed settings
                     </Button>
                   </CardContent>
                 </Card>
@@ -1155,27 +1612,26 @@ export default function SetupWizardPage() {
             {mappingSheet}
           </div>
         )
-      case 16:
+      case 13:
         return (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Name the people carriers, payroll, and WEX should call for file issues, testing windows, and cutover.
+              One place to see what is live, what is still testing, and what you started earlier in the wizard.
             </p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FloatLabel label="Primary technical contact" readOnly className="bg-muted/50" value="Jordan Lee" />
-              <FloatLabel label="Escalation" readOnly className="bg-muted/50" value="Priya Shah" />
-              <FloatLabel label="Carrier TAM" readOnly className="bg-muted/50" value="Assigned at activation" />
-              <FloatLabel label="Payroll partner" readOnly className="bg-muted/50" value="ADP specialist (demo)" />
-            </div>
-          </div>
-        )
-      case 17:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Align census, eligibility, deduction, and carrier fields. Census, eligibility, CDH, and COBRA share one WEX
-              standard where file-based delivery is used.
-            </p>
+            <ul className="space-y-1.5 rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm text-foreground">
+              <li>
+                Employee system:{' '}
+                <span className="font-medium">
+                  {draft.linkedPayrollFromEmployeeSetup ? 'Linked from Employee setup' : 'Not linked from Employee setup'}
+                </span>
+              </li>
+              <li>
+                Benefit / provider feeds:{' '}
+                <span className="font-medium">
+                  {draft.linkedBenefitFeedsFromBenefits ? 'Touched while configuring plans' : 'Not configured in plan setup'}
+                </span>
+              </li>
+            </ul>
             <div className="grid gap-3 sm:grid-cols-2">
               {CONNECTORS.map((c) => (
                 <Card key={c.id}>
@@ -1187,7 +1643,7 @@ export default function SetupWizardPage() {
                   </CardHeader>
                   <CardContent>
                     <Button type="button" variant="outline" size="sm" onClick={() => setMappingOpen(true)}>
-                      Configure
+                      View status
                     </Button>
                   </CardContent>
                 </Card>
@@ -1197,12 +1653,88 @@ export default function SetupWizardPage() {
             {mappingSheet}
           </div>
         )
-      case 18:
+      case 14:
+        return (
+          <div className="space-y-5">
+            <p className="text-sm text-muted-foreground">
+              Run eligibility rules and contribution math against test or sandbox data—catch gaps before production
+              enrollment opens.
+            </p>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Eligibility (test census)</CardTitle>
+                <CardDescription>Re-run rules on sample lives; align language with your SPD.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <textarea
+                  rows={6}
+                  value={draft.eligibilityNotes}
+                  onChange={(e) => setDraft((d) => ({ ...d, eligibilityNotes: e.target.value }))}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm"
+                />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Contributions & deductions</CardTitle>
+                <CardDescription>Compare expected EE / ER amounts by group against payroll test runs.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead>Expected EE</TableHead>
+                      <TableHead>Expected ER</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">Jordan Lee</TableCell>
+                      <TableCell>Summit PPO — EE+children</TableCell>
+                      <TableCell>$186.40</TableCell>
+                      <TableCell>$412.10</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Priya Shah</TableCell>
+                      <TableCell>Summit PPO — EE only</TableCell>
+                      <TableCell>$102.00</TableCell>
+                      <TableCell>$355.00</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Sandbox checklist</CardTitle>
+                <CardDescription>Light pass—production would tie to your tenant’s test environment.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <label className="flex items-center gap-2">
+                  <Checkbox defaultChecked />
+                  Test tenant reflects latest plan year and classes
+                </label>
+                <label className="flex items-center gap-2">
+                  <Checkbox defaultChecked />
+                  Deduction codes match payroll mapping
+                </label>
+                <label className="flex items-center gap-2">
+                  <Checkbox />
+                  Carrier test file accepted (if applicable)
+                </label>
+              </CardContent>
+            </Card>
+          </div>
+        )
+      case 15:
         return (
           <>
             <div className="shrink-0 space-y-2 px-6 pb-3 pt-0">
               <p className="text-sm text-muted-foreground">
-                Preview what employees see—site-wide look, navigation, and key enrollment screens. Use{' '}
+                <strong className="font-medium text-foreground">Optional.</strong> Preview what employees see—site-wide
+                look, navigation, and key enrollment screens. Run this after you are comfortable with rules in sandbox. Use{' '}
                 <strong className="font-medium text-foreground">Skip for now</strong> if design can wait; the studio stays
                 available from your account menu.
               </p>
@@ -1212,226 +1744,95 @@ export default function SetupWizardPage() {
             </div>
           </>
         )
-      case 19:
+      case 16:
         return (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Confirm a handful of imported rows—titles, classes, and dependents—before you trust rate and eligibility
-              runs.
+              <strong className="font-medium text-foreground">Optional.</strong> Spot-check a few migrated or imported
+              rows before you invite the full population.
             </p>
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Census spot-check</CardTitle>
-                <CardDescription>Upload a CSV or pull the latest HRIS snapshot.</CardDescription>
+                <CardTitle className="text-base">Employee data</CardTitle>
+                <CardDescription>Census row, class, and dependents.</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline">
-                  Download template
+                  Open sample roster
                 </Button>
-                <Button type="button">Upload CSV</Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Add manually</CardTitle>
-                <CardDescription>For one-off corrections during testing.</CardDescription>
-              </CardHeader>
-              <CardContent>
                 <Button type="button" variant="outline">
-                  Open quick add employee
+                  Upload test CSV
                 </Button>
               </CardContent>
             </Card>
-          </div>
-        )
-      case 20:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Compare a few sample lives against expected payroll deductions and employer contributions.
-            </p>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Plan</TableHead>
-                  <TableHead>Expected EE</TableHead>
-                  <TableHead>Expected ER</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="font-medium">Jordan Lee</TableCell>
-                  <TableCell>Summit PPO — EE+children</TableCell>
-                  <TableCell>$186.40</TableCell>
-                  <TableCell>$412.10</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Priya Shah</TableCell>
-                  <TableCell>Summit PPO — EE only</TableCell>
-                  <TableCell>$102.00</TableCell>
-                  <TableCell>$355.00</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </div>
-        )
-      case 21:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Re-run eligibility against test census; fix rule gaps before production enrollment opens.
-            </p>
-            <textarea
-              rows={8}
-              value={draft.eligibilityNotes}
-              onChange={(e) => setDraft((d) => ({ ...d, eligibilityNotes: e.target.value }))}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm"
-            />
-          </div>
-        )
-      case 22:
-        return (
-          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Sandbox verification</CardTitle>
-                <CardDescription>Confirm end-to-end behavior before you remove test-only flags.</CardDescription>
+                <CardTitle className="text-base">Benefits data</CardTitle>
+                <CardDescription>Plans, tiers, and effective dates for the same lives.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3 text-sm">
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
                 <label className="flex items-center gap-2">
                   <Checkbox defaultChecked />
-                  Test employees walk the full enrollment path
+                  Medical tier matches HRIS class
                 </label>
                 <label className="flex items-center gap-2">
                   <Checkbox defaultChecked />
-                  Deduction codes post to payroll test company
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox />
-                  Carrier test files accepted
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox defaultChecked />
-                  Rate and tier logic match billing preview
+                  Dependents sync to carrier test file
                 </label>
               </CardContent>
             </Card>
           </div>
         )
-      case 23:
+      case 17:
         return (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Final blockers</CardTitle>
-                <CardDescription>Resolve anything that would stop invites or first payroll deductions.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <label className="flex items-center gap-2">
-                  <Checkbox defaultChecked />
-                  Data mappings signed off
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox />
-                  Carrier effective dates confirmed
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox defaultChecked />
-                  Billing / funding account verified
-                </label>
-              </CardContent>
-            </Card>
-          </div>
-        )
-      case 24:
-        return (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Final approvals</CardTitle>
-                <CardDescription>Document sign-off from HR leadership and finance (demo placeholders).</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <label className="flex items-center gap-2">
-                  <Checkbox defaultChecked />
-                  HR executive approval
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox defaultChecked />
-                  Finance approval on contributions
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox />
-                  Broker of record acknowledgment
-                </label>
-              </CardContent>
-            </Card>
-          </div>
-        )
-      case 25:
-        return (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">First employee access</CardTitle>
-                <CardDescription>Confirm at least one real employee can sign in and see the right offers.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <label className="flex items-center gap-2">
-                  <Checkbox defaultChecked />
-                  Invite sent to pilot employee
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox defaultChecked />
-                  Login and MFA completed
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox />
-                  Enrollment path completed in production tenant
-                </label>
-              </CardContent>
-            </Card>
-            <div className="flex flex-wrap gap-3">
-              <Button type="button" size="lg" className="gap-2" onClick={launch}>
-                Launch employer portal
-              </Button>
-              <Button type="button" variant="outline" asChild>
-                <Link to="/">Back to dashboard</Link>
-              </Button>
-            </div>
-          </div>
-        )
-      case 26:
-        return (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <p className="text-sm text-muted-foreground">
-              You’re done with guided setup—admin home is where day-to-day tasks, tickets, and announcements live.
+              One compact preflight—blockers, approvals, and readiness before you launch. This is not a full operations
+              dashboard.
             </p>
-            <Button type="button" size="lg" asChild>
-              <Link to="/">Go to admin home</Link>
-            </Button>
-          </div>
-        )
-      case 27:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Keep integrations, rates, and rules current as products and statutes change.
-            </p>
-            <ul className="list-inside list-disc space-y-2 text-sm text-muted-foreground">
-              <li>Quarterly carrier and payroll reconciliation</li>
-              <li>Annual renewal and open enrollment prep</li>
-              <li>Document updates (SPD, SBC, notices)</li>
-            </ul>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" asChild>
-                <Link to="/">Open dashboard</Link>
-              </Button>
-              <Button type="button" variant="outline" asChild>
-                <Link to="/settings">Account settings</Link>
-              </Button>
-            </div>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Launch readiness</CardTitle>
+                <CardDescription>Demo summary; production would pull live checklist and sign-off state.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-md border border-border bg-muted/25 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Blockers</p>
+                    <p className="mt-1 font-medium text-foreground">1 open · 4 clear</p>
+                  </div>
+                  <div className="rounded-md border border-border bg-muted/25 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Approvals</p>
+                    <p className="mt-1 font-medium text-foreground">HR ✓ · Finance ✓ · Broker pending</p>
+                  </div>
+                  <div className="rounded-md border border-border bg-muted/25 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Readiness</p>
+                    <p className="mt-1 font-medium text-foreground">High — minor follow-ups</p>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Launch confidence</span>
+                    <span className="font-medium text-foreground">88%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full w-[88%] rounded-full bg-primary" />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+                  <Button type="button" size="lg" className="gap-2" onClick={launch}>
+                    Launch employer portal
+                  </Button>
+                  <Button type="button" variant="outline" asChild>
+                    <Link to="/">Go to admin home</Link>
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  After launch, send a pilot invite and confirm login. Ongoing work lives in admin home, dashboard, and
+                  settings.
+                </p>
+              </CardContent>
+            </Card>
           </div>
         )
       default:
@@ -1448,36 +1849,38 @@ export default function SetupWizardPage() {
           stepIndex === PREVIEW_EMPLOYEE_TASK_INDEX && 'min-h-0',
         )}
       >
-        <header className="mb-6 shrink-0 lg:mb-8">
-          <h1 className="text-2xl font-bold tracking-tight">Guided employer setup</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">
-              Phase {phaseIndexForTask(stepIndex) + 1} of {PHASES.length} · {phaseMeta.phase.title}
-            </span>
-            <span className="text-muted-foreground"> · </span>
-            {TASK_LABELS[stepIndex]}
-            <span className="text-muted-foreground">
-              {' '}
-              · Task {phaseMeta.indexInPhase + 1} of {phaseMeta.phaseSize} in this phase
-            </span>
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">
-              This phase: {currentPhaseRequired.complete} of {currentPhaseRequired.total} required tasks complete
-            </span>
-            {currentPhaseOptionalLine ? (
-              <>
+        <header className="mb-5 shrink-0 space-y-4 pb-0 lg:mb-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Guided employer setup</h1>
+              <p className="mt-1 truncate text-sm text-muted-foreground" title={`${stepMeta.step.title} · ${TASK_LABELS[stepIndex]}`}>
+                <span className="text-foreground/90">{stepMeta.step.title}</span>
                 <span className="text-muted-foreground"> · </span>
-                <span>{currentPhaseOptionalLine}</span>
-              </>
-            ) : null}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Overall:{' '}
-            <span className="font-medium text-foreground">
-              {finishedRequiredCount} of {totalRequiredTasks} required tasks complete
-            </span>
-          </p>
+                {TASK_LABELS[stepIndex]}
+              </p>
+              <p className="mt-1.5 text-xs tabular-nums leading-snug text-muted-foreground">
+                <span className="font-medium text-foreground/80">
+                  {overallRequired.complete}/{overallRequired.total}
+                </span>{' '}
+                required tasks complete
+                {overallOptional.total > 0 ? (
+                  <>
+                    <span className="text-border"> · </span>
+                    <span title="Optional tasks do not fill the required bar">
+                      {overallOptional.complete}/{overallOptional.total} optional done
+                    </span>
+                  </>
+                ) : null}
+              </p>
+            </div>
+            <Badge
+              intent="default"
+              className="shrink-0 rounded-md border border-border/80 bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-foreground"
+            >
+              {TASK_STATUS_LABEL[resolveTaskNavStatus(stepIndex, stepIndex, taskOutcomes)]}
+            </Badge>
+          </div>
+          <Separator className="bg-border/60" />
         </header>
 
         <div
@@ -1487,166 +1890,166 @@ export default function SetupWizardPage() {
           )}
         >
           <aside className="order-2 shrink-0 lg:order-1 lg:w-[17.5rem] xl:w-[18.5rem]">
-            <nav aria-labelledby="setup-phases-heading" className="lg:sticky lg:top-24">
-              <div className="mb-1 flex items-center gap-0.5">
-                <p
-                  id="setup-phases-heading"
-                  className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
-                >
-                  Phases
-                </p>
-                <button
-                  type="button"
-                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-                  aria-expanded={phasesHelpOpen}
-                  aria-controls="setup-phases-help"
-                  onClick={() => setPhasesHelpOpen((o) => !o)}
-                >
-                  <Info className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                  <span className="sr-only">How phases and task status work</span>
-                </button>
-              </div>
-              {phasesHelpOpen ? <SetupPhasesHelpPanel id="setup-phases-help" /> : null}
-              <ol className="scrollbar-hide mt-2 flex max-h-[min(52vh,30rem)] flex-col gap-1 overflow-y-auto pb-1 lg:max-h-none lg:overflow-visible lg:pb-0">
-                {PHASES.map((phase, phaseIdx) => {
-                  const badge = phaseBadgeMode(phase, draft.taskOutcomes, stepIndex)
-                  const phaseContainsCurrent = phase.taskIndices.includes(stepIndex)
-                  const phaseSelected = selectedPhaseIndex === phaseIdx
-                  const reqProgress = phaseRequiredProgress(phase, draft.taskOutcomes)
-                  const optLine = formatOptionalSummaryLine(phaseOptionalSummary(phase, draft.taskOutcomes))
-                  const waitingPhase = phaseHasWaitingOnOthers(phase, draft.taskOutcomes)
+            <nav aria-labelledby="setup-steps-heading" className="lg:sticky lg:top-24">
+              <p
+                id="setup-steps-heading"
+                className="mb-1 text-sm font-semibold leading-snug tracking-tight text-foreground"
+              >
+                Setup steps
+              </p>
+              <SetupProgressHelpDisclosure id="setup-progress-help" />
+              <ScrollArea className="mt-2 h-[min(52vh,30rem)] w-full lg:h-auto lg:max-h-none">
+                <ol className="flex flex-col gap-1 pb-1 pr-3 lg:pb-0 lg:pr-0">
+                {WIZARD_STEPS.map((wizardStep, stepIdx) => {
+                  const stepInd = wizardStepRequiredIndicators(wizardStep, draft.taskOutcomes, stepIndex)
+                  const stepRowSelected = selectedStepIndex === stepIdx
+                  const reqProgress = stepRequiredProgress(wizardStep, draft.taskOutcomes)
+                  const optionalIndices = wizardStep.taskIndices.filter((i) => !isTaskRequired(i))
+                  const optionalComplete = optionalIndices.filter((i) => draft.taskOutcomes[i] === 'complete').length
+                  const optionalTotal = optionalIndices.length
+                  const waitingStep = stepHasWaitingOnOthers(wizardStep, draft.taskOutcomes)
+                  const isConnectSystemsStep = wizardStep.title === 'Connect Systems'
+                  const reqSummaryShort =
+                    reqProgress.total > 0
+                      ? `${reqProgress.complete}/${reqProgress.total} required`
+                      : optionalTotal > 0
+                        ? isConnectSystemsStep
+                          ? `Optional step · ${optionalComplete}/${optionalTotal} done`
+                          : `${optionalComplete}/${optionalTotal} optional done`
+                        : 'All optional'
+                  const StepNavIcon = WIZARD_STEP_NAV_ICONS[stepIdx] ?? Building2
 
                   return (
-                    <li
-                      key={phase.title}
-                      className={cn(
-                        'rounded-lg border border-transparent',
-                        phaseContainsCurrent && 'border-primary/20 bg-primary/[0.04]',
-                        phaseSelected && 'border-border/80 bg-muted/20',
-                      )}
-                    >
+                    <li key={wizardStep.title} className="rounded-lg">
                       <button
                         type="button"
-                        onClick={() => setSelectedPhaseIndex(phaseIdx)}
+                        onClick={() => setSelectedStepIndex(stepIdx)}
                         className={cn(
-                          'flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left transition-colors',
-                          'hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25',
+                          'flex w-full items-start gap-3 rounded-lg px-1 py-2.5 text-left transition-colors',
+                          'hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25',
                         )}
-                        aria-expanded={phaseSelected}
-                        aria-controls={`setup-phase-panel-${phaseIdx}`}
-                        aria-label={`${phase.title}, ${reqProgress.complete} of ${reqProgress.total} required tasks complete${optLine ? `, ${optLine}` : ''}`}
-                        id={`setup-phase-trigger-${phaseIdx}`}
+                        aria-pressed={stepRowSelected}
+                        aria-controls={stepRowSelected ? `setup-step-panel-${stepIdx}` : undefined}
+                        aria-label={`${wizardStep.title}, ${reqProgress.total > 0 ? `${reqProgress.complete} of ${reqProgress.total} required complete` : isConnectSystemsStep ? 'optional step, no required tasks' : 'all tasks optional in this step'}`}
+                        id={`setup-step-trigger-${stepIdx}`}
                       >
-                        <span className="mt-0.5 text-muted-foreground" aria-hidden>
-                          {phaseSelected ? (
-                            <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={2} />
-                          ) : (
-                            <ChevronRight className="h-4 w-4 shrink-0" strokeWidth={2} />
-                          )}
-                        </span>
                         <span
                           className={cn(
-                            'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold tabular-nums',
-                            badge === 'all_complete' && 'bg-emerald-600/90 text-white',
-                            badge === 'partial_skipped' &&
-                              'border border-amber-500/50 bg-amber-500/15 text-amber-900 dark:text-amber-100',
-                            badge === 'active' && 'bg-primary text-primary-foreground',
-                            badge === 'behind' &&
-                              'border border-amber-600/40 bg-amber-500/15 text-amber-900 dark:text-amber-100',
-                            badge === 'upcoming' && 'bg-muted/80 text-muted-foreground',
+                            'relative mt-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center text-muted-foreground',
+                            stepInd.showActiveStepRing &&
+                              'rounded-md ring-2 ring-primary/35 ring-offset-2 ring-offset-background',
+                            stepInd.isPastStep && !stepRowSelected && 'opacity-80',
                           )}
                           aria-hidden
                         >
-                          {badge === 'all_complete' ? (
-                            <Check className="h-3 w-3" strokeWidth={2.5} />
-                          ) : badge === 'partial_skipped' ? (
-                            <Minus className="h-3 w-3" strokeWidth={2.5} />
-                          ) : badge === 'behind' ? (
-                            <AlertCircle className="h-3 w-3" strokeWidth={2.5} />
-                          ) : (
-                            phaseIdx + 1
-                          )}
+                          <StepNavIcon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                          {stepInd.showRequiredSuccess ? (
+                            <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm">
+                              <Check className="h-2 w-2" strokeWidth={3} aria-hidden />
+                            </span>
+                          ) : stepInd.showRequiredAttention ? (
+                            <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-500 text-white shadow-sm">
+                              <AlertCircle className="h-2 w-2" strokeWidth={3} aria-hidden />
+                            </span>
+                          ) : stepInd.showRequiredInProgress ? (
+                            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary shadow-sm ring-2 ring-background" aria-hidden />
+                          ) : null}
                         </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-1.5">
-                            <span className="text-[13px] font-semibold leading-snug text-foreground">{phase.title}</span>
-                            {waitingPhase ? (
-                              <span
-                                className="inline-flex items-center gap-0.5 rounded bg-sky-500/15 px-1 py-0 text-[9px] font-semibold uppercase tracking-wide text-sky-900 dark:text-sky-100"
-                                title="A task in this phase is waiting on an external party"
+                        <span className="min-w-0 flex-1 pt-0.5">
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-sm font-semibold leading-snug text-foreground">{wizardStep.title}</span>
+                            {isConnectSystemsStep ? (
+                              <Badge
+                                intent="outline"
+                                className="h-5 px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide"
+                                title="Nothing in this step is required for setup progress"
+                              >
+                                Optional
+                              </Badge>
+                            ) : null}
+                            {waitingStep ? (
+                              <Badge
+                                intent="default"
+                                className="h-5 gap-0.5 bg-sky-500/15 px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide text-sky-900 dark:text-sky-100"
+                                title="A task in this step is waiting on an external party"
                               >
                                 <Clock className="h-2.5 w-2.5" strokeWidth={2.5} aria-hidden />
                                 Waiting
-                              </span>
+                              </Badge>
                             ) : null}
                           </span>
-                          {!phaseSelected ? (
-                            <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground">
-                              {reqProgress.complete} of {reqProgress.total} required done
-                              {optLine ? ` · ${optLine}` : ''}
-                              {phaseContainsCurrent ? ' · You are here' : ''}
+                          {!stepRowSelected ? (
+                            <span className="mt-0.5 block text-xs tabular-nums leading-snug text-muted-foreground">
+                              {reqSummaryShort}
                             </span>
                           ) : (
-                            <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground">
-                              {phase.description}
-                            </span>
+                            <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{wizardStep.navHint}</span>
                           )}
                         </span>
                       </button>
 
-                      {phaseSelected ? (
+                      {stepRowSelected ? (
                         <div
-                          className="border-t border-border/50 px-2 pb-2 pt-1"
-                          id={`setup-phase-panel-${phaseIdx}`}
+                          className="pb-2 pl-1 pt-0.5"
+                          id={`setup-step-panel-${stepIdx}`}
                           role="region"
-                          aria-labelledby={`setup-phase-trigger-${phaseIdx}`}
+                          aria-labelledby={`setup-step-trigger-${stepIdx}`}
                         >
-                          <p className="mb-1.5 px-1 text-[9px] font-medium uppercase tracking-wider text-muted-foreground">
-                            Tasks in this phase
-                          </p>
-                          <p className="mb-2 px-1 text-[10px] font-medium text-foreground">
-                            {reqProgress.complete} of {reqProgress.total} required complete
-                            {optLine ? ` · ${optLine}` : ''}
-                          </p>
-                          <ol className="space-y-0.5 border-l border-border/60 pl-2">
-                            {phase.taskIndices.map((taskIdx, ord) => {
+                          <ol className="space-y-0.5 pl-7">
+                            {wizardStep.taskIndices.map((taskIdx, taskOrd) => {
                               const navStatus = resolveTaskNavStatus(taskIdx, stepIndex, draft.taskOutcomes)
                               const current = taskIdx === stepIndex
                               const label = TASK_LABELS[taskIdx]
                               const blocked = navStatus === 'blocked'
-                              const optional = OPTIONAL_TASK_IDS.has(taskIdx)
-                              const taskOrdinalInPhase = ord + 1
+                              const showOptionalTaskBadge =
+                                OPTIONAL_TASK_IDS.has(taskIdx) && !CONNECT_SYSTEMS_TASK_IDS.has(taskIdx)
                               return (
                                 <li key={label}>
                                   <button
                                     type="button"
                                     onClick={() => goToTask(taskIdx)}
                                     className={cn(
-                                      'flex w-full items-center gap-2 rounded-md py-1 pl-1.5 pr-1 text-left text-[11px] leading-tight transition-colors',
+                                      'flex w-full items-center gap-2 rounded-r-md py-2 pl-2.5 pr-2 text-left text-sm leading-tight transition-colors',
                                       current &&
                                         !blocked &&
-                                        'bg-primary/10 font-medium text-foreground ring-1 ring-primary/25',
+                                        'border-l-[3px] border-primary bg-primary/10 font-medium text-primary',
                                       current &&
                                         blocked &&
-                                        'bg-amber-500/10 font-medium text-foreground ring-1 ring-amber-400/35',
-                                      !current && !blocked && 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-                                      !current && blocked && 'text-muted-foreground hover:bg-muted/50',
+                                        'border-l-[3px] border-amber-500 bg-amber-500/10 font-medium text-foreground',
+                                      !current && 'border-l-[3px] border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground',
                                     )}
                                     aria-current={current ? 'step' : undefined}
-                                    aria-label={`${label}, ${optional ? 'Optional. ' : ''}${TASK_STATUS_LABEL[navStatus]}${blocked ? '. You can open this to preview; finish earlier steps to complete it.' : ''}`}
+                                    aria-label={`${label}, ${showOptionalTaskBadge ? 'Optional. ' : CONNECT_SYSTEMS_TASK_IDS.has(taskIdx) ? 'Part of optional Connect Systems step. ' : ''}${TASK_STATUS_LABEL[navStatus]}${blocked ? '. You can open this to preview; finish earlier steps to complete it.' : ''}`}
                                   >
-                                    <TaskStatusGlyph status={navStatus} taskNumber={taskOrdinalInPhase} />
-                                    <span className="min-w-0 flex-1 truncate">{label}</span>
-                                    {optional ? (
-                                      <span
-                                        className="shrink-0 rounded bg-muted/80 px-1 py-px text-[8px] font-semibold uppercase tracking-wide text-muted-foreground"
-                                        title="Optional Marketplace add-ons (pet, legal, and similar)—not required for launch"
+                                    <TaskStatusGlyph status={navStatus} taskNumber={taskOrd + 1} />
+                                    <span
+                                      className={cn(
+                                        'min-w-0 flex-1 truncate',
+                                        current && !blocked && 'text-primary',
+                                        navStatus === 'skipped' && 'text-amber-900 line-through decoration-amber-700/50 dark:text-amber-200',
+                                        navStatus === 'waiting_on_others' && 'text-sky-900 dark:text-sky-100',
+                                        navStatus === 'needs_review' && 'text-amber-800 dark:text-amber-200',
+                                      )}
+                                    >
+                                      {label}
+                                    </span>
+                                    {showOptionalTaskBadge ? (
+                                      <Badge
+                                        intent="outline"
+                                        className="h-5 shrink-0 px-1.5 py-0 text-[8px] font-semibold uppercase tracking-wide"
+                                        title={
+                                          taskIdx === 8
+                                            ? 'Marketplace — optional third-party add-ons'
+                                            : taskIdx === 15
+                                              ? 'Employee experience preview — optional; run after verify when you want'
+                                              : 'Optional — does not count toward required setup progress'
+                                        }
                                       >
                                         Optional
-                                      </span>
+                                      </Badge>
                                     ) : null}
                                     {navStatus === 'waiting_on_others' ? (
-                                      <Clock className="h-3 w-3 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
+                                      <Clock className="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
                                     ) : null}
                                   </button>
                                 </li>
@@ -1658,7 +2061,8 @@ export default function SetupWizardPage() {
                     </li>
                   )
                 })}
-              </ol>
+                </ol>
+              </ScrollArea>
             </nav>
           </aside>
 
@@ -1669,18 +2073,13 @@ export default function SetupWizardPage() {
             )}
           >
             <Card className={cn('shadow-sm', stepIndex === PREVIEW_EMPLOYEE_TASK_INDEX && 'flex min-h-0 flex-1 flex-col overflow-hidden')}>
-              <CardHeader className={cn('px-6 pb-4', stepIndex === PREVIEW_EMPLOYEE_TASK_INDEX && 'shrink-0')}>
-                <div className="flex flex-wrap items-center gap-2">
-                  <CardTitle className="text-xl">{TASK_LABELS[stepIndex]}</CardTitle>
-                  <Badge intent="default" className="rounded-full text-[11px] font-normal">
-                    {TASK_STATUS_LABEL[resolveTaskNavStatus(stepIndex, stepIndex, taskOutcomes)]}
-                  </Badge>
-                </div>
-                <CardDescription>
-                  {OPTIONAL_TASK_IDS.has(stepIndex)
-                    ? 'This is an optional task—it does not count toward required setup progress. Skipped optional work stays visible in the list but is not treated as done.'
-                    : 'This is a required task—it counts toward your required progress when you finish the work and tap Next. Skips stay visible but do not count as done.'}{' '}
-                  Progress saves automatically in this browser.
+              <CardHeader className={cn('px-6 pb-3', stepIndex === PREVIEW_EMPLOYEE_TASK_INDEX && 'shrink-0')}>
+                <CardTitle className="text-xl">{TASK_LABELS[stepIndex]}</CardTitle>
+                <p className="mt-1.5 text-sm leading-snug text-muted-foreground">{stepMeta.step.description}</p>
+                <CardDescription className="mt-2 text-xs text-muted-foreground">
+                  {OPTIONAL_TASK_IDS.has(stepIndex) && !CONNECT_SYSTEMS_TASK_IDS.has(stepIndex)
+                    ? 'Optional — not counted toward required progress.'
+                    : 'Progress saves automatically in this browser.'}
                 </CardDescription>
               </CardHeader>
               <CardContent
@@ -1689,10 +2088,7 @@ export default function SetupWizardPage() {
                 )}
               >
                 {currentBlocked && prereqForCurrent !== undefined ? (
-                  <div
-                    className="mb-4 space-y-3 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm"
-                    role="status"
-                  >
+                  <Alert intent="info" role="status" className="mb-4 flex flex-col gap-3 text-sm">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                         Available for you now
@@ -1713,7 +2109,7 @@ export default function SetupWizardPage() {
                         </ul>
                       ) : (
                         <p className="mt-1.5 text-[13px] text-muted-foreground">
-                          Use the phases on the left to revisit a completed step, or use the button below to open what’s
+                          Use the steps on the left to revisit a completed task, or use the button below to open what’s
                           blocking you.
                         </p>
                       )}
@@ -1721,7 +2117,8 @@ export default function SetupWizardPage() {
                         <p className="mt-1 text-xs text-muted-foreground">+ more in the task list</p>
                       ) : null}
                     </div>
-                    <div className="border-t border-border/60 pt-2">
+                    <Separator className="bg-border/60" />
+                    <div>
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                         This screen
                       </p>
@@ -1730,9 +2127,10 @@ export default function SetupWizardPage() {
                         up.
                       </p>
                     </div>
-                    <div className="border-t border-border/60 pt-2">
+                    <Separator className="bg-border/60" />
+                    <div>
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        What unlocks this step
+                        What unlocks this task
                       </p>
                       <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
                         {unlockGuidanceForPrereq(prereqForCurrent, taskOutcomes)}
@@ -1741,7 +2139,7 @@ export default function SetupWizardPage() {
                         Go to {TASK_LABELS[prereqForCurrent]}
                       </Button>
                     </div>
-                  </div>
+                  </Alert>
                 ) : null}
                 <div
                   className={cn(
