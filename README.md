@@ -46,7 +46,11 @@ Workflow: [`.github/workflows/deploy-github-pages.yml`](.github/workflows/deploy
 **One-time (GitHub UI)**
 
 1. **Settings → Pages → Build and deployment**: set **Source** to **GitHub Actions** (not “Deploy from a branch”).
-2. **Settings → Secrets and variables → Actions**: add **`ARTIFACTORY_NPM_TOKEN`** (exact name) as a **repository secret** with your JFrog npm identity token — the same value you use locally with `export ARTIFACTORY_NPM_TOKEN=…`. The workflow writes `.npmrc` during the job using this secret. If the secret is missing or wrong, `npm ci` fails with **E401**.
+2. **Settings → Secrets and variables → Actions** — add repository secrets:
+   - **`ARTIFACTORY_NPM_TOKEN`** (required): JFrog **identity token** (what you use as the npm “password” locally).
+   - **`ARTIFACTORY_NPM_USERNAME`** (optional but often required): your **Artifactory login email** (or username). If `npm ci` still returns **E401** with only the token, add this secret: CI will use `_auth = base64(username:token)`, matching `npm login` to JFrog.
+
+   The workflow writes `.npmrc` for the job (scoped registry for `@wexinc-healthbenefits`, default registry for everything else).
 
 **Live URL** (project site): `https://<owner>.github.io/<repo>/` — e.g. `https://harrybmorgan.github.io/ngb-admin-ux/`. The workflow sets `VITE_BASE_PATH=/<repo>/` so assets and `react-router` match that path (see [`src/main.tsx`](src/main.tsx) `routerBasename()`). `postbuild` already copies `index.html` to `404.html` for SPA reloads.
 
