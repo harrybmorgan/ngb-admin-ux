@@ -32,13 +32,23 @@ jobs:
           node-version-file: '.nvmrc'
           cache: npm
 
-      - name: Configure npm for private registry
-        run: cp .npmrc.example .npmrc
-
+      # Write .npmrc in the same step as the token so the value is interpolated by the shell.
+      # (Relying on npm's ${VAR} expansion inside .npmrc is unreliable in Actions; an empty/missing
+      # secret then yields E401 against the public registry.)
       - name: Install dependencies
         env:
           ARTIFACTORY_NPM_TOKEN: ${{ secrets.ARTIFACTORY_NPM_TOKEN }}
-        run: npm ci --ignore-scripts
+        run: |
+          if [ -z "$ARTIFACTORY_NPM_TOKEN" ]; then
+            echo "::error::Add repository secret ARTIFACTORY_NPM_TOKEN (Settings → Secrets and variables → Actions). Use your JFrog npm identity token — same as local installs."
+            exit 1
+          fi
+          {
+            echo '@wexinc-healthbenefits:registry=https://usartifactorywexinc.jfrog.io/artifactory/api/npm/benefits-npm/'
+            printf '//usartifactorywexinc.jfrog.io/artifactory/api/npm/benefits-npm/:_authToken=%s\n' "$ARTIFACTORY_NPM_TOKEN"
+            echo '//usartifactorywexinc.jfrog.io/artifactory/api/npm/benefits-npm/:always-auth=true'
+          } > .npmrc
+          npm ci --ignore-scripts
 
       - name: Build
         env:
