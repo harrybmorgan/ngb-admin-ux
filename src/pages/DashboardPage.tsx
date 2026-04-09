@@ -1,25 +1,9 @@
 import { Link } from 'react-router-dom'
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@wexinc-healthbenefits/ben-ui-kit'
-import {
-  ArrowRight,
-  ClipboardCheck,
-  CreditCard,
-  FileSpreadsheet,
-  Palette,
-  Rocket,
-  Users,
-} from 'lucide-react'
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@wexinc-healthbenefits/ben-ui-kit'
+import { BarChart3, CreditCard, FileSpreadsheet, LineChart, Palette, Users } from 'lucide-react'
+import { DashboardWelcomeHero } from '@/components/dashboard/DashboardWelcomeHero'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
-import { EMPLOYER } from '@/data/adminMockData'
 import { useEmployerSetup } from '@/hooks/useEmployerSetup'
 import { cn } from '@/lib/utils'
 
@@ -59,70 +43,29 @@ const secondaryTasks = [
   },
 ] as const
 
+const dashboardWidgets = [
+  {
+    title: 'Enrollment snapshot',
+    description: 'Participation rates, life-event queue, and census freshness pulled from payroll sync.',
+    icon: BarChart3,
+  },
+  {
+    title: 'Financial pulse',
+    description: 'Invoice status, spend pacing, and claims volume for finance and benefits reviews.',
+    icon: LineChart,
+  },
+] as const
+
 export default function DashboardPage() {
-  const { onboardingComplete, planReady, launchComplete } = useEmployerSetup()
-  const shelly = EMPLOYER.hrAdminName.split(' ')[0]
+  const { onboardingComplete, planReady } = useEmployerSetup()
 
   return (
     <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
 
       <main className="mx-auto w-full max-w-[1200px] flex-1 space-y-10 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-        <section className="space-y-4">
-          <div className="space-y-2">
-            <Badge intent="info" className="w-fit rounded-full border-0 bg-[#eef2ff] px-3 py-1 text-[12px] font-semibold text-[#3958c3]">
-              {EMPLOYER.name}
-            </Badge>
-            <h1 className="text-3xl font-bold tracking-tight text-[#14182c] sm:text-4xl">
-              Welcome, {shelly}
-            </h1>
-          </div>
-        </section>
-
         <section>
-          <Card className={cn(cardSurface, 'hover:shadow-md')}>
-            <CardHeader className="space-y-4 px-6 pb-2 pt-6">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3]">
-                  <Rocket className="h-5 w-5" />
-                </div>
-                <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg font-bold leading-6 text-[#14182c]">
-                      {onboardingComplete ? 'Guided employer setup' : 'Start guided setup'}
-                    </CardTitle>
-                    <CardDescription className="text-sm leading-5 text-[#5f6a94]">
-                      {onboardingComplete
-                        ? 'You can revisit any step or adjust branding from your profile menu. Launch status is below.'
-                        : 'First time here? Walk through low-touch steps for plans, eligibility, integrations, and branding. Save anytime and pick up later.'}
-                    </CardDescription>
-                  </div>
-                  {!onboardingComplete ? (
-                    <Badge intent="warning" className="shrink-0 rounded-full">
-                      In progress
-                    </Badge>
-                  ) : null}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 px-6 pb-6 pt-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <Button
-                asChild
-                size="lg"
-                className="gap-2 rounded-xl border-0 bg-[#3958c3] px-6 text-[15px] font-medium text-white hover:bg-[#2d4699]"
-              >
-                <Link to="/setup" className="inline-flex items-center gap-2">
-                  {onboardingComplete ? 'Get started' : 'Start setup wizard'}
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-              {!planReady && (
-                <p className="text-sm leading-5 text-[#5f6a94]">
-                  Complete plan design to unlock billing reconciliation shortcuts.
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          <DashboardWelcomeHero onboardingComplete={onboardingComplete} planReady={planReady} />
         </section>
 
         <section className="space-y-4">
@@ -170,59 +113,87 @@ export default function DashboardPage() {
           )}
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-3">
-          <Card className={cn(cardSurface, 'hover:shadow-md lg:col-span-2')}>
-            <CardHeader className="px-6 pb-2 pt-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3]">
-                  <ClipboardCheck className="h-5 w-5" />
-                </div>
-                <div>
-                  <CardTitle className="text-base font-bold leading-6 text-[#14182c]">Launch status</CardTitle>
-                  <CardDescription className="text-sm text-[#5f6a94]">
-                    Prototype flags stored in your browser (localStorage).
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-0 px-6 pb-6 pt-2">
-              <div className="flex justify-between border-b border-[#e3e7f4] py-3 text-sm">
-                <span className="text-[#5f6a94]">Guided setup</span>
-                <span className="font-semibold text-[#14182c]">
-                  {onboardingComplete ? 'Wizard finished' : 'In progress'}
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-[#e3e7f4] py-3 text-sm">
-                <span className="text-[#5f6a94]">Plan framework ready</span>
-                <span className="font-semibold text-[#14182c]">{planReady ? 'Yes' : 'No'}</span>
-              </div>
-              <div className="flex justify-between py-3 text-sm">
-                <span className="text-[#5f6a94]">Portal launch</span>
-                <span className="font-semibold text-[#14182c]">{launchComplete ? 'Live' : 'Not launched'}</span>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className={cn(cardSurface, 'hover:shadow-md')}>
-            <CardHeader className="px-6 pb-2 pt-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3]">
-                  <Rocket className="h-5 w-5" />
-                </div>
-                <CardTitle className="text-base font-bold leading-6 text-[#14182c]">Quick links</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2 px-6 pb-6">
-              <Button asChild variant="outline" size="sm" className={cn('justify-center sm:justify-start', outlineSpark)}>
-                <Link to="/reports">Reports & analytics</Link>
-              </Button>
-              <Button asChild variant="outline" size="sm" className={cn('justify-center sm:justify-start', outlineSpark)}>
-                <Link to="/content">Content library</Link>
-              </Button>
-              <Button asChild variant="outline" size="sm" className={cn('justify-center sm:justify-start', outlineSpark)}>
-                <Link to="/setup">Jump to review & launch</Link>
-              </Button>
-            </CardContent>
-          </Card>
+        <section className="space-y-4">
+          <h2 className={sectionEyebrow}>Data & reports</h2>
+          <div className="grid gap-6 lg:grid-cols-2">
+            {dashboardWidgets.map(({ title, description, icon: Icon }) => {
+              const locked = !planReady
+              return (
+                <Card
+                  key={title}
+                  className={cn(
+                    cardSurface,
+                    locked ? 'opacity-60' : 'hover:shadow-md',
+                  )}
+                >
+                  <CardHeader className="space-y-3 px-6 pb-2 pt-6">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <div
+                          className={cn(
+                            'flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3]',
+                            locked && 'grayscale',
+                          )}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 space-y-1">
+                          <CardTitle className="text-base font-bold leading-6 text-[#14182c]">{title}</CardTitle>
+                          <CardDescription className="text-sm leading-5 text-[#5f6a94]">{description}</CardDescription>
+                        </div>
+                      </div>
+                      {locked ? (
+                        <span className="shrink-0 rounded-full bg-[#f1f3f9] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#5f6a94]">
+                          Awaits setup
+                        </span>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-[#ecfdf5] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
+                          Ready for data
+                        </span>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4 px-6 pb-6">
+                    <div
+                      className={cn(
+                        'rounded-xl border border-dashed border-[#d5dbe8] bg-[#f8f9fe] p-4',
+                        locked && 'pointer-events-none select-none',
+                      )}
+                      aria-hidden={locked ? true : undefined}
+                    >
+                      <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#9aa3bd]">
+                        Placeholder preview
+                      </p>
+                      <div className="space-y-2.5">
+                        {[72, 48, 88, 56].map((w, i) => (
+                          <div
+                            key={i}
+                            className="h-2.5 rounded-full bg-[#e3e7f4]"
+                            style={{ width: `${w}%` }}
+                          />
+                        ))}
+                      </div>
+                      <div className="mt-4 h-16 rounded-lg bg-[#eef2ff]/60" />
+                    </div>
+                    <p className="text-xs leading-4 text-[#5f6a94]">
+                      {locked
+                        ? 'This widget stays disabled until your plan framework is ready, same as shortcuts above. Then it will update with reports and synced data from your environment.'
+                        : 'Layout preview only. Metrics and exports will replace this placeholder once reporting feeds are connected (prototype).'}
+                    </p>
+                    <Button type="button" variant="outline" size="sm" disabled className="w-full rounded-xl sm:w-auto">
+                      {locked ? 'Complete plan setup first' : 'View report (coming soon)'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+          {!planReady && (
+            <p className="text-xs leading-4 text-[#5f6a94]">
+              Widgets unlock together with frequent tasks when plan setup is finished in the wizard. After that, this area
+              is where live dashboards and report shortcuts will land.
+            </p>
+          )}
         </section>
       </main>
 

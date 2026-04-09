@@ -15,6 +15,7 @@ const ContentPage = React.lazy(() => import('@/pages/ContentPage'))
 const CommunicationsPage = React.lazy(() => import('@/pages/CommunicationsPage'))
 const ThemingPage = React.lazy(() => import('@/pages/ThemingPage'))
 const SettingsPage = React.lazy(() => import('@/pages/SettingsPage'))
+const TicketsPage = React.lazy(() => import('@/pages/TicketsPage'))
 
 function PageLoader() {
   return (
@@ -48,6 +49,7 @@ export function AppRoutes() {
         <Route path="communications" element={withProtected(<CommunicationsPage />)} />
         <Route path="theming" element={withProtected(<ThemingPage />)} />
         <Route path="settings" element={withProtected(<SettingsPage />)} />
+        <Route path="tickets" element={withProtected(<TicketsPage />)} />
       </Routes>
     </React.Suspense>
   )

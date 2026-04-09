@@ -24,6 +24,7 @@ import {
   Menu,
   Palette,
   Settings,
+  Ticket,
   User,
   Users,
 } from 'lucide-react'
@@ -157,6 +158,10 @@ export function AdminNavigation({ hideNav = false }: AdminNavigationProps) {
                   <DropdownMenuItem onClick={() => navigate('/settings')}>
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/tickets')}>
+                    <Ticket className="mr-2 h-4 w-4" />
+                    Tickets
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/theming')}>
                     <Palette className="mr-2 h-4 w-4" />
