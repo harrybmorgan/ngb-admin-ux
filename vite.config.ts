@@ -3,9 +3,18 @@ import react from '@vitejs/plugin-react'
 import path from 'node:path'
 import { tokensCSSPlugin } from './vite-plugins/tokens-css'
 
+/** GitHub project Pages: `https://<user>.github.io/<repo>/` → set `VITE_BASE_PATH=/<repo>/` in CI. */
+function viteBase(): string {
+  const raw = process.env.VITE_BASE_PATH?.trim()
+  if (!raw) return '/'
+  let b = raw.startsWith('/') ? raw : `/${raw}`
+  if (b !== '/' && !b.endsWith('/')) b = `${b}/`
+  return b
+}
+
 // https://vite.dev/config/
 export default defineConfig(() => ({
-  base: '/',
+  base: viteBase(),
   plugins: [
     react(),
     tokensCSSPlugin(), // Generate CSS from JSON at build time

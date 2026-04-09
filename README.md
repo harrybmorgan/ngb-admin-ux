@@ -9,7 +9,10 @@ WEX-branded **employer admin** prototype that pairs with the consumer experience
 
 ## Setup
 
-1. Ensure `.npmrc` is configured (repo includes a template using `ARTIFACTORY_NPM_TOKEN`, same pattern as `cxr-ux`). Before install, run `export ARTIFACTORY_NPM_TOKEN="…"` with your Artifactory npm token.
+1. **Private UI kit (`@wexinc-healthbenefits/ben-ui-kit`)** resolves from WEX JFrog **`benefits-npm`** (see `package-lock.json`). Without a local `.npmrc`, npm hits the public registry and you get **E401**.
+   - Copy the template: `cp .npmrc.example .npmrc`
+   - Create a token in **Artifactory / JFrog** (identity token or team-documented npm credential; same pattern as **cxr-ux**).
+   - In the same shell: `export ARTIFACTORY_NPM_TOKEN="…"` then `npm install`
 2. Install dependencies. If `patch-package` errors appear during `@wexinc-healthbenefits/ben-ui-kit` postinstall, use:
    ```bash
    npm install --ignore-scripts
@@ -35,6 +38,25 @@ WEX-branded **employer admin** prototype that pairs with the consumer experience
 ## Related repo
 
 Consumer portal: `cxr-ux` (sibling folder). Design tokens and Vite token CSS plugin are mirrored here for the same look and feel.
+
+## GitHub Pages (stakeholder demo)
+
+Workflow: [`.github/workflows/deploy-github-pages.yml`](.github/workflows/deploy-github-pages.yml) builds on every push to **`main`** and publishes **`dist/`** to Pages.
+
+**One-time (GitHub UI)**
+
+1. **Settings → Pages → Build and deployment**: set **Source** to **GitHub Actions** (not “Deploy from a branch”).
+2. **Settings → Secrets and variables → Actions**: add **`ARTIFACTORY_NPM_TOKEN`** with your JFrog npm token (same as local install). The workflow copies [`.npmrc.example`](.npmrc.example) to `.npmrc` and uses this secret for `npm ci`.
+
+**Live URL** (project site): `https://<owner>.github.io/<repo>/` — e.g. `https://harrybmorgan.github.io/ngb-admin-ux/`. The workflow sets `VITE_BASE_PATH=/<repo>/` so assets and `react-router` match that path (see [`src/main.tsx`](src/main.tsx) `routerBasename()`). `postbuild` already copies `index.html` to `404.html` for SPA reloads.
+
+**Preview a Pages build locally**
+
+```bash
+VITE_BASE_PATH=/ngb-admin-ux/ npm run build && npm run preview
+```
+
+(Replace `ngb-admin-ux` with your repository name if different.)
 
 ## Scripts
 

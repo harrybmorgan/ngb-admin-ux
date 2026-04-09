@@ -1,5 +1,12 @@
-# Copy to `.npmrc` or keep the repo `.npmrc` and set your token in the environment:
-#   export ARTIFACTORY_NPM_TOKEN="your-artifactory-token"
-registry=https://registry.npmjs.org/
+# Copy to `.npmrc` in this repo root (`.npmrc` is gitignored).
+# Obtain an npm identity token from WEX Artifactory / JFrog (same access as cxr-ux / benefits npm).
+#
+#   cp .npmrc.example .npmrc
+#   export ARTIFACTORY_NPM_TOKEN="YOUR_TOKEN"
+#   npm install
+#
+# Token: Artifactory → user menu → Edit profile → Generate an Identity Token (or your team’s documented API key flow).
+
 @wexinc-healthbenefits:registry=https://usartifactorywexinc.jfrog.io/artifactory/api/npm/benefits-npm/
 //usartifactorywexinc.jfrog.io/artifactory/api/npm/benefits-npm/:_authToken=${ARTIFACTORY_NPM_TOKEN}
+//usartifactorywexinc.jfrog.io/artifactory/api/npm/benefits-npm/:always-auth=true

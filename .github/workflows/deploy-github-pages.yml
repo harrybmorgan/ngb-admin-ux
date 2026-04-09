@@ -1,0 +1,60 @@
+# Build and deploy the Vite app to GitHub Pages (project site: /<repo>/).
+#
+# One-time repo setup:
+#   Settings → Pages → Build and deployment → Source: GitHub Actions
+#   Settings → Secrets and variables → Actions → add repository secret:
+#     ARTIFACTORY_NPM_TOKEN  (JFrog npm token for @wexinc-healthbenefits/ben-ui-kit)
+#
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Configure npm for private registry
+        run: cp .npmrc.example .npmrc
+
+      - name: Install dependencies
+        env:
+          ARTIFACTORY_NPM_TOKEN: ${{ secrets.ARTIFACTORY_NPM_TOKEN }}
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        env:
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+        run: npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
