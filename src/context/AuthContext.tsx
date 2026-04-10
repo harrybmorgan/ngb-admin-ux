@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { clearGuidedSetupWizardDraft } from '@/hooks/useEmployerSetup'
 
 interface AuthContextType {
   isAuthenticated: boolean
@@ -30,7 +31,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated])
 
   const login = () => setIsAuthenticated(true)
-  const logout = () => setIsAuthenticated(false)
+  const logout = () => {
+    clearGuidedSetupWizardDraft()
+    setIsAuthenticated(false)
+  }
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, login, logout }}>

@@ -2,6 +2,12 @@ import { useCallback, useSyncExternalStore } from 'react'
 
 export const SETUP_STORAGE_KEY = 'ngb_admin_employer_setup'
 
+/**
+ * localStorage key for guided employer setup wizard draft.
+ * Must stay in sync with `SetupWizardPage` persistence (single source of truth here).
+ */
+export const GUIDED_SETUP_WIZARD_DRAFT_KEY = 'ngb_admin_wizard_draft_v7'
+
 export type EmployerSetupState = {
   onboardingComplete: boolean
   planReady: boolean
@@ -54,6 +60,13 @@ function getServerSnapshot(): EmployerSetupState {
 
 export function emitSetupChanged() {
   window.dispatchEvent(new Event('ngb-admin-setup'))
+}
+
+/** Remove saved wizard draft so the next session starts with no tasks complete. Call on sign-out. */
+export function clearGuidedSetupWizardDraft() {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem(GUIDED_SETUP_WIZARD_DRAFT_KEY)
+  emitSetupChanged()
 }
 
 export function writeEmployerSetup(partial: Partial<EmployerSetupState>) {

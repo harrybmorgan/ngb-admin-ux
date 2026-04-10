@@ -48,10 +48,11 @@ import { cn } from '@/lib/utils'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import { CONNECTORS, EMPLOYER, PRODUCT_OPTIONS } from '@/data/adminMockData'
-import { emitSetupChanged, writeEmployerSetup } from '@/hooks/useEmployerSetup'
-
-/** v7: Shared default benefit dates + optional per-plan overrides in Configure plans. */
-const WIZARD_DRAFT_KEY = 'ngb_admin_wizard_draft_v7'
+import {
+  emitSetupChanged,
+  GUIDED_SETUP_WIZARD_DRAFT_KEY,
+  writeEmployerSetup,
+} from '@/hooks/useEmployerSetup'
 
 /** Linear task order (18 tasks). */
 const TASK_LABELS = [
@@ -146,6 +147,19 @@ function taskOrdinalInStepGroup(taskIndex: number): { step: WizardStepDef; index
   const step = WIZARD_STEPS[stepGroupIndexForTask(taskIndex)]
   const indexInStep = step.taskIndices.indexOf(taskIndex)
   return { step, indexInStep: indexInStep >= 0 ? indexInStep : 0, stepSize: step.taskIndices.length }
+}
+
+/** First task in the step that is not `complete` (skipped / waiting / review still count as “open”). If all are complete, first task in the step. */
+function firstNonCompleteTaskIndexInStep(
+  step: WizardStepDef,
+  outcomes: readonly StoredTaskOutcome[],
+): number {
+  const first = step.taskIndices[0]
+  if (first === undefined) return 0
+  for (const i of step.taskIndices) {
+    if (outcomes[i] !== 'complete') return i
+  }
+  return first
 }
 
 /** Persisted per-task outcome. Blocked / in progress / not started are derived for UI. */
@@ -368,7 +382,7 @@ function normalizeDraft(parsed: Partial<Draft> & { stepIndex?: number }): Draft 
 
 function loadDraft(): Draft {
   try {
-    const raw = localStorage.getItem(WIZARD_DRAFT_KEY)
+    const raw = localStorage.getItem(GUIDED_SETUP_WIZARD_DRAFT_KEY)
     if (!raw) return { ...defaultDraft }
     return normalizeDraft(JSON.parse(raw) as Partial<Draft>)
   } catch {
@@ -377,7 +391,7 @@ function loadDraft(): Draft {
 }
 
 function saveDraft(d: Draft) {
-  localStorage.setItem(WIZARD_DRAFT_KEY, JSON.stringify(d))
+  localStorage.setItem(GUIDED_SETUP_WIZARD_DRAFT_KEY, JSON.stringify(d))
   emitSetupChanged()
 }
 
@@ -643,6 +657,16 @@ export default function SetupWizardPage() {
 
   const goToTask = useCallback((taskIdx: number) => {
     setDraft((d) => ({ ...d, stepIndex: taskIdx }))
+  }, [])
+
+  const selectStepAndGoToFirstOpenTask = useCallback((stepIdx: number) => {
+    setSelectedStepIndex(stepIdx)
+    setDraft((d) => {
+      const step = WIZARD_STEPS[stepIdx]
+      if (!step) return d
+      const target = firstNonCompleteTaskIndexInStep(step, d.taskOutcomes)
+      return { ...d, stepIndex: target }
+    })
   }, [])
 
   const availableNowTasks = useMemo(() => availableOpenTasks(taskOutcomes), [taskOutcomes])
@@ -1923,7 +1947,7 @@ export default function SetupWizardPage() {
                     <li key={wizardStep.title} className="rounded-lg">
                       <button
                         type="button"
-                        onClick={() => setSelectedStepIndex(stepIdx)}
+                        onClick={() => selectStepAndGoToFirstOpenTask(stepIdx)}
                         className={cn(
                           'flex w-full items-start gap-3 rounded-lg px-1 py-2.5 text-left transition-colors',
                           'hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25',
