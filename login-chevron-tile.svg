@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="300" viewBox="0 0 360 300">
+  <g fill="#ffffff" fill-opacity="0.18">
+    <path d="M-40 150 L50 60 L140 150 L50 240 Z" />
+    <path d="M140 150 L230 60 L320 150 L230 240 Z" />
+    <path d="M320 150 L410 60 L500 150 L410 240 Z" />
+  </g>
+</svg>
