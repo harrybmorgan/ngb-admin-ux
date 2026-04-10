@@ -133,9 +133,3 @@ export const REPORT_LIBRARY = [
     updated: '2026-02-18',
   },
 ] as const
-
-export const CONTENT_ITEMS = [
-  { id: 'c1', type: 'document' as const, title: '2026 SPD — Medical & Rx', size: '2.4 MB' },
-  { id: 'c2', type: 'video' as const, title: 'Open enrollment walkthrough (8 min)', size: 'Stream' },
-  { id: 'c3', type: 'tutorial' as const, title: 'How to approve life events', size: 'Guide' },
-]
