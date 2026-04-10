@@ -110,6 +110,7 @@ export const REPORT_LIBRARY = [
     author: 'System',
     service: 'BenAdmin',
     updated: '2026-04-01',
+    updatedTime: '2:45 PM',
   },
   {
     id: 'r2',
@@ -117,6 +118,7 @@ export const REPORT_LIBRARY = [
     author: 'Shelly Hamilton',
     service: 'COBRA & Direct Bill',
     updated: '2026-03-29',
+    updatedTime: '9:12 AM',
   },
   {
     id: 'r3',
@@ -124,6 +126,7 @@ export const REPORT_LIBRARY = [
     author: 'System',
     service: 'Accounts Payments',
     updated: '2026-04-06',
+    updatedTime: '4:30 PM',
   },
   {
     id: 'r4',
@@ -131,11 +134,6 @@ export const REPORT_LIBRARY = [
     author: 'Jordan Lee',
     service: 'BenAdmin',
     updated: '2026-02-18',
+    updatedTime: '11:05 AM',
   },
 ] as const
-
-export const CONTENT_ITEMS = [
-  { id: 'c1', type: 'document' as const, title: '2026 SPD — Medical & Rx', size: '2.4 MB' },
-  { id: 'c2', type: 'video' as const, title: 'Open enrollment walkthrough (8 min)', size: 'Stream' },
-  { id: 'c3', type: 'tutorial' as const, title: 'How to approve life events', size: 'Guide' },
-]
