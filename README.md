@@ -41,18 +41,20 @@ Consumer portal: `cxr-ux` (sibling folder). Design tokens and Vite token CSS plu
 
 ## GitHub Pages (stakeholder demo)
 
-Workflow: [`.github/workflows/deploy-github-pages.yml`](.github/workflows/deploy-github-pages.yml) builds on every push to **`main`** and publishes **`dist/`** to Pages.
+Workflow: [`.github/workflows/pages.yml`](.github/workflows/pages.yml) runs on pushes to **`main`** (and **workflow_dispatch**). It builds with `VITE_BASE_PATH=/<repo>/`, runs **`postbuild`** (copies `dist/index.html` → `dist/404.html` for client-side routing), then pushes **`dist/`** to the **`gh-pages`** branch via [peaceiris/actions-gh-pages](https://github.com/peaceiris/actions-gh-pages) using **`GITHUB_TOKEN`**.
 
-**One-time (GitHub UI)**
+**Repository secrets** (Settings → Secrets and variables → Actions):
 
-1. **Settings → Pages → Build and deployment**: set **Source** to **GitHub Actions** (not “Deploy from a branch”).
-2. **Settings → Secrets and variables → Actions** — add repository secrets:
-   - **`ARTIFACTORY_NPM_TOKEN`** (required): JFrog **identity token** (what you use as the npm “password” locally).
-   - **`ARTIFACTORY_NPM_USERNAME`** (optional but often required): your **Artifactory login email** (or username). If `npm ci` still returns **E401** with only the token, add this secret: CI will use `_auth = base64(username:token)`, matching `npm login` to JFrog.
+- **`ARTIFACTORY_NPM_TOKEN`** (required)
+- **`ARTIFACTORY_NPM_USERNAME`** (optional; often needed for JFrog Basic auth — see workflow comments)
 
-   The workflow writes `.npmrc` for the job (scoped registry for `@wexinc-healthbenefits`, default registry for everything else).
+**Enable Pages in GitHub (after the first successful workflow run creates `gh-pages`)**
 
-**Live URL** (project site): `https://<owner>.github.io/<repo>/` — e.g. `https://harrybmorgan.github.io/ngb-admin-ux/`. The workflow sets `VITE_BASE_PATH=/<repo>/` so assets and `react-router` match that path (see [`src/main.tsx`](src/main.tsx) `routerBasename()`). `postbuild` already copies `index.html` to `404.html` for SPA reloads.
+1. Open the repo on GitHub → **Settings** → **Pages** (left sidebar, under “Code and automation”).
+2. Under **Build and deployment** → **Source**, choose **Deploy from a branch** (not “GitHub Actions” for this setup).
+3. **Branch**: select **`gh-pages`** and folder **`/ (root)`** → **Save**.
+
+**Live URL** (project site): `https://<owner>.github.io/<repo>/` — e.g. `https://harrybmorgan.github.io/ngb-admin-ux/`. `VITE_BASE_PATH` matches that path (see [`src/main.tsx`](src/main.tsx) `routerBasename()`).
 
 **Preview a Pages build locally**
 

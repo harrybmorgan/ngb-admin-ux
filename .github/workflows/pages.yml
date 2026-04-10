@@ -1,14 +1,13 @@
-# Build and deploy the Vite app to GitHub Pages (project site: /<repo>/).
+# Build the Vite app and push static output to the gh-pages branch (peaceiris/actions-gh-pages).
 #
-# One-time repo setup:
-#   Settings → Pages → Build and deployment → Source: GitHub Actions
-#   Settings → Secrets and variables → Actions → repository secrets:
-#     ARTIFACTORY_NPM_TOKEN     — JFrog identity / access token (npm “password”)
-#     ARTIFACTORY_NPM_USERNAME  — optional: your Artifactory email (or username). If E401 persists
-#                                 with token-only auth, add this so CI uses _auth = base64(user:token)
-#                                 (same as `npm login` to JFrog).
+# Secrets (Settings → Secrets and variables → Actions):
+#   ARTIFACTORY_NPM_TOKEN     — required (JFrog npm token)
+#   ARTIFACTORY_NPM_USERNAME  — optional (Artifactory email for Basic _auth)
 #
-name: Deploy to GitHub Pages
+# After first successful run: Settings → Pages → Build and deployment → Deploy from a branch
+#   Branch: gh-pages, folder: / (root). See README.
+#
+name: Deploy Pages
 
 on:
   push:
@@ -16,16 +15,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: gh-pages-deploy
   cancel-in-progress: true
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,8 +32,6 @@ jobs:
           node-version-file: '.nvmrc'
           cache: npm
 
-      # JFrog npm auth: many WEX setups expect Basic _auth (email:identityToken), not bare _authToken.
-      # Default registry stays npmjs so public deps are not sent to Artifactory without credentials.
       - name: Install dependencies
         env:
           ARTIFACTORY_NPM_TOKEN: ${{ secrets.ARTIFACTORY_NPM_TOKEN }}
@@ -67,16 +62,8 @@ jobs:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
         run: npm run build
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
