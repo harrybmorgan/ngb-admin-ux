@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from 'react'
 import { Link } from 'react-router-dom'
 import { EmbeddedThemingStudio } from '@/pages/theming-engine/EmbeddedThemingStudio'
 import {
@@ -105,6 +114,57 @@ const BENEFITS_DEFAULTS_VERSION = 2
 
 /** Older guided-setup default before expanded catalog + six default checks. */
 const LEGACY_DEFAULT_BENEFIT_PRODUCT_IDS = new Set(['medical', 'dental', 'hsa'])
+
+type ProductOptionRow = (typeof PRODUCT_OPTIONS)[number]
+
+function sortProductOptionsAlphabetically(options: readonly ProductOptionRow[]): ProductOptionRow[] {
+  return [...options].sort((a, b) =>
+    a.label.localeCompare(b.label, undefined, { sensitivity: 'base', numeric: true }),
+  )
+}
+
+/**
+ * Splits A–Z `sorted` into sequential column slices (first `n % cols` columns get one extra row when
+ * `n` is not divisible by `cols`), then flattens row-major so default CSS grid reads A–Z top-to-bottom
+ * in each column. The naive `i = r + c * ceil(n/cols)` map breaks when the last grid row is short.
+ */
+function productOptionsForColumnWiseGrid<T extends { id: string }>(sorted: readonly T[], cols: number): T[] {
+  if (cols <= 1) return [...sorted]
+  const n = sorted.length
+  const base = Math.floor(n / cols)
+  const remainder = n % cols
+  const colChunks: T[][] = []
+  let from = 0
+  for (let c = 0; c < cols; c++) {
+    const h = base + (c < remainder ? 1 : 0)
+    colChunks.push(sorted.slice(from, from + h) as T[])
+    from += h
+  }
+  const maxRows = colChunks.reduce((m, ch) => Math.max(m, ch.length), 0)
+  const out: T[] = []
+  for (let r = 0; r < maxRows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const ch = colChunks[c]!
+      if (r < ch.length) out.push(ch[r]!)
+    }
+  }
+  return out
+}
+
+const SORTED_PRODUCT_OPTIONS = sortProductOptionsAlphabetically(PRODUCT_OPTIONS)
+
+/** Match computed `grid-template-columns` to the real column count (syncs column-major DOM order with the grid). */
+function countComputedGridColumns(gridTemplateColumns: string): number {
+  if (!gridTemplateColumns || gridTemplateColumns === 'none') return 1
+  const trimmed = gridTemplateColumns.trim()
+  const repeatMatch = /^repeat\(\s*(\d+)\s*,/i.exec(trimmed)
+  if (repeatMatch) return Math.max(1, parseInt(repeatMatch[1]!, 10))
+  const minmaxTracks = trimmed.match(/minmax\([^)]+\)/g)
+  if (minmaxTracks && minmaxTracks.length > 0) return minmaxTracks.length
+  const sizedTracks = trimmed.match(/\d+(?:\.\d+)?(?:px|fr)\b/g)
+  if (sizedTracks && sizedTracks.length > 0) return sizedTracks.length
+  return Math.max(1, trimmed.split(/\s+/).filter(Boolean).length)
+}
 
 /** Full-bleed embedded theming / preview surface. */
 const PREVIEW_EMPLOYEE_TASK_INDEX = 11
@@ -1357,6 +1417,35 @@ export default function SetupWizardPage() {
   const [draft, setDraft] = useState<Draft>(() => loadDraft())
   const [mappingOpen, setMappingOpen] = useState(false)
   const [selectedStepIndex, setSelectedStepIndex] = useState(() => stepGroupIndexForTask(loadDraft().stepIndex))
+  const benefitsOfferGridRef = useRef<HTMLDivElement>(null)
+  const [benefitsOfferGridCols, setBenefitsOfferGridCols] = useState(1)
+
+  useLayoutEffect(() => {
+    if (draft.stepIndex !== 5) return
+    const el = benefitsOfferGridRef.current
+    if (!el) return
+
+    const measureCols = () => {
+      let n = countComputedGridColumns(getComputedStyle(el).gridTemplateColumns)
+      if (n === 1 && typeof window !== 'undefined') {
+        const w = window.innerWidth
+        if (w >= 1280) n = 3
+        else if (w >= 640) n = 2
+      }
+      const cols = Math.min(6, Math.max(1, n))
+      setBenefitsOfferGridCols((prev) => (prev !== cols ? cols : prev))
+    }
+
+    measureCols()
+    const ro = new ResizeObserver(measureCols)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [draft.stepIndex])
+
+  const benefitsOfferDisplayOrder = useMemo(
+    () => productOptionsForColumnWiseGrid(SORTED_PRODUCT_OPTIONS, benefitsOfferGridCols),
+    [benefitsOfferGridCols],
+  )
 
   useEffect(() => {
     saveDraft(draft)
@@ -2454,8 +2543,8 @@ export default function SetupWizardPage() {
               Select every benefit category you offer. Each selection becomes a plan you configure in{' '}
               <strong className="font-medium text-foreground">Configure plans</strong>—you can add more categories later.
             </p>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {PRODUCT_OPTIONS.map((p) => (
+            <div ref={benefitsOfferGridRef} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {benefitsOfferDisplayOrder.map((p) => (
                 <label
                   key={p.id}
                   className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted/40"
