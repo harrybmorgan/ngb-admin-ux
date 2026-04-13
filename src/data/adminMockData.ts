@@ -1,13 +1,72 @@
 /** Realistic dummy data for the employer admin prototype (Summit Ridge Bakery Co.) */
 
 export const EMPLOYER = {
+  /** Display / marketing name used elsewhere in the admin shell */
   name: 'Summit Ridge Bakery Co.',
+  legalName: 'Summit Ridge Bakery Company, LLC',
+  dbaName: 'Summit Ridge Café',
   ein: '84-1029384',
+  /** Multiline HQ + mailing (guided setup Company basics) */
+  addresses:
+    'Headquarters\n1200 Commerce Pkwy, Suite 200\nDenver, CO 80202\n\nMailing\nPO Box 4400\nDenver, CO 80204',
+  industryNaics: '311811 — Retail bakery',
+  businessStructure: 'LLC (Limited Liability Company)',
   payrollFrequency: 'Bi-weekly (26)',
   employeeCount: 48,
   hrAdminName: 'Shelly Hamilton',
   hrAdminEmail: 'shelly.nguyen@summitridgebakery.com',
 }
+
+/** Employer admin users for guided setup → Roles and Permissions (task 1). */
+export type EmployerRolesUserRow = {
+  id: string
+  name: string
+  email: string
+  userRights: string
+  /** When true, row is read-only (no edit control). */
+  locked?: boolean
+}
+
+export const EMPLOYER_ROLES_USER_RIGHTS_OPTIONS = [
+  'Benefits administrator — full access',
+  'Payroll liaison',
+  'Read-only auditor',
+  'Billing & finance',
+] as const
+
+export const EMPLOYER_ROLES_DEFAULT_USERS: EmployerRolesUserRow[] = [
+  {
+    id: 'shelly',
+    name: 'Shelly Hamilton',
+    email: 'shelly.nguyen@summitridgebakery.com',
+    userRights: 'Benefits administrator — full access',
+    locked: true,
+  },
+  {
+    id: 'marcus-chen',
+    name: 'Marcus Chen',
+    email: 'marcus.chen@summitridgebakery.com',
+    userRights: 'Payroll liaison',
+    locked: false,
+  },
+  {
+    id: 'riley-patel',
+    name: 'Riley Patel',
+    email: 'riley.patel@summitridgebakery.com',
+    userRights: 'Read-only auditor',
+    locked: false,
+  },
+]
+
+/** Options shown under Business structure in guided setup (Company basics). */
+export const EMPLOYER_BUSINESS_STRUCTURE_OPTIONS = [
+  'C Corporation',
+  'Sole Proprietorship',
+  'Partnership',
+  'S Corporation',
+  'LLC (Limited Liability Company)',
+  'Non-Profit',
+] as const
 
 export const PRODUCT_OPTIONS = [
   { id: 'hsa', label: 'HSA' },

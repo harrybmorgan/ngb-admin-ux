@@ -17,6 +17,11 @@ import {
   Checkbox,
   FloatLabel,
   ScrollArea,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Separator,
   Sheet,
   SheetContent,
@@ -40,6 +45,8 @@ import {
   Link2,
   Lock,
   Minus,
+  Pencil,
+  Plus,
   Rocket,
   SkipForward,
   Users,
@@ -47,7 +54,15 @@ import {
 import { cn } from '@/lib/utils'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
-import { CONNECTORS, EMPLOYER, PRODUCT_OPTIONS } from '@/data/adminMockData'
+import {
+  CONNECTORS,
+  EMPLOYER,
+  EMPLOYER_BUSINESS_STRUCTURE_OPTIONS,
+  EMPLOYER_ROLES_DEFAULT_USERS,
+  EMPLOYER_ROLES_USER_RIGHTS_OPTIONS,
+  PRODUCT_OPTIONS,
+  type EmployerRolesUserRow,
+} from '@/data/adminMockData'
 import {
   emitSetupChanged,
   GUIDED_SETUP_WIZARD_DRAFT_KEY,
@@ -57,7 +72,7 @@ import {
 /** Linear task order (18 tasks). */
 const TASK_LABELS = [
   'Company basics',
-  'Employer users & roles / permissions',
+  'Roles and Permissions',
   'Add employees',
   'Define employee groups / divisions / classes',
   'Define waiting periods',
@@ -95,8 +110,8 @@ type WizardStepDef = {
 const WIZARD_STEPS: readonly WizardStepDef[] = [
   {
     title: 'Company basics',
-    description: 'Legal profile and who can administer benefits in your organization.',
-    navHint: 'Entity details, employer users, roles, and optional SSO.',
+    description: 'Legal entity details and employer admin roles—who can change plans, billing, and integrations.',
+    navHint: 'Company profile, then roles & permissions for admins.',
     taskIndices: [0, 1],
   },
   {
@@ -744,6 +759,17 @@ export default function SetupWizardPage() {
     setBenefitsActivePlanIndex((i) => Math.min(i, Math.max(0, benefitPlansForConfig.length - 1)))
   }, [benefitPlansForConfig.length])
 
+  const [rolesPermissionRows, setRolesPermissionRows] = useState<EmployerRolesUserRow[]>(() => [
+    ...EMPLOYER_ROLES_DEFAULT_USERS,
+  ])
+  const [rolesSheetOpen, setRolesSheetOpen] = useState(false)
+  const [rolesEditingId, setRolesEditingId] = useState<string | null>(null)
+  const [rolesEditForm, setRolesEditForm] = useState({
+    name: '',
+    email: '',
+    userRights: 'Read-only auditor',
+  })
+
   const stepBody = (() => {
     const mappingSheet = (
       <Sheet open={mappingOpen} onOpenChange={setMappingOpen}>
@@ -794,6 +820,85 @@ export default function SetupWizardPage() {
       </Sheet>
     )
 
+    const rolesPermissionsSheet = (
+      <Sheet
+        open={rolesSheetOpen}
+        onOpenChange={(open) => {
+          setRolesSheetOpen(open)
+          if (!open) setRolesEditingId(null)
+        }}
+      >
+        <SheetContent className="flex w-full flex-col gap-4 overflow-y-auto sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Edit user</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col gap-4">
+            <FloatLabel
+              label="Name"
+              id="roles-edit-name"
+              value={rolesEditForm.name}
+              onChange={(e) => setRolesEditForm((f) => ({ ...f, name: e.target.value }))}
+            />
+            <FloatLabel
+              label="Email"
+              id="roles-edit-email"
+              type="email"
+              autoComplete="email"
+              value={rolesEditForm.email}
+              onChange={(e) => setRolesEditForm((f) => ({ ...f, email: e.target.value }))}
+            />
+            <div className="space-y-2">
+              <label htmlFor="roles-edit-rights" className="text-sm font-medium text-foreground">
+                User rights
+              </label>
+              <Select
+                value={rolesEditForm.userRights}
+                onValueChange={(v) => setRolesEditForm((f) => ({ ...f, userRights: v }))}
+              >
+                <SelectTrigger id="roles-edit-rights" className="w-full">
+                  <SelectValue placeholder="Select user rights" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EMPLOYER_ROLES_USER_RIGHTS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>
+                      {opt}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="mt-auto flex gap-2 border-t border-border pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                setRolesSheetOpen(false)
+                setRolesEditingId(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
+              onClick={() => {
+                if (!rolesEditingId) return
+                setRolesPermissionRows((rows) =>
+                  rows.map((r) => (r.id === rolesEditingId ? { ...r, ...rolesEditForm } : r)),
+                )
+                setRolesSheetOpen(false)
+                setRolesEditingId(null)
+              }}
+            >
+              Save
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    )
+
     const waitingOnMappingsToggle = (
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2 border-t border-border/60 pt-3">
         <span className="text-xs text-muted-foreground">Waiting on a vendor or file feed?</span>
@@ -836,102 +941,156 @@ export default function SetupWizardPage() {
     switch (stepIndex) {
       case 0:
         return (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <p className="text-sm text-muted-foreground">
-              Pulled automatically from your broker file and IRS records. You can correct details with one support ticket
-              if anything looks off.
+              Confirm your legal entity profile. Values shown are sample data for this preview—production would sync from
+              your implementation files and verified sources.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
+              <FloatLabel label="Legal Name" readOnly className="bg-muted/50" value={EMPLOYER.legalName} />
+              <FloatLabel label="DBA Name" readOnly className="bg-muted/50" value={EMPLOYER.dbaName} />
+              <FloatLabel label="EIN" readOnly className="bg-muted/50" value={EMPLOYER.ein} />
               <FloatLabel
-                label="Company name"
+                label="Industry / NAICS Code"
                 readOnly
-                className="bg-muted/50"
-                value={EMPLOYER.name}
+                className="bg-muted/50 sm:col-span-2"
+                value={EMPLOYER.industryNaics}
               />
-              <FloatLabel label="Federal Tax ID (EIN)" readOnly className="bg-muted/50" value={EMPLOYER.ein} />
-              <FloatLabel
-                label="Payroll frequency"
-                readOnly
-                className="bg-muted/50"
-                value={EMPLOYER.payrollFrequency}
-              />
-              <FloatLabel
-                label="Total employees"
-                readOnly
-                className="bg-muted/50"
-                value={String(EMPLOYER.employeeCount)}
-              />
+            </div>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Addresses</CardTitle>
+                <CardDescription>Headquarters and mailing locations on file.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">{EMPLOYER.addresses}</p>
+              </CardContent>
+            </Card>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Business structure</p>
+              <ul className="grid gap-2 sm:grid-cols-2" role="list">
+                {EMPLOYER_BUSINESS_STRUCTURE_OPTIONS.map((opt) => {
+                  const selected = opt === EMPLOYER.businessStructure
+                  return (
+                    <li
+                      key={opt}
+                      aria-current={selected ? 'true' : undefined}
+                      className={cn(
+                        'flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm',
+                        selected
+                          ? 'border-primary bg-primary/5 font-medium text-foreground'
+                          : 'border-border bg-muted/20 text-muted-foreground',
+                      )}
+                    >
+                      {selected ? (
+                        <Check className="h-4 w-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden />
+                      ) : (
+                        <span className="h-4 w-4 shrink-0 rounded-full border border-muted-foreground/35" aria-hidden />
+                      )}
+                      <span>{opt}</span>
+                    </li>
+                  )
+                })}
+              </ul>
             </div>
           </div>
         )
       case 1:
         return (
-          <div className="space-y-6">
-            <p className="text-sm text-muted-foreground">
-              Employer users administer benefits in WEX—separate from employees who only enroll. Pair each person with a
-              role so permissions stay auditable.
-            </p>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Users & invites</CardTitle>
-                <CardDescription>HR, finance, and broker partners who need secure access.</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline">
-                  Download user template
-                </Button>
-                <Button type="button">Send invites</Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Roles & permissions</CardTitle>
-                <CardDescription>Who can change plans, approve enrollments, view billing, and manage integrations.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Scope</TableHead>
-                      <TableHead>Typical owner</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">Benefits administrator</TableCell>
-                      <TableCell>Full product setup</TableCell>
-                      <TableCell>HR lead</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Payroll liaison</TableCell>
-                      <TableCell>Deductions & census</TableCell>
-                      <TableCell>Payroll manager</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Read-only auditor</TableCell>
-                      <TableCell>Reports</TableCell>
-                      <TableCell>Finance</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-                <Button type="button" variant="outline" size="sm">
-                  Add new person
-                </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">SSO / directory</CardTitle>
-                <CardDescription>Optional—connect an IdP later without blocking your first pass.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button type="button" variant="outline" size="sm">
-                  View connection options
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+          <>
+            {rolesPermissionsSheet}
+            <div className="space-y-6">
+              <p className="text-sm text-muted-foreground">
+                Employer admins are separate from employees who only enroll. Assign user rights so plan changes, billing,
+                and integrations stay auditable.
+              </p>
+              <Card>
+                <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1.5">
+                    <CardTitle className="text-base">Roles &amp; Permissions</CardTitle>
+                    <CardDescription>Name, email, and rights for each person who can sign in to this employer workspace.</CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    className="shrink-0 gap-2 sm:mt-0"
+                    onClick={() => {
+                      const id = `user-${Date.now()}`
+                      const defaultRights: string = EMPLOYER_ROLES_USER_RIGHTS_OPTIONS[2] ?? 'Read-only auditor'
+                      const newRow: EmployerRolesUserRow = {
+                        id,
+                        name: 'New user',
+                        email: '',
+                        userRights: defaultRights,
+                        locked: false,
+                      }
+                      setRolesPermissionRows((rows) => [...rows, newRow])
+                      setRolesEditingId(id)
+                      setRolesEditForm({
+                        name: newRow.name,
+                        email: newRow.email,
+                        userRights: newRow.userRights,
+                      })
+                      setRolesSheetOpen(true)
+                    }}
+                  >
+                    <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+                    Add user
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>User rights</TableHead>
+                        <TableHead className="w-[100px] text-right">
+                          <span className="sr-only">Actions</span>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rolesPermissionRows.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="font-medium">{row.name}</TableCell>
+                          <TableCell className="max-w-[200px] break-all text-muted-foreground">{row.email || '—'}</TableCell>
+                          <TableCell className="max-w-[min(280px,40vw)] break-words">{row.userRights}</TableCell>
+                          <TableCell className="text-right">
+                            {row.locked ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" title="Primary administrator on file">
+                                <Lock className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
+                                <span className="hidden sm:inline">Locked</span>
+                              </span>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1.5 text-muted-foreground hover:text-foreground"
+                                aria-label={`Edit ${row.name}`}
+                                onClick={() => {
+                                  setRolesEditingId(row.id)
+                                  setRolesEditForm({
+                                    name: row.name,
+                                    email: row.email,
+                                    userRights: row.userRights,
+                                  })
+                                  setRolesSheetOpen(true)
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
+                                Edit
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          </>
         )
       case 2:
         return (
