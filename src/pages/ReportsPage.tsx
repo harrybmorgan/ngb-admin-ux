@@ -24,8 +24,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '@wexinc-healthbenefits/ben-ui-kit'
-import { ArrowUpRight, Sparkles } from 'lucide-react'
+import { ArrowUpRight, Download, Sparkles } from 'lucide-react'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import { REPORT_LIBRARY } from '@/data/adminMockData'
@@ -91,6 +95,7 @@ const kpis: { service: string; metrics: ServiceMetric[] }[] = [
 ]
 
 export default function ReportsPage() {
+  const [activeTab, setActiveTab] = useState('overview')
   const [nl, setNl] = useState('')
   const [reportSearch, setReportSearch] = useState('')
   const [authorFilter, setAuthorFilter] = useState('all')
@@ -134,7 +139,8 @@ export default function ReportsPage() {
         !q ||
         r.name.toLowerCase().includes(q) ||
         r.author.toLowerCase().includes(q) ||
-        r.service.toLowerCase().includes(q)
+        r.service.toLowerCase().includes(q) ||
+        r.category.toLowerCase().includes(q)
       const matchesAuthor = authorFilter === 'all' || r.author === authorFilter
       const matchesService = serviceFocusFilter === 'all' || r.service === serviceFocusFilter
       return matchesSearch && matchesAuthor && matchesService
@@ -147,74 +153,80 @@ export default function ReportsPage() {
       <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-8 px-4 py-8 sm:px-6 lg:px-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Reporting & Analytics</h1>
-          {/* <p className="text-sm text-muted-foreground">
-            Natural language report ideas, your service dashboard, and a searchable report library.
-          </p> */}
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              Your AI Assistant
-            </CardTitle>
-            <CardDescription>
-            Ask questions in natural language to gain insights into your data
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Input
-              value={nl}
-              onChange={(e) => setNl(e.target.value)}
-              placeholder='Ask a question about your benefits data...'
-            />
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" size="sm" disabled={!nl.trim()}>
-                Ask
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="flex h-auto w-full flex-wrap gap-1 sm:w-auto">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="report-library">Report Library</TabsTrigger>
+            <TabsTrigger value="custom-report">Custom Report</TabsTrigger>
+          </TabsList>
 
-        <section>
-          <h2 className="mb-4 text-lg font-semibold">Services dashboard</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {kpis.map((k) => (
-              <Card key={k.service}>
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-base">{k.service}</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col space-y-7">
-                  {k.metrics.map((m) => (
-                    <div key={m.label} className="flex flex-col gap-2">
-                      <p className="text-xs text-muted-foreground">{m.label}</p>
-                      <div className="flex flex-wrap items-baseline gap-1">
-                        <p className="text-2xl font-bold tabular-nums">{m.value}</p>
-                        {m.trendPercent != null && m.trendPercent !== '' && (
-                          <span className="inline-flex shrink-0 items-center gap-0.5 text-sm font-medium text-green-600 dark:text-green-500">
-                            <ArrowUpRight className="h-4 w-4" aria-hidden />
-                            {m.trendPercent}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="mt-2 w-full"
-                    onClick={() =>
-                      document.getElementById('report-library')?.scrollIntoView({ behavior: 'smooth' })
-                    }
-                  >
-                    View Report Libraries
+          <TabsContent value="overview" className="mt-6 space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  Your AI Assistant
+                </CardTitle>
+                <CardDescription>
+                  Ask questions in natural language to gain insights into your data
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Input
+                  value={nl}
+                  onChange={(e) => setNl(e.target.value)}
+                  placeholder="Ask a question about your benefits data..."
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" disabled={!nl.trim()}>
+                    Ask
                   </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
+                </div>
+              </CardContent>
+            </Card>
 
+            <section>
+              <h2 className="mb-4 text-lg font-semibold">Services dashboard</h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {kpis.map((k) => (
+                  <Card key={k.service}>
+                    <CardHeader className="pb-4">
+                      <CardTitle className="text-base">{k.service}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col space-y-7">
+                      {k.metrics.map((m) => (
+                        <div key={m.label} className="flex flex-col gap-2">
+                          <p className="text-xs text-muted-foreground">{m.label}</p>
+                          <div className="flex flex-wrap items-baseline gap-1">
+                            <p className="text-2xl font-bold tabular-nums">{m.value}</p>
+                            {m.trendPercent != null && m.trendPercent !== '' && (
+                              <span className="inline-flex shrink-0 items-center gap-0.5 text-sm font-medium text-green-600 dark:text-green-500">
+                                <ArrowUpRight className="h-4 w-4" aria-hidden />
+                                {m.trendPercent}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="mt-2 w-full"
+                        onClick={() => setActiveTab('report-library')}
+                      >
+                        View Report Libraries
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          </TabsContent>
+
+          <TabsContent value="report-library" className="mt-6 space-y-8">
+            <div id="report-library" className="space-y-8">
         <section id="pinned-reports" className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -274,6 +286,126 @@ export default function ReportsPage() {
             </div>
           )}
         </section>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Report library</CardTitle>
+            <CardDescription>Explore available reports. Use the search and filters to narrow before downloading..</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <FloatLabel
+                label="Search reports"
+                containerClassName="w-full"
+                value={reportSearch}
+                onChange={(e) => setReportSearch(e.target.value)}
+              />
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                <div className="w-full min-w-[160px] sm:w-52">
+                  <span className="mb-1 block text-xs font-medium text-muted-foreground">Author</span>
+                  <Select value={authorFilter} onValueChange={setAuthorFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Author" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All authors</SelectItem>
+                      {reportAuthors.map((a) => (
+                        <SelectItem key={a} value={a}>
+                          {a}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-full min-w-[160px] sm:w-52">
+                  <span className="mb-1 block text-xs font-medium text-muted-foreground">Service focus</span>
+                  <Select value={serviceFocusFilter} onValueChange={setServiceFocusFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Service focus" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All services</SelectItem>
+                      {reportServiceFocuses.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Author</TableHead>
+                  <TableHead>Service focus</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Updated</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredReportLibrary.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell>{r.author}</TableCell>
+                    <TableCell>{r.service}</TableCell>
+                    <TableCell>{r.category}</TableCell>
+                    <TableCell>
+                      {r.updated} · {r.updatedTime}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Download ${r.name}`}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {filteredReportLibrary.length === 0 && (
+              <p className="text-sm text-muted-foreground">No reports match your filters.</p>
+            )}
+
+            <div className="flex justify-start pt-2">
+              <Button type="button" variant="outline">
+                View More Reports
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="custom-report" className="mt-6 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Custom report</CardTitle>
+                <CardDescription>
+                  Build a one-off or saved custom report with filters, columns, and scheduling (coming soon).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  This area will let you define custom datasets, preview results, and save report definitions for your
+                  team.
+                </p>
+                <Button type="button" disabled>
+                  Create custom report
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         <Sheet open={managePinnedOpen} onOpenChange={setManagePinnedOpen}>
           <SheetContent className="flex w-full flex-col gap-4 overflow-y-auto sm:max-w-md">
@@ -353,96 +485,6 @@ export default function ReportsPage() {
             )}
           </SheetContent>
         </Sheet>
-
-        <Card id="report-library">
-          <CardHeader>
-            <CardTitle>Report library</CardTitle>
-            <CardDescription>Search, filter by author and service focus, download CSV or PDF (mock).</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <FloatLabel
-                label="Search reports"
-                containerClassName="w-full"
-                value={reportSearch}
-                onChange={(e) => setReportSearch(e.target.value)}
-              />
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-                <div className="w-full min-w-[160px] sm:w-52">
-                  <span className="mb-1 block text-xs font-medium text-muted-foreground">Author</span>
-                  <Select value={authorFilter} onValueChange={setAuthorFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Author" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All authors</SelectItem>
-                      {reportAuthors.map((a) => (
-                        <SelectItem key={a} value={a}>
-                          {a}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="w-full min-w-[160px] sm:w-52">
-                  <span className="mb-1 block text-xs font-medium text-muted-foreground">Service focus</span>
-                  <Select value={serviceFocusFilter} onValueChange={setServiceFocusFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Service focus" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All services</SelectItem>
-                      {reportServiceFocuses.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Author</TableHead>
-                  <TableHead>Service focus</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredReportLibrary.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell>{r.author}</TableCell>
-                    <TableCell>{r.service}</TableCell>
-                    <TableCell>
-                      {r.updated} · {r.updatedTime}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button type="button" variant="outline" size="sm">
-                        Download
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            {filteredReportLibrary.length === 0 && (
-              <p className="text-sm text-muted-foreground">No reports match your filters.</p>
-            )}
-
-            <div className="flex justify-start pt-2">
-              <Button type="button" variant="outline">
-                View More Reports
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </main>
       <AdminFooter />
     </div>
