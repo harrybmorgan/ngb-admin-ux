@@ -58,6 +58,117 @@ export const EMPLOYER_ROLES_DEFAULT_USERS: EmployerRolesUserRow[] = [
   },
 ]
 
+/**
+ * Employee groups / divisions / classes (guided setup task 3).
+ * Pre-populated as if imported from census in “Add employees” (step 2).
+ */
+export type EmployeeGroupClassRow = {
+  id: string
+  groupLabel: string
+  /** Subdivisions or roles within the group, e.g. Office / Sales / Janitor */
+  breakdown: string
+  /** True when row came from census import in the prior step */
+  fromCensus: boolean
+}
+
+export const EMPLOYEE_GROUPS_CENSUS_DEFAULT: EmployeeGroupClassRow[] = [
+  {
+    id: 'executives',
+    groupLabel: 'Executives',
+    breakdown: '—',
+    fromCensus: true,
+  },
+  {
+    id: 'full-time',
+    groupLabel: 'Full-time',
+    breakdown: 'Office / Sales / Janitor',
+    fromCensus: true,
+  },
+  {
+    id: 'part-time',
+    groupLabel: 'Part-time',
+    breakdown: 'Office / Sales / Janitor',
+    fromCensus: true,
+  },
+  {
+    id: 'cobra',
+    groupLabel: 'COBRA',
+    breakdown: 'Continuation coverage',
+    fromCensus: true,
+  },
+]
+
+/** Default enrollment window lookbacks / lookaheads for life events (guided setup). */
+export const LIFE_EVENT_DEFAULT_RETRO_DAYS = 60
+export const LIFE_EVENT_DEFAULT_FUTURE_DAYS = 30
+
+export type LifeEventRuleRow = {
+  id: string
+  eventName: string
+  code: string
+  retroDays: number
+  futureDays: number
+}
+
+export const LIFE_EVENTS_DEFAULT_ROWS: LifeEventRuleRow[] = [
+  {
+    id: 'birth-adoption',
+    eventName: 'Birth or Adoption',
+    code: 'BIRTH_ADOPT',
+    retroDays: LIFE_EVENT_DEFAULT_RETRO_DAYS,
+    futureDays: LIFE_EVENT_DEFAULT_FUTURE_DAYS,
+  },
+  {
+    id: 'marriage-dp',
+    eventName: 'Marriage, Domestic Partnership, Common Law, or Civil Union',
+    code: 'MARRIAGE_DP',
+    retroDays: LIFE_EVENT_DEFAULT_RETRO_DAYS,
+    futureDays: LIFE_EVENT_DEFAULT_FUTURE_DAYS,
+  },
+  {
+    id: 'pt-to-ft',
+    eventName: 'Part Time to Full Time',
+    code: 'PT_TO_FT',
+    retroDays: LIFE_EVENT_DEFAULT_RETRO_DAYS,
+    futureDays: LIFE_EVENT_DEFAULT_FUTURE_DAYS,
+  },
+  {
+    id: 'dep-loss',
+    eventName: 'Dependent Loss of Coverage',
+    code: 'DEP_LOSS_COV',
+    retroDays: LIFE_EVENT_DEFAULT_RETRO_DAYS,
+    futureDays: LIFE_EVENT_DEFAULT_FUTURE_DAYS,
+  },
+  {
+    id: 'dep-gains',
+    eventName: 'Dependent Gains',
+    code: 'DEP_GAIN',
+    retroDays: LIFE_EVENT_DEFAULT_RETRO_DAYS,
+    futureDays: LIFE_EVENT_DEFAULT_FUTURE_DAYS,
+  },
+  {
+    id: 'cov-elsewhere',
+    eventName: 'Coverage Elsewhere',
+    code: 'COV_ELSEWHERE',
+    retroDays: LIFE_EVENT_DEFAULT_RETRO_DAYS,
+    futureDays: LIFE_EVENT_DEFAULT_FUTURE_DAYS,
+  },
+  {
+    id: 'divorce',
+    eventName: 'Divorce/Annulment',
+    code: 'DIVORCE',
+    retroDays: LIFE_EVENT_DEFAULT_RETRO_DAYS,
+    futureDays: LIFE_EVENT_DEFAULT_FUTURE_DAYS,
+  },
+  {
+    id: 'admin-override',
+    eventName: 'Admin Override',
+    code: 'ADMIN_OVR',
+    retroDays: LIFE_EVENT_DEFAULT_RETRO_DAYS,
+    futureDays: LIFE_EVENT_DEFAULT_FUTURE_DAYS,
+  },
+]
+
 /** Options shown under Business structure in guided setup (Company basics). */
 export const EMPLOYER_BUSINESS_STRUCTURE_OPTIONS = [
   'C Corporation',

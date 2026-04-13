@@ -49,6 +49,7 @@ import {
   Plus,
   Rocket,
   SkipForward,
+  Trash2,
   Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -58,10 +59,16 @@ import {
   CONNECTORS,
   EMPLOYER,
   EMPLOYER_BUSINESS_STRUCTURE_OPTIONS,
+  EMPLOYEE_GROUPS_CENSUS_DEFAULT,
   EMPLOYER_ROLES_DEFAULT_USERS,
   EMPLOYER_ROLES_USER_RIGHTS_OPTIONS,
+  LIFE_EVENT_DEFAULT_FUTURE_DAYS,
+  LIFE_EVENT_DEFAULT_RETRO_DAYS,
+  LIFE_EVENTS_DEFAULT_ROWS,
   PRODUCT_OPTIONS,
+  type EmployeeGroupClassRow,
   type EmployerRolesUserRow,
+  type LifeEventRuleRow,
 } from '@/data/adminMockData'
 import {
   emitSetupChanged,
@@ -75,7 +82,7 @@ const TASK_LABELS = [
   'Roles and Permissions',
   'Add employees',
   'Define employee groups / divisions / classes',
-  'Define waiting periods',
+  'Waiting periods & life events',
   'Choose benefits to offer',
   'Set default benefit dates',
   'Configure plans',
@@ -117,8 +124,8 @@ const WIZARD_STEPS: readonly WizardStepDef[] = [
   {
     title: 'Employee setup',
     description:
-      'Add employees with payroll, CSV, or manual entry, then define classes, divisions, and waiting periods so eligibility lines up with payroll and carriers.',
-    navHint: 'Add people, then groups/classes, then waiting periods.',
+      'Add employees with payroll, CSV, or manual entry—any path is valid. Connecting payroll here carries forward to Connect Systems so you are not asked to start over.',
+    navHint: 'Add people, then groups/classes, then waiting periods & life events.',
     taskIndices: [2, 3, 4],
   },
   {
@@ -770,6 +777,28 @@ export default function SetupWizardPage() {
     userRights: 'Read-only auditor',
   })
 
+  const [employeeGroupRows, setEmployeeGroupRows] = useState<EmployeeGroupClassRow[]>(() => [
+    ...EMPLOYEE_GROUPS_CENSUS_DEFAULT,
+  ])
+  const [employeeGroupSheetOpen, setEmployeeGroupSheetOpen] = useState(false)
+  const [employeeGroupEditingId, setEmployeeGroupEditingId] = useState<string | null>(null)
+  const [employeeGroupEditForm, setEmployeeGroupEditForm] = useState({
+    groupLabel: '',
+    breakdown: '',
+  })
+  const [employeeGroupSheetIsAdd, setEmployeeGroupSheetIsAdd] = useState(false)
+
+  const [lifeEventRows, setLifeEventRows] = useState<LifeEventRuleRow[]>(() => [...LIFE_EVENTS_DEFAULT_ROWS])
+  const [lifeEventSheetOpen, setLifeEventSheetOpen] = useState(false)
+  const [lifeEventEditingId, setLifeEventEditingId] = useState<string | null>(null)
+  const [lifeEventSheetIsAdd, setLifeEventSheetIsAdd] = useState(false)
+  const [lifeEventEditForm, setLifeEventEditForm] = useState({
+    eventName: '',
+    code: '',
+    retroDays: String(LIFE_EVENT_DEFAULT_RETRO_DAYS),
+    futureDays: String(LIFE_EVENT_DEFAULT_FUTURE_DAYS),
+  })
+
   const stepBody = (() => {
     const mappingSheet = (
       <Sheet open={mappingOpen} onOpenChange={setMappingOpen}>
@@ -890,6 +919,181 @@ export default function SetupWizardPage() {
                 )
                 setRolesSheetOpen(false)
                 setRolesEditingId(null)
+              }}
+            >
+              Save
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    )
+
+    const employeeGroupsSheet = (
+      <Sheet
+        open={employeeGroupSheetOpen}
+        onOpenChange={(open) => {
+          setEmployeeGroupSheetOpen(open)
+          if (!open) {
+            setEmployeeGroupEditingId(null)
+            setEmployeeGroupSheetIsAdd(false)
+          }
+        }}
+      >
+        <SheetContent className="flex w-full flex-col gap-4 overflow-y-auto sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>{employeeGroupSheetIsAdd ? 'Add group' : 'Edit group'}</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col gap-4">
+            <FloatLabel
+              label="Group"
+              id="eg-edit-label"
+              value={employeeGroupEditForm.groupLabel}
+              onChange={(e) => setEmployeeGroupEditForm((f) => ({ ...f, groupLabel: e.target.value }))}
+            />
+            <FloatLabel
+              label="Divisions / classes"
+              id="eg-edit-breakdown"
+              value={employeeGroupEditForm.breakdown}
+              onChange={(e) => setEmployeeGroupEditForm((f) => ({ ...f, breakdown: e.target.value }))}
+            />
+            <p className="text-xs leading-snug text-muted-foreground">
+              For Full-time and Part-time, list subdivisions separated by slashes or commas (e.g. Office / Sales /
+              Janitor). Use an em dash or leave blank when there are no subdivisions.
+            </p>
+          </div>
+          <div className="mt-auto flex gap-2 border-t border-border pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                if (employeeGroupSheetIsAdd && employeeGroupEditingId) {
+                  setEmployeeGroupRows((rows) => rows.filter((r) => r.id !== employeeGroupEditingId))
+                }
+                setEmployeeGroupSheetOpen(false)
+                setEmployeeGroupEditingId(null)
+                setEmployeeGroupSheetIsAdd(false)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
+              onClick={() => {
+                if (!employeeGroupEditingId) return
+                setEmployeeGroupRows((rows) =>
+                  rows.map((r) =>
+                    r.id === employeeGroupEditingId
+                      ? {
+                          ...r,
+                          groupLabel: employeeGroupEditForm.groupLabel,
+                          breakdown: employeeGroupEditForm.breakdown,
+                        }
+                      : r,
+                  ),
+                )
+                setEmployeeGroupSheetIsAdd(false)
+                setEmployeeGroupEditingId(null)
+                setEmployeeGroupSheetOpen(false)
+              }}
+            >
+              Save
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    )
+
+    const lifeEventsSheet = (
+      <Sheet
+        open={lifeEventSheetOpen}
+        onOpenChange={(open) => {
+          setLifeEventSheetOpen(open)
+          if (!open) {
+            setLifeEventEditingId(null)
+            setLifeEventSheetIsAdd(false)
+          }
+        }}
+      >
+        <SheetContent className="flex w-full flex-col gap-4 overflow-y-auto sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>{lifeEventSheetIsAdd ? 'Add life event' : 'Edit life event'}</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col gap-4">
+            <FloatLabel
+              label="Event name"
+              id="le-edit-name"
+              value={lifeEventEditForm.eventName}
+              onChange={(e) => setLifeEventEditForm((f) => ({ ...f, eventName: e.target.value }))}
+            />
+            <FloatLabel
+              label="Code"
+              id="le-edit-code"
+              value={lifeEventEditForm.code}
+              onChange={(e) => setLifeEventEditForm((f) => ({ ...f, code: e.target.value }))}
+            />
+            <FloatLabel
+              label="Retro (days)"
+              id="le-edit-retro"
+              inputMode="numeric"
+              value={lifeEventEditForm.retroDays}
+              onChange={(e) => setLifeEventEditForm((f) => ({ ...f, retroDays: e.target.value }))}
+            />
+            <FloatLabel
+              label="Future (days)"
+              id="le-edit-future"
+              inputMode="numeric"
+              value={lifeEventEditForm.futureDays}
+              onChange={(e) => setLifeEventEditForm((f) => ({ ...f, futureDays: e.target.value }))}
+            />
+            <p className="text-xs leading-snug text-muted-foreground">
+              Retro and future set how far back or forward enrollment may apply from the event date.
+            </p>
+          </div>
+          <div className="mt-auto flex gap-2 border-t border-border pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                if (lifeEventSheetIsAdd && lifeEventEditingId) {
+                  setLifeEventRows((rows) => rows.filter((r) => r.id !== lifeEventEditingId))
+                }
+                setLifeEventSheetOpen(false)
+                setLifeEventEditingId(null)
+                setLifeEventSheetIsAdd(false)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
+              onClick={() => {
+                if (!lifeEventEditingId) return
+                const retro = Number.parseInt(lifeEventEditForm.retroDays.trim(), 10)
+                const future = Number.parseInt(lifeEventEditForm.futureDays.trim(), 10)
+                const retroDays =
+                  Number.isFinite(retro) && retro >= 0 ? retro : LIFE_EVENT_DEFAULT_RETRO_DAYS
+                const futureDays =
+                  Number.isFinite(future) && future >= 0 ? future : LIFE_EVENT_DEFAULT_FUTURE_DAYS
+                setLifeEventRows((rows) =>
+                  rows.map((r) =>
+                    r.id === lifeEventEditingId
+                      ? {
+                          ...r,
+                          eventName: lifeEventEditForm.eventName.trim() || r.eventName,
+                          code: lifeEventEditForm.code.trim() || r.code,
+                          retroDays,
+                          futureDays,
+                        }
+                      : r,
+                  ),
+                )
+                setLifeEventSheetIsAdd(false)
+                setLifeEventEditingId(null)
+                setLifeEventSheetOpen(false)
               }}
             >
               Save
@@ -1095,14 +1299,11 @@ export default function SetupWizardPage() {
       case 2:
         return (
           <div className="space-y-6">
-            <p className="text-sm text-muted-foreground">
-              Add employees with payroll, CSV, or manual entry—any path is valid. Connecting ADP / Workday here carries
-              forward to Connect Systems so you are not asked to start over.
-            </p>
+           
             <div className="grid gap-3 sm:grid-cols-1">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Connect ADP / Workday</CardTitle>
+                  <CardTitle className="text-base">Connect payroll</CardTitle>
                   <CardDescription>Bi-directional payroll / HRIS—recommended when you have a supported vendor.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-2">
@@ -1126,7 +1327,7 @@ export default function SetupWizardPage() {
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">Upload CSV</CardTitle>
-                  <CardDescription>Bulk import with name, hire date, job title, and work email.</CardDescription>
+                  <CardDescription>Bulk import with employee census data.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-2">
                   <Button type="button" variant="outline">
@@ -1152,55 +1353,233 @@ export default function SetupWizardPage() {
         )
       case 3:
         return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Classes and divisions drive eligibility, contributions, and reporting—keep them aligned with payroll and
-              carrier contracts.
-            </p>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Group</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="font-medium">Full-time</TableCell>
-                  <TableCell>Eligibility class</TableCell>
-                  <TableCell>30+ hrs / week</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Northeast region</TableCell>
-                  <TableCell>Division</TableCell>
-                  <TableCell>Reporting only</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-            <Button type="button" variant="outline" size="sm">
-              Add group or division
-            </Button>
-          </div>
+          <>
+            {employeeGroupsSheet}
+            <div className="space-y-6">
+              <p className="text-sm text-muted-foreground">
+                Groups and classes from your employee census (previous step) are shown below. Adjust labels or
+                subdivisions so eligibility, contributions, and carrier reporting stay aligned with payroll.
+              </p>
+              <Card>
+                <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1.5">
+                    <CardTitle className="text-base">Groups, divisions &amp; classes</CardTitle>
+                    <CardDescription>
+                      Executives, full- and part-time cohorts, COBRA, and any custom groups you add.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    className="shrink-0 gap-2 sm:mt-0"
+                    onClick={() => {
+                      const id = `group-${Date.now()}`
+                      const newRow: EmployeeGroupClassRow = {
+                        id,
+                        groupLabel: 'New group',
+                        breakdown: '',
+                        fromCensus: false,
+                      }
+                      setEmployeeGroupRows((rows) => [...rows, newRow])
+                      setEmployeeGroupEditingId(id)
+                      setEmployeeGroupEditForm({
+                        groupLabel: newRow.groupLabel,
+                        breakdown: newRow.breakdown,
+                      })
+                      setEmployeeGroupSheetIsAdd(true)
+                      setEmployeeGroupSheetOpen(true)
+                    }}
+                  >
+                    <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+                    Add group
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Group</TableHead>
+                        <TableHead>Divisions / classes</TableHead>
+                        <TableHead className="w-[130px]">Source</TableHead>
+                        <TableHead className="w-[100px] text-right">
+                          <span className="sr-only">Actions</span>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {employeeGroupRows.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="font-medium">{row.groupLabel}</TableCell>
+                          <TableCell className="max-w-[min(320px,50vw)] break-words text-muted-foreground">
+                            {row.breakdown || '—'}
+                          </TableCell>
+                          <TableCell>
+                            {row.fromCensus ? (
+                              <Badge intent="outline" className="whitespace-nowrap text-[10px] font-semibold uppercase">
+                                Census
+                              </Badge>
+                            ) : (
+                              <Badge intent="default" className="whitespace-nowrap text-[10px] font-normal">
+                                Manual
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1.5 text-muted-foreground hover:text-foreground"
+                              aria-label={`Edit ${row.groupLabel}`}
+                              onClick={() => {
+                                setEmployeeGroupEditingId(row.id)
+                                setEmployeeGroupEditForm({
+                                  groupLabel: row.groupLabel,
+                                  breakdown: row.breakdown === '—' ? '' : row.breakdown,
+                                })
+                                setEmployeeGroupSheetIsAdd(false)
+                                setEmployeeGroupSheetOpen(true)
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
+                              Edit
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          </>
         )
       case 4:
         return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Waiting periods control when coverage starts after hire or life events—keep them consistent with SPD and
-              carrier contracts.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {['First of month after DOH', '60-day benefits wait', '90-day probation', 'Rehire rules'].map((label) => (
-                <Badge key={label} intent="default" className="cursor-default">
-                  {label}
-                </Badge>
-              ))}
+          <>
+            {lifeEventsSheet}
+            <div className="space-y-6">
+              <p className="text-sm text-muted-foreground">
+                Waiting periods control when coverage starts after hire. Life event rules set how far back or forward
+                enrollment may apply—keep both aligned with your SPD and carrier contracts.
+              </p>
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Waiting periods</p>
+                <div className="flex flex-wrap gap-2">
+                  {['First of month after DOH', '60-day benefits wait', '90-day probation', 'Rehire rules'].map(
+                    (label) => (
+                      <Badge key={label} intent="default" className="cursor-default">
+                        {label}
+                      </Badge>
+                    ),
+                  )}
+                </div>
+                <Button type="button" variant="outline" size="sm">
+                  Open waiting-period editor
+                </Button>
+              </div>
+              <Card>
+                <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1.5">
+                    <CardTitle className="text-base">Life events</CardTitle>
+                    <CardDescription>
+                      Enrollment windows by event type. New rows default to {LIFE_EVENT_DEFAULT_RETRO_DAYS} days retro
+                      and {LIFE_EVENT_DEFAULT_FUTURE_DAYS} days future unless you change them.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    className="shrink-0 gap-2 sm:mt-0"
+                    onClick={() => {
+                      const id = `life-event-${Date.now()}`
+                      const newRow: LifeEventRuleRow = {
+                        id,
+                        eventName: 'New life event',
+                        code: 'NEW_EVENT',
+                        retroDays: LIFE_EVENT_DEFAULT_RETRO_DAYS,
+                        futureDays: LIFE_EVENT_DEFAULT_FUTURE_DAYS,
+                      }
+                      setLifeEventRows((rows) => [...rows, newRow])
+                      setLifeEventEditingId(id)
+                      setLifeEventEditForm({
+                        eventName: newRow.eventName,
+                        code: newRow.code,
+                        retroDays: String(newRow.retroDays),
+                        futureDays: String(newRow.futureDays),
+                      })
+                      setLifeEventSheetIsAdd(true)
+                      setLifeEventSheetOpen(true)
+                    }}
+                  >
+                    <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+                    Add event
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Event Name</TableHead>
+                        <TableHead>Code</TableHead>
+                        <TableHead className="w-[100px]">Retro</TableHead>
+                        <TableHead className="w-[100px]">Future</TableHead>
+                        <TableHead className="w-[120px] text-right">
+                          <span className="sr-only">Actions</span>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {lifeEventRows.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="max-w-[min(320px,55vw)] font-medium break-words">
+                            {row.eventName}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm text-muted-foreground">{row.code}</TableCell>
+                          <TableCell>{row.retroDays} days</TableCell>
+                          <TableCell>{row.futureDays} days</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex flex-wrap justify-end gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1.5 text-muted-foreground hover:text-foreground"
+                                aria-label={`Edit ${row.eventName}`}
+                                onClick={() => {
+                                  setLifeEventEditingId(row.id)
+                                  setLifeEventEditForm({
+                                    eventName: row.eventName,
+                                    code: row.code,
+                                    retroDays: String(row.retroDays),
+                                    futureDays: String(row.futureDays),
+                                  })
+                                  setLifeEventSheetIsAdd(false)
+                                  setLifeEventSheetOpen(true)
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
+                                Edit
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1.5 text-destructive hover:text-destructive"
+                                aria-label={`Delete ${row.eventName}`}
+                                onClick={() => setLifeEventRows((rows) => rows.filter((r) => r.id !== row.id))}
+                              >
+                                <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
+                                Delete
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
             </div>
-            <Button type="button" variant="outline" size="sm">
-              Open waiting-period editor
-            </Button>
-          </div>
+          </>
         )
       case 5:
         return (
