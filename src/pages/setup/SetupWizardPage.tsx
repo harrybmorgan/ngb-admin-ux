@@ -44,6 +44,7 @@ import {
   Clock,
   HeartPulse,
   Link2,
+  Loader2,
   Lock,
   Minus,
   Pencil,
@@ -370,6 +371,596 @@ function isConfigurePlanNameFilled(names: Record<string, string>, productId: str
   return (names[productId] ?? '').trim().length > 0
 }
 
+type PlanFundingType = 'fully_insured' | 'self_funded'
+
+type ConfigurePlanRequirements = {
+  fundingType: PlanFundingType
+  acaMeetsMec: boolean
+  cobraEligible: boolean
+}
+
+function defaultPlanRequirementsForProduct(productId: string): ConfigurePlanRequirements {
+  return {
+    fundingType: 'fully_insured',
+    acaMeetsMec: productId === 'medical',
+    cobraEligible: ['medical', 'dental', 'vision'].includes(productId),
+  }
+}
+
+function mergeConfigurePlanRequirements(
+  selectedProductIds: readonly string[],
+  existing: Record<string, ConfigurePlanRequirements> | undefined,
+): Record<string, ConfigurePlanRequirements> {
+  const out: Record<string, ConfigurePlanRequirements> = {}
+  for (const id of selectedProductIds) {
+    const prev = existing?.[id]
+    const base = defaultPlanRequirementsForProduct(id)
+    out[id] = prev
+      ? {
+          fundingType: prev.fundingType === 'self_funded' ? 'self_funded' : 'fully_insured',
+          acaMeetsMec: typeof prev.acaMeetsMec === 'boolean' ? prev.acaMeetsMec : base.acaMeetsMec,
+          cobraEligible: typeof prev.cobraEligible === 'boolean' ? prev.cobraEligible : base.cobraEligible,
+        }
+      : base
+  }
+  return out
+}
+
+/** Guided eligibility rules in Configure plans (per product). Order matters: first matching rule wins. */
+const MAX_ELIGIBILITY_RULES = 5
+const MAX_ELIGIBILITY_CONDITIONS = 4
+
+type EligFieldId = 'employment_type' | 'avg_weekly_hours' | 'days_since_hire'
+type EligOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte'
+
+type EligibilityConditionRow = {
+  field: EligFieldId
+  op: EligOp
+  value: string
+}
+
+type EligibilityRuleRow = {
+  id: string
+  conditions: EligibilityConditionRow[]
+  thenKey: string
+}
+
+type ConfigureEligibilityPlanState = {
+  rules: EligibilityRuleRow[]
+}
+
+const ELIGIBILITY_FIELD_OPTIONS: { id: EligFieldId; label: string }[] = [
+  { id: 'employment_type', label: 'Employment type' },
+  { id: 'avg_weekly_hours', label: 'Avg weekly hours' },
+  { id: 'days_since_hire', label: 'Days since hire' },
+]
+
+const ELIGIBILITY_OP_OPTIONS: { id: EligOp; label: string }[] = [
+  { id: 'eq', label: 'equals' },
+  { id: 'neq', label: 'does not equal' },
+  { id: 'gt', label: 'is greater than' },
+  { id: 'gte', label: 'is at least' },
+  { id: 'lt', label: 'is less than' },
+  { id: 'lte', label: 'is at most' },
+]
+
+const ELIGIBILITY_OUTCOME_OPTIONS = [
+  { key: 'eligible_first_next_month', label: 'Eligible — first of month after waiting period' },
+  { key: 'limited_medical_only', label: 'Offer limited medical only' },
+  { key: 'not_eligible', label: 'Not eligible for this plan' },
+  { key: 'manual_review', label: 'Route to manual review' },
+] as const
+
+const ELIGIBILITY_EMPLOYMENT_VALUES = [
+  { value: 'full-time', label: 'Full-time' },
+  { value: 'part-time', label: 'Part-time' },
+  { value: 'contract', label: 'Contract' },
+] as const
+
+/** Small multiples for live simulation (fixed census slices). */
+const ELIGIBILITY_SIM_PROFILES = [
+  { id: 'sim-ft-tenured', label: 'FT baker, tenured', employment_type: 'full-time', avg_weekly_hours: '40', days_since_hire: '400' },
+  { id: 'sim-pt', label: 'PT counter, low hours', employment_type: 'part-time', avg_weekly_hours: '22', days_since_hire: '180' },
+  { id: 'sim-ft-new', label: 'FT new hire', employment_type: 'full-time', avg_weekly_hours: '40', days_since_hire: '14' },
+] as const
+
+function newEligibilityRuleId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `er-${crypto.randomUUID().slice(0, 8)}`
+  }
+  return `er-${Date.now().toString(36)}`
+}
+
+function defaultEligibilityRulesForProduct(_productId: string): EligibilityRuleRow[] {
+  return [
+    {
+      id: 'er-seed-a',
+      conditions: [
+        { field: 'employment_type', op: 'eq', value: 'full-time' },
+        { field: 'days_since_hire', op: 'gte', value: '60' },
+      ],
+      thenKey: 'eligible_first_next_month',
+    },
+    {
+      id: 'er-seed-b',
+      conditions: [{ field: 'avg_weekly_hours', op: 'lt', value: '30' }],
+      thenKey: 'limited_medical_only',
+    },
+  ]
+}
+
+function normalizeEligOp(raw: unknown): EligOp {
+  const o = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte'].includes(String(raw)) ? String(raw) : 'eq'
+  return o as EligOp
+}
+
+function normalizeEligField(raw: unknown): EligFieldId {
+  const f = String(raw)
+  if (f === 'avg_weekly_hours' || f === 'days_since_hire') return f
+  return 'employment_type'
+}
+
+function normalizeEligibilityCondition(raw: unknown): EligibilityConditionRow {
+  if (!raw || typeof raw !== 'object') {
+    return { field: 'employment_type', op: 'eq', value: 'full-time' }
+  }
+  const o = raw as Record<string, unknown>
+  return {
+    field: normalizeEligField(o.field),
+    op: normalizeEligOp(o.op),
+    value: typeof o.value === 'string' ? o.value : String(o.value ?? ''),
+  }
+}
+
+function normalizeEligibilityRule(raw: unknown): EligibilityRuleRow {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      id: newEligibilityRuleId(),
+      conditions: [{ field: 'employment_type', op: 'eq', value: 'full-time' }],
+      thenKey: 'eligible_first_next_month',
+    }
+  }
+  const o = raw as Record<string, unknown>
+  const conds = Array.isArray(o.conditions) ? o.conditions.map(normalizeEligibilityCondition) : []
+  const thenKey =
+    typeof o.thenKey === 'string' && ELIGIBILITY_OUTCOME_OPTIONS.some((x) => x.key === o.thenKey)
+      ? o.thenKey
+      : 'eligible_first_next_month'
+  return {
+    id: typeof o.id === 'string' && o.id.length > 0 ? o.id : newEligibilityRuleId(),
+    conditions:
+      conds.length > 0
+        ? conds.slice(0, MAX_ELIGIBILITY_CONDITIONS)
+        : [{ field: 'employment_type', op: 'eq', value: 'full-time' }],
+    thenKey,
+  }
+}
+
+function mergeConfigureEligibilityRules(
+  selectedProductIds: readonly string[],
+  existing: Record<string, ConfigureEligibilityPlanState> | undefined,
+): Record<string, ConfigureEligibilityPlanState> {
+  const out: Record<string, ConfigureEligibilityPlanState> = {}
+  for (const id of selectedProductIds) {
+    const prev = existing?.[id]
+    const rawRules = prev?.rules
+    if (!rawRules || !Array.isArray(rawRules) || rawRules.length === 0) {
+      out[id] = { rules: defaultEligibilityRulesForProduct(id) }
+    } else {
+      out[id] = {
+        rules: rawRules.slice(0, MAX_ELIGIBILITY_RULES).map(normalizeEligibilityRule),
+      }
+    }
+  }
+  return out
+}
+
+function profileField(profile: (typeof ELIGIBILITY_SIM_PROFILES)[number], field: EligFieldId): string {
+  return profile[field]
+}
+
+function evaluateEligibilityCondition(cond: EligibilityConditionRow, profile: (typeof ELIGIBILITY_SIM_PROFILES)[number]): boolean {
+  const left = profileField(profile, cond.field).trim()
+  const right = cond.value.trim()
+  if (cond.field === 'employment_type') {
+    if (cond.op === 'eq') return left === right
+    if (cond.op === 'neq') return left !== right
+    return false
+  }
+  const nL = Number.parseFloat(left)
+  const nR = Number.parseFloat(right)
+  if (!Number.isFinite(nL) || !Number.isFinite(nR)) return false
+  switch (cond.op) {
+    case 'eq':
+      return nL === nR
+    case 'neq':
+      return nL !== nR
+    case 'gt':
+      return nL > nR
+    case 'gte':
+      return nL >= nR
+    case 'lt':
+      return nL < nR
+    case 'lte':
+      return nL <= nR
+    default:
+      return false
+  }
+}
+
+function eligibilityRuleMatches(rule: EligibilityRuleRow, profile: (typeof ELIGIBILITY_SIM_PROFILES)[number]): boolean {
+  return rule.conditions.every((c) => evaluateEligibilityCondition(c, profile))
+}
+
+function firstMatchingEligibilityRule(
+  rules: EligibilityRuleRow[],
+  profile: (typeof ELIGIBILITY_SIM_PROFILES)[number],
+): { rule: EligibilityRuleRow; index: number } | null {
+  for (let i = 0; i < rules.length; i++) {
+    const r = rules[i]!
+    if (eligibilityRuleMatches(r, profile)) return { rule: r, index: i }
+  }
+  return null
+}
+
+function outcomeLabelForKey(key: string): string {
+  return ELIGIBILITY_OUTCOME_OPTIONS.find((o) => o.key === key)?.label ?? key
+}
+
+const MAX_CONTRIBUTION_SETS = 3
+
+type CoverageTierKey = 'ee_only' | 'ee_spouse' | 'ee_one_child' | 'ee_family'
+
+const COVERAGE_TIER_KEYS: readonly CoverageTierKey[] = [
+  'ee_only',
+  'ee_spouse',
+  'ee_one_child',
+  'ee_family',
+]
+
+const COVERAGE_TIER_LABELS: Record<CoverageTierKey, string> = {
+  ee_only: 'Employee only',
+  ee_spouse: 'Employee + spouse',
+  ee_one_child: 'Employee + one child',
+  ee_family: 'Employee + family',
+}
+
+type PlanTotalCosts = Record<CoverageTierKey, string>
+
+type ContributionSetRow = {
+  id: string
+  groupIds: string[]
+  contributionType: 'dollar' | 'percent'
+  applySameToAllTiers: boolean
+  employerByTier: PlanTotalCosts
+}
+
+type ConfigurePlanCostsState = {
+  totalCosts: PlanTotalCosts
+  contributionSets: ContributionSetRow[]
+}
+
+function emptyTierCosts(): PlanTotalCosts {
+  return { ee_only: '', ee_spouse: '', ee_one_child: '', ee_family: '' }
+}
+
+function newContributionSetId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `cs-${crypto.randomUUID().slice(0, 8)}`
+  }
+  return `cs-${Date.now().toString(36)}`
+}
+
+function defaultContributionSet(): ContributionSetRow {
+  return {
+    id: newContributionSetId(),
+    groupIds: ['full-time'],
+    contributionType: 'dollar',
+    applySameToAllTiers: false,
+    employerByTier: emptyTierCosts(),
+  }
+}
+
+function defaultConfigurePlanCosts(): ConfigurePlanCostsState {
+  return {
+    totalCosts: emptyTierCosts(),
+    contributionSets: [defaultContributionSet()],
+  }
+}
+
+function normalizeEmployerByTier(raw: unknown): PlanTotalCosts {
+  const base = emptyTierCosts()
+  if (!raw || typeof raw !== 'object') return base
+  const o = raw as Record<string, unknown>
+  for (const k of COVERAGE_TIER_KEYS) {
+    const v = o[k]
+    base[k] = typeof v === 'string' ? v : ''
+  }
+  return base
+}
+
+function normalizeContributionSet(raw: unknown): ContributionSetRow {
+  if (!raw || typeof raw !== 'object') {
+    return defaultContributionSet()
+  }
+  const o = raw as Record<string, unknown>
+  const groupIds = Array.isArray(o.groupIds)
+    ? o.groupIds.filter((x): x is string => typeof x === 'string')
+    : []
+  const contributionType = o.contributionType === 'percent' ? 'percent' : 'dollar'
+  return {
+    id: typeof o.id === 'string' && o.id.length > 0 ? o.id : newContributionSetId(),
+    groupIds: groupIds.length > 0 ? groupIds : ['full-time'],
+    contributionType,
+    applySameToAllTiers: o.applySameToAllTiers === true,
+    employerByTier: normalizeEmployerByTier(o.employerByTier),
+  }
+}
+
+function normalizeConfigurePlanCosts(raw: unknown): ConfigurePlanCostsState {
+  const def = defaultConfigurePlanCosts()
+  if (!raw || typeof raw !== 'object') return def
+  const o = raw as Record<string, unknown>
+  const totals = { ...def.totalCosts }
+  const tr = o.totalCosts
+  if (tr && typeof tr === 'object') {
+    const t = tr as Record<string, unknown>
+    for (const k of COVERAGE_TIER_KEYS) {
+      const v = t[k]
+      totals[k] = typeof v === 'string' ? v : ''
+    }
+  }
+  let sets: ContributionSetRow[] = []
+  if (Array.isArray(o.contributionSets)) {
+    sets = o.contributionSets.map(normalizeContributionSet).slice(0, MAX_CONTRIBUTION_SETS)
+  }
+  if (sets.length === 0) sets = [defaultContributionSet()]
+  return { totalCosts: totals, contributionSets: sets }
+}
+
+function mergeConfigurePlanCosts(
+  selectedProductIds: readonly string[],
+  existing: Record<string, ConfigurePlanCostsState> | undefined,
+): Record<string, ConfigurePlanCostsState> {
+  const out: Record<string, ConfigurePlanCostsState> = {}
+  for (const id of selectedProductIds) {
+    const prev = existing?.[id]
+    out[id] = prev ? normalizeConfigurePlanCosts(prev) : defaultConfigurePlanCosts()
+  }
+  return out
+}
+
+function parseMoneyInput(s: string): number | null {
+  const t = s.replace(/[$,\s]/g, '').trim()
+  if (t === '') return null
+  const n = Number.parseFloat(t)
+  return Number.isFinite(n) ? n : null
+}
+
+function parsePercentInput(s: string): number | null {
+  const t = s.replace(/%/g, '').trim()
+  if (t === '') return null
+  const n = Number.parseFloat(t)
+  return Number.isFinite(n) ? n : null
+}
+
+function formatUsd(n: number): string {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+/** Employee share from total premium and employer input (dollar ER amount or ER % of premium). */
+function employeeContributionDisplay(
+  totalStr: string,
+  employerStr: string,
+  mode: 'dollar' | 'percent',
+): string {
+  const total = parseMoneyInput(totalStr)
+  if (total === null) return '—'
+  if (mode === 'dollar') {
+    const er = parseMoneyInput(employerStr)
+    if (er === null) return '—'
+    return `$${formatUsd(Math.max(0, total - er))}`
+  }
+  const p = parsePercentInput(employerStr)
+  if (p === null) return '—'
+  return `$${formatUsd(Math.max(0, (total * (100 - p)) / 100))}`
+}
+
+type SandboxVerifyCheckResult = 'pass' | 'warning' | 'fail'
+
+type SandboxVerifyRunSlot = {
+  lastRunMs: number | null
+  result: SandboxVerifyCheckResult | null
+  evidence: string
+}
+
+type SandboxVerifyRuns = {
+  eligibilityRules: SandboxVerifyRunSlot
+  contributionMath: SandboxVerifyRunSlot
+}
+
+function emptySandboxVerifySlot(): SandboxVerifyRunSlot {
+  return { lastRunMs: null, result: null, evidence: '' }
+}
+
+function defaultSandboxVerifyRuns(): SandboxVerifyRuns {
+  return {
+    eligibilityRules: emptySandboxVerifySlot(),
+    contributionMath: emptySandboxVerifySlot(),
+  }
+}
+
+function normalizeSandboxVerifySlot(raw: unknown): SandboxVerifyRunSlot {
+  const empty = emptySandboxVerifySlot()
+  if (!raw || typeof raw !== 'object') return empty
+  const o = raw as Record<string, unknown>
+  const result =
+    o.result === 'pass' || o.result === 'warning' || o.result === 'fail' ? o.result : null
+  const lastRunMs =
+    typeof o.lastRunMs === 'number' && Number.isFinite(o.lastRunMs) ? o.lastRunMs : null
+  const evidence = typeof o.evidence === 'string' ? o.evidence : ''
+  return { lastRunMs, result, evidence }
+}
+
+function normalizeSandboxVerifyRuns(raw: unknown): SandboxVerifyRuns {
+  if (!raw || typeof raw !== 'object') return defaultSandboxVerifyRuns()
+  const o = raw as Record<string, unknown>
+  return {
+    eligibilityRules: normalizeSandboxVerifySlot(o.eligibilityRules),
+    contributionMath: normalizeSandboxVerifySlot(o.contributionMath),
+  }
+}
+
+/** Prototype: derive sandbox eligibility check from configure-plan state + notes. */
+function computeEligibilitySandboxOutcome(d: Draft): { result: SandboxVerifyCheckResult; evidence: string } {
+  const products = d.selectedProducts
+  if (products.length === 0) {
+    return { result: 'fail', evidence: 'No benefit categories selected—nothing to verify.' }
+  }
+  const unnamed = products.filter((pid) => !isConfigurePlanNameFilled(d.configurePlanNames, pid))
+  if (unnamed.length > 0) {
+    return {
+      result: 'fail',
+      evidence: `${unnamed.length} selected plan${unnamed.length === 1 ? '' : 's'} still need${unnamed.length === 1 ? 's' : ''} a name in Configure plans.`,
+    }
+  }
+  let ruleCount = 0
+  for (const pid of products) {
+    const rules = d.configureEligibilityRules[pid]?.rules ?? defaultEligibilityRulesForProduct(pid)
+    ruleCount += rules.length
+  }
+  const primaryPid = products.includes('medical') ? 'medical' : products[0]!
+  const rulesForSim =
+    d.configureEligibilityRules[primaryPid]?.rules ?? defaultEligibilityRulesForProduct(primaryPid)
+  let manualOrReview = 0
+  for (const profile of ELIGIBILITY_SIM_PROFILES) {
+    const hit = firstMatchingEligibilityRule(rulesForSim, profile)
+    if (hit && (hit.rule.thenKey === 'manual_review' || hit.rule.thenKey === 'not_eligible')) {
+      manualOrReview++
+    }
+  }
+  const notesShort = d.eligibilityNotes.trim().length === 0
+  if (notesShort) {
+    return {
+      result: 'warning',
+      evidence: `${products.length} plan(s), ${ruleCount} rule stack(s). Test census hits manual review / not eligible on ${manualOrReview} of ${ELIGIBILITY_SIM_PROFILES.length} sample profiles—review outcomes. Add documentation notes for SPD alignment (optional section below).`,
+    }
+  }
+  if (manualOrReview > 0) {
+    return {
+      result: 'warning',
+      evidence: `${products.length} plan(s), ${ruleCount} rules. ${manualOrReview} sample profile(s) route to manual review or not eligible—confirm intended.`,
+    }
+  }
+  return {
+    result: 'pass',
+    evidence: `${products.length} plan(s), ${ruleCount} rules; sample census profiles resolve under current stacks (demo). Documentation notes present.`,
+  }
+}
+
+function tierPremiumCoverage(pc: ConfigurePlanCostsState): 'none' | 'partial' | 'full' {
+  let filled = 0
+  for (const k of COVERAGE_TIER_KEYS) {
+    const n = parseMoneyInput(pc.totalCosts[k])
+    if (n !== null && n > 0) filled++
+  }
+  if (filled === 0) return 'none'
+  if (filled === COVERAGE_TIER_KEYS.length) return 'full'
+  return 'partial'
+}
+
+/** Prototype: contribution math vs tier premiums configured per product. */
+function computeContributionSandboxOutcome(d: Draft): { result: SandboxVerifyCheckResult; evidence: string } {
+  const products = d.selectedProducts
+  if (products.length === 0) {
+    return { result: 'fail', evidence: 'No benefit categories selected.' }
+  }
+  const scores = products.map((pid) => ({
+    pid,
+    cov: tierPremiumCoverage(d.configurePlanCosts[pid] ?? defaultConfigurePlanCosts()),
+  }))
+  if (scores.some((s) => s.cov === 'none')) {
+    const names = scores
+      .filter((s) => s.cov === 'none')
+      .map((s) => PRODUCT_OPTIONS.find((p) => p.id === s.pid)?.label ?? s.pid)
+    return {
+      result: 'fail',
+      evidence: `Enter total plan cost by tier for: ${names.join(', ')} (Configure plans → Plan costs).`,
+    }
+  }
+  if (scores.every((s) => s.cov === 'full')) {
+    return {
+      result: 'pass',
+      evidence: `All ${products.length} plan(s) have tier premiums on file; contribution sets can be compared to payroll test deductions (demo).`,
+    }
+  }
+  return {
+    result: 'warning',
+    evidence: `Some plans are missing one or more tier premiums—contribution preview may be incomplete until totals are complete.`,
+  }
+}
+
+type SandboxEnvProbe = {
+  id: string
+  label: string
+  status: 'pass' | 'warning' | 'attention' | 'na'
+  evidence: string
+}
+
+function sandboxEnvironmentProbes(d: Draft): SandboxEnvProbe[] {
+  const def = d.defaultBenefitDates
+  const payrollOk =
+    d.connectSystemsLineState.payroll === 'connected' || d.linkedPayrollFromEmployeeSetup
+  const payrollAttention = d.connectSystemsLineState.payroll === 'needs_attention'
+  const carrierOk =
+    d.connectSystemsLineState.carrier === 'connected' || d.linkedBenefitFeedsFromBenefits
+  const carrierAttention = d.connectSystemsLineState.carrier === 'needs_attention'
+  const carrierRelevant = d.selectedProducts.some((id) =>
+    ['medical', 'dental', 'vision', 'basic-term-life', 'supplemental-life'].includes(id),
+  )
+
+  const probes: SandboxEnvProbe[] = [
+    {
+      id: 'plan-year',
+      label: 'Test plan year',
+      status: 'pass',
+      evidence: `Coverage window ${def.planYearStart} – ${def.planYearEnd} (mirrors employer defaults in this prototype).`,
+    },
+    {
+      id: 'payroll-deductions',
+      label: 'Payroll deduction mapping',
+      status: payrollOk ? 'pass' : payrollAttention ? 'attention' : 'warning',
+      evidence: payrollOk
+        ? 'Payroll / HRIS linked—deduction codes aligned in sandbox (demo).'
+        : payrollAttention
+          ? 'Payroll connection needs attention—reconcile before production deductions.'
+          : 'Payroll not connected—system cannot confirm deduction codes in sandbox.',
+    },
+  ]
+
+  if (!carrierRelevant) {
+    probes.push({
+      id: 'carrier-file',
+      label: 'Carrier test file',
+      status: 'na',
+      evidence: 'No carrier-fed lines in your current benefit selection.',
+    })
+  } else {
+    probes.push({
+      id: 'carrier-file',
+      label: 'Carrier test file',
+      status: carrierOk ? 'pass' : carrierAttention ? 'attention' : 'warning',
+      evidence: carrierOk
+        ? 'Carrier feed linked—eligibility test lane ready (demo).'
+        : carrierAttention
+          ? 'Carrier feed flagged—check acknowledgements or mapping.'
+          : 'Carrier feed not connected—cannot confirm test file acceptance.',
+    })
+  }
+
+  return probes
+}
+
 function normalizeDefaultBenefitDates(raw: unknown): DefaultBenefitDatesState {
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_BENEFIT_DATES }
   const o = raw as Record<string, unknown>
@@ -444,6 +1035,14 @@ type Draft = {
   planBenefitDateSettings: Record<string, PlanBenefitDateSettings>
   /** User-entered plan display names in Configure plans (empty until typed). */
   configurePlanNames: Record<string, string>
+  /** Per-product funding, ACA MEC, and COBRA flags in Configure plans. */
+  configurePlanRequirements: Record<string, ConfigurePlanRequirements>
+  /** Per-product eligibility rule stack (Configure plans → Coverage eligibility). */
+  configureEligibilityRules: Record<string, ConfigureEligibilityPlanState>
+  /** Per-product total premiums by tier and contribution rule sets (max 3 sets). */
+  configurePlanCosts: Record<string, ConfigurePlanCostsState>
+  /** Last sandbox verification runs (Test & Launch → verify task). */
+  sandboxVerifyRuns: SandboxVerifyRuns
   /** Stored draft version for benefit checkbox defaults (migration). */
   benefitsDefaultsVersion: number
 }
@@ -461,6 +1060,10 @@ const defaultDraft: Draft = {
   defaultBenefitDates: { ...DEFAULT_BENEFIT_DATES },
   planBenefitDateSettings: mergePlanDateSettings([...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS], undefined),
   configurePlanNames: mergeConfigurePlanNames([...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS], undefined),
+  configurePlanRequirements: mergeConfigurePlanRequirements([...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS], undefined),
+  configureEligibilityRules: mergeConfigureEligibilityRules([...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS], undefined),
+  configurePlanCosts: mergeConfigurePlanCosts([...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS], undefined),
+  sandboxVerifyRuns: defaultSandboxVerifyRuns(),
   benefitsDefaultsVersion: BENEFITS_DEFAULTS_VERSION,
 }
 
@@ -507,6 +1110,19 @@ function normalizeDraft(parsed: Partial<Draft> & { stepIndex?: number }): Draft 
     merged.selectedProducts,
     merged.configurePlanNames as Record<string, string> | undefined,
   )
+  merged.configurePlanRequirements = mergeConfigurePlanRequirements(
+    merged.selectedProducts,
+    merged.configurePlanRequirements as Record<string, ConfigurePlanRequirements> | undefined,
+  )
+  merged.configureEligibilityRules = mergeConfigureEligibilityRules(
+    merged.selectedProducts,
+    merged.configureEligibilityRules as Record<string, ConfigureEligibilityPlanState> | undefined,
+  )
+  merged.configurePlanCosts = mergeConfigurePlanCosts(
+    merged.selectedProducts,
+    merged.configurePlanCosts as Record<string, ConfigurePlanCostsState> | undefined,
+  )
+  merged.sandboxVerifyRuns = normalizeSandboxVerifyRuns(merged.sandboxVerifyRuns)
   return merged
 }
 
@@ -812,6 +1428,9 @@ export default function SetupWizardPage() {
         selectedProducts: selected,
         planBenefitDateSettings: mergePlanDateSettings(selected, d.planBenefitDateSettings),
         configurePlanNames: mergeConfigurePlanNames(selected, d.configurePlanNames),
+        configurePlanRequirements: mergeConfigurePlanRequirements(selected, d.configurePlanRequirements),
+        configureEligibilityRules: mergeConfigureEligibilityRules(selected, d.configureEligibilityRules),
+        configurePlanCosts: mergeConfigurePlanCosts(selected, d.configurePlanCosts),
       }
     })
   }
@@ -901,6 +1520,102 @@ export default function SetupWizardPage() {
 
   const [connectMappingLine, setConnectMappingLine] = useState<ConnectSystemsLineKey | null>(null)
   const [connectExpandLine, setConnectExpandLine] = useState<ConnectSystemsLineKey | null>(null)
+
+  const [contributionEditSheet, setContributionEditSheet] = useState<{
+    productId: string
+    setId: string
+  } | null>(null)
+
+  /** Plan costs card: show $ prefix only when tier field is focused or has a value. */
+  const [planCostTotalFocusKey, setPlanCostTotalFocusKey] = useState<string | null>(null)
+
+  useEffect(() => {
+    setContributionEditSheet(null)
+    setPlanCostTotalFocusKey(null)
+  }, [benefitsActivePlanIndex])
+
+  const [sandboxVerifyRunning, setSandboxVerifyRunning] = useState<
+    null | 'eligibility' | 'contributions' | 'all'
+  >(null)
+
+  const runSandboxEligibilityVerify = useCallback(() => {
+    setSandboxVerifyRunning('eligibility')
+    window.setTimeout(() => {
+      setDraft((d) => {
+        const { result, evidence } = computeEligibilitySandboxOutcome(d)
+        return {
+          ...d,
+          sandboxVerifyRuns: {
+            ...d.sandboxVerifyRuns,
+            eligibilityRules: {
+              lastRunMs: Date.now(),
+              result,
+              evidence,
+            },
+          },
+        }
+      })
+      setSandboxVerifyRunning(null)
+    }, 750)
+  }, [])
+
+  const runSandboxContributionVerify = useCallback(() => {
+    setSandboxVerifyRunning('contributions')
+    window.setTimeout(() => {
+      setDraft((d) => {
+        const { result, evidence } = computeContributionSandboxOutcome(d)
+        return {
+          ...d,
+          sandboxVerifyRuns: {
+            ...d.sandboxVerifyRuns,
+            contributionMath: {
+              lastRunMs: Date.now(),
+              result,
+              evidence,
+            },
+          },
+        }
+      })
+      setSandboxVerifyRunning(null)
+    }, 750)
+  }, [])
+
+  const runAllSandboxVerifications = useCallback(() => {
+    setSandboxVerifyRunning('all')
+    window.setTimeout(() => {
+      setDraft((d) => {
+        const { result, evidence } = computeEligibilitySandboxOutcome(d)
+        return {
+          ...d,
+          sandboxVerifyRuns: {
+            ...d.sandboxVerifyRuns,
+            eligibilityRules: {
+              lastRunMs: Date.now(),
+              result,
+              evidence,
+            },
+          },
+        }
+      })
+      window.setTimeout(() => {
+        setDraft((d) => {
+          const { result, evidence } = computeContributionSandboxOutcome(d)
+          return {
+            ...d,
+            sandboxVerifyRuns: {
+              ...d.sandboxVerifyRuns,
+              contributionMath: {
+                lastRunMs: Date.now(),
+                result,
+                evidence,
+              },
+            },
+          }
+        })
+        setSandboxVerifyRunning(null)
+      }, 800)
+    }, 800)
+  }, [])
 
   const stepBody = (() => {
     const mappingSheet = (
@@ -1839,9 +2554,16 @@ export default function SetupWizardPage() {
                   : plan.productId === 'transit-parking'
                     ? 'Commuter vendor'
                     : 'Carrier TBD'
-        const cobraName = `cobra-${plan.productId}`
         const planDates =
           draft.planBenefitDateSettings[plan.productId] ?? defaultPlanDateEntry()
+        const planReq =
+          draft.configurePlanRequirements[plan.productId] ??
+          defaultPlanRequirementsForProduct(plan.productId)
+        const eligRules =
+          draft.configureEligibilityRules[plan.productId]?.rules ??
+          defaultEligibilityRulesForProduct(plan.productId)
+        const planCosts =
+          draft.configurePlanCosts[plan.productId] ?? defaultConfigurePlanCosts()
         const def = draft.defaultBenefitDates
         const configurePlansTotal = benefitPlansForConfig.length
         const configurePlansWithName = benefitPlansForConfig.filter((p) =>
@@ -1849,80 +2571,108 @@ export default function SetupWizardPage() {
         ).length
         const configurePlansNeedName = configurePlansTotal - configurePlansWithName
         return (
-          <div className="space-y-5">
+          <div className="space-y-6">
             <p className="text-sm text-muted-foreground">
               Configure one plan at a time. Dates follow your employer defaults unless you turn off “Use default benefit
               dates” for an exception (for example, calendar-year FSA vs plan-year medical).
             </p>
 
+            <Card className="border-border bg-card shadow-sm ring-1 ring-border/60">
+              <CardHeader className="space-y-1.5 pb-3">
+                <CardTitle
+                  id="configure-plans-benefit-heading"
+                  className="text-lg font-semibold leading-snug tracking-tight text-foreground"
+                >
+                  Benefit type
+                </CardTitle>
+                <CardDescription className="text-sm leading-relaxed">
+                  Choose which benefit you are configuring. Everything below—plan name, dates, requirements, and
+                  eligibility—applies to this selection until you switch.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 pt-0">
+                <Select
+                  value={plan.productId}
+                  onValueChange={(pid) => {
+                    const idx = benefitPlansForConfig.findIndex((p) => p.productId === pid)
+                    if (idx >= 0) setBenefitsActivePlanIndex(idx)
+                  }}
+                >
+                  <SelectTrigger
+                    id="configure-benefit-type"
+                    className="h-11 w-full max-w-xl"
+                    aria-labelledby="configure-plans-benefit-heading"
+                  >
+                    <SelectValue placeholder="Select benefit type" />
+                  </SelectTrigger>
+                  <SelectContent className="min-w-[var(--radix-select-trigger-width)] max-w-[min(100vw-2rem,28rem)]">
+                    {benefitPlansForConfig.map((p) => {
+                      const filled = isConfigurePlanNameFilled(draft.configurePlanNames, p.productId)
+                      return (
+                        <SelectItem key={p.productId} value={p.productId} className="pr-2">
+                          <span className="flex w-full min-w-0 items-center justify-between gap-3">
+                            <span className="truncate">{p.benefitType}</span>
+                            <span
+                              className={cn(
+                                'flex shrink-0 items-center gap-1 text-xs',
+                                filled ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-600',
+                              )}
+                            >
+                              {filled ? (
+                                <>
+                                  <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                                  <span>Ready</span>
+                                </>
+                              ) : (
+                                <span>Needs name</span>
+                              )}
+                            </span>
+                          </span>
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs leading-snug text-muted-foreground" aria-live="polite">
+                  {configurePlansNeedName === 0 ? (
+                    <>
+                      All {configurePlansTotal} selected benefit{' '}
+                      {configurePlansTotal === 1 ? 'type has' : 'types have'} a plan name.
+                    </>
+                  ) : (
+                    <>
+                      {configurePlansWithName} of {configurePlansTotal} have a plan name
+                      <span className="text-muted-foreground/80"> · </span>
+                      <span className="font-medium text-foreground">
+                        {configurePlansNeedName} still need{configurePlansNeedName === 1 ? 's' : ''} a name
+                      </span>
+                    </>
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+
+            <div
+              className="space-y-4 border-l-2 border-primary/25 pl-4 sm:space-y-5 sm:pl-5"
+              role="region"
+              aria-labelledby="configure-plans-detail-scope"
+            >
+              <p
+                id="configure-plans-detail-scope"
+                className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+              >
+                Details for <span className="font-semibold text-foreground">{plan.benefitType}</span>
+              </p>
+
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">1 · Basic plan information</CardTitle>
                 <CardDescription>
-                  Benefit type, plan name, carrier, and whether this plan follows shared default dates or uses its own.
+                  Plan name, carrier, and whether this plan follows shared default dates or uses its own.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2 sm:col-span-2">
-                    <label htmlFor="configure-benefit-type" className="text-sm font-medium text-foreground">
-                      Benefit type
-                    </label>
-                    <Select
-                      value={plan.productId}
-                      onValueChange={(pid) => {
-                        const idx = benefitPlansForConfig.findIndex((p) => p.productId === pid)
-                        if (idx >= 0) setBenefitsActivePlanIndex(idx)
-                      }}
-                    >
-                      <SelectTrigger id="configure-benefit-type" className="w-full max-w-md">
-                        <SelectValue placeholder="Select benefit type" />
-                      </SelectTrigger>
-                      <SelectContent className="min-w-[var(--radix-select-trigger-width)] max-w-[min(100vw-2rem,28rem)]">
-                        {benefitPlansForConfig.map((p) => {
-                          const filled = isConfigurePlanNameFilled(draft.configurePlanNames, p.productId)
-                          return (
-                            <SelectItem key={p.productId} value={p.productId} className="pr-2">
-                              <span className="flex w-full min-w-0 items-center justify-between gap-3">
-                                <span className="truncate">{p.benefitType}</span>
-                                <span
-                                  className={cn(
-                                    'flex shrink-0 items-center gap-1 text-xs',
-                                    filled ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-600',
-                                  )}
-                                >
-                                  {filled ? (
-                                    <>
-                                      <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
-                                      <span>Ready</span>
-                                    </>
-                                  ) : (
-                                    <span>Needs name</span>
-                                  )}
-                                </span>
-                              </span>
-                            </SelectItem>
-                          )
-                        })}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs leading-snug text-muted-foreground" aria-live="polite">
-                      {configurePlansNeedName === 0 ? (
-                        <>
-                          All {configurePlansTotal} selected benefit{' '}
-                          {configurePlansTotal === 1 ? 'type has' : 'types have'} a plan name.
-                        </>
-                      ) : (
-                        <>
-                          {configurePlansWithName} of {configurePlansTotal} have a plan name
-                          <span className="text-muted-foreground/80"> · </span>
-                          <span className="font-medium text-foreground">
-                            {configurePlansNeedName} still need{configurePlansNeedName === 1 ? 's' : ''} a name
-                          </span>
-                        </>
-                      )}
-                    </p>
-                  </div>
                   <FloatLabel
                     label="Plan name"
                     id={`configure-plan-name-${plan.productId}`}
@@ -2082,36 +2832,7 @@ export default function SetupWizardPage() {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">2 · Plan requirements</CardTitle>
-                <CardDescription>Plan-specific rules, MEC / ACA posture, and funding where applicable.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-muted-foreground">
-                <label className="flex items-center gap-2">
-                  <Checkbox defaultChecked />
-                  Network and tier rules documented for this plan
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox defaultChecked={plan.productId === 'medical'} />
-                  MEC / ACA minimum value considered (medical-style products)
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox />
-                  Affordability / safe harbor checks documented
-                </label>
-                <p className="text-xs font-medium text-foreground">Funding type</p>
-                <div className="flex flex-wrap gap-2">
-                  {(['Fully insured', 'Level-funded', 'Self-funded', 'Pre-tax only (CDH)'] as const).map((ft) => (
-                    <Badge key={ft} intent="default" className="cursor-default font-normal">
-                      {ft}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">3 · Coverage eligibility</CardTitle>
+                <CardTitle className="text-base">2 · Coverage eligibility</CardTitle>
                 <CardDescription>Who can enroll under this plan and dependent rules.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
@@ -2142,78 +2863,751 @@ export default function SetupWizardPage() {
                     ))}
                   </div>
                 </div>
-                <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">Eligibility notes (SPD-aligned)</p>
-                  <textarea
-                    rows={4}
-                    value={draft.eligibilityNotes}
-                    onChange={(e) => setDraft((d) => ({ ...d, eligibilityNotes: e.target.value }))}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
-                  />
+                <div className="border-t border-border/70 pt-4">
+                  <div className="mb-3 space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Eligibility rules
+                    </p>
+                    <p className="text-[11px] leading-snug text-muted-foreground">
+                      Build IF → THEN rows for this plan only. The first rule that matches wins; order matters.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {eligRules.map((rule, ruleIdx) => (
+                      <div
+                        key={rule.id}
+                        className="rounded-md border border-border/80 bg-muted/[0.35] px-3 py-3 text-[13px] leading-snug"
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+                            Rule {ruleIdx + 1}
+                          </span>
+                          {eligRules.length > 1 ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive"
+                              onClick={() =>
+                                setDraft((d) => {
+                                  const rules =
+                                    d.configureEligibilityRules[plan.productId]?.rules ??
+                                    defaultEligibilityRulesForProduct(plan.productId)
+                                  const next = rules.filter((r) => r.id !== rule.id)
+                                  return {
+                                    ...d,
+                                    configureEligibilityRules: {
+                                      ...d.configureEligibilityRules,
+                                      [plan.productId]: {
+                                        rules:
+                                          next.length > 0
+                                            ? next
+                                            : [
+                                                {
+                                                  id: newEligibilityRuleId(),
+                                                  conditions: [
+                                                    {
+                                                      field: 'employment_type',
+                                                      op: 'eq',
+                                                      value: 'full-time',
+                                                    },
+                                                  ],
+                                                  thenKey: 'eligible_first_next_month',
+                                                },
+                                              ],
+                                      },
+                                    },
+                                  }
+                                })
+                              }
+                            >
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                              Remove
+                            </Button>
+                          ) : null}
+                        </div>
+
+                        <div className="space-y-2">
+                          {rule.conditions.map((cond, ci) => (
+                            <div key={ci}>
+                              {ci > 0 ? (
+                                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  and
+                                </p>
+                              ) : null}
+                              <div className="flex flex-col gap-2 border-l-2 border-primary/25 pl-3 sm:flex-row sm:flex-wrap sm:items-center">
+                                <Select
+                                  value={cond.field}
+                                  onValueChange={(v) => {
+                                    const field = v as EligFieldId
+                                    setDraft((d) => {
+                                      const rules = [
+                                        ...(d.configureEligibilityRules[plan.productId]?.rules ??
+                                          defaultEligibilityRulesForProduct(plan.productId)),
+                                      ]
+                                      const ri = rules.findIndex((x) => x.id === rule.id)
+                                      if (ri < 0) return d
+                                      const copy = {
+                                        ...rules[ri]!,
+                                        conditions: [...rules[ri]!.conditions],
+                                      }
+                                      const nextVal =
+                                        field === 'employment_type'
+                                          ? 'full-time'
+                                          : field === 'avg_weekly_hours'
+                                            ? '30'
+                                            : '60'
+                                      copy.conditions[ci] = {
+                                        ...copy.conditions[ci]!,
+                                        field,
+                                        value: nextVal,
+                                        op:
+                                          field === 'employment_type'
+                                            ? 'eq'
+                                            : copy.conditions[ci]!.op === 'eq' ||
+                                                copy.conditions[ci]!.op === 'neq'
+                                              ? 'gte'
+                                              : copy.conditions[ci]!.op,
+                                      }
+                                      rules[ri] = copy
+                                      return {
+                                        ...d,
+                                        configureEligibilityRules: {
+                                          ...d.configureEligibilityRules,
+                                          [plan.productId]: { rules },
+                                        },
+                                      }
+                                    })
+                                  }}
+                                >
+                                  <SelectTrigger className="h-9 w-full min-w-[10rem] text-xs sm:w-[11rem]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {ELIGIBILITY_FIELD_OPTIONS.map((f) => (
+                                      <SelectItem key={f.id} value={f.id} className="text-xs">
+                                        {f.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+
+                                <Select
+                                  value={cond.op}
+                                  onValueChange={(v) => {
+                                    const op = v as EligOp
+                                    setDraft((d) => {
+                                      const rules = [
+                                        ...(d.configureEligibilityRules[plan.productId]?.rules ??
+                                          defaultEligibilityRulesForProduct(plan.productId)),
+                                      ]
+                                      const ri = rules.findIndex((x) => x.id === rule.id)
+                                      if (ri < 0) return d
+                                      const copy = {
+                                        ...rules[ri]!,
+                                        conditions: [...rules[ri]!.conditions],
+                                      }
+                                      copy.conditions[ci] = { ...copy.conditions[ci]!, op }
+                                      rules[ri] = copy
+                                      return {
+                                        ...d,
+                                        configureEligibilityRules: {
+                                          ...d.configureEligibilityRules,
+                                          [plan.productId]: { rules },
+                                        },
+                                      }
+                                    })
+                                  }}
+                                >
+                                  <SelectTrigger className="h-9 w-full min-w-[9.5rem] text-xs sm:w-[10.5rem]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {ELIGIBILITY_OP_OPTIONS.map((o) => (
+                                      <SelectItem key={o.id} value={o.id} className="text-xs">
+                                        {o.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+
+                                {cond.field === 'employment_type' ? (
+                                  <Select
+                                    value={cond.value}
+                                    onValueChange={(v) => {
+                                      setDraft((d) => {
+                                        const rules = [
+                                          ...(d.configureEligibilityRules[plan.productId]?.rules ??
+                                            defaultEligibilityRulesForProduct(plan.productId)),
+                                        ]
+                                        const ri = rules.findIndex((x) => x.id === rule.id)
+                                        if (ri < 0) return d
+                                        const copy = {
+                                          ...rules[ri]!,
+                                          conditions: [...rules[ri]!.conditions],
+                                        }
+                                        copy.conditions[ci] = { ...copy.conditions[ci]!, value: v }
+                                        rules[ri] = copy
+                                        return {
+                                          ...d,
+                                          configureEligibilityRules: {
+                                            ...d.configureEligibilityRules,
+                                            [plan.productId]: { rules },
+                                          },
+                                        }
+                                      })
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-9 w-full min-w-[8rem] text-xs sm:w-[9rem]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {ELIGIBILITY_EMPLOYMENT_VALUES.map((ev) => (
+                                        <SelectItem key={ev.value} value={ev.value} className="text-xs">
+                                          {ev.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={cond.value}
+                                    onChange={(e) => {
+                                      const value = e.target.value
+                                      setDraft((d) => {
+                                        const rules = [
+                                          ...(d.configureEligibilityRules[plan.productId]?.rules ??
+                                            defaultEligibilityRulesForProduct(plan.productId)),
+                                        ]
+                                        const ri = rules.findIndex((x) => x.id === rule.id)
+                                        if (ri < 0) return d
+                                        const copy = {
+                                          ...rules[ri]!,
+                                          conditions: [...rules[ri]!.conditions],
+                                        }
+                                        copy.conditions[ci] = { ...copy.conditions[ci]!, value }
+                                        rules[ri] = copy
+                                        return {
+                                          ...d,
+                                          configureEligibilityRules: {
+                                            ...d.configureEligibilityRules,
+                                            [plan.productId]: { rules },
+                                          },
+                                        }
+                                      })
+                                    }}
+                                    className="h-9 w-full min-w-[5rem] rounded-md border border-input bg-background px-2 text-xs tabular-nums sm:w-24"
+                                    aria-label="Comparison value"
+                                  />
+                                )}
+
+                                {rule.conditions.length > 1 ? (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-9 shrink-0 px-2 text-muted-foreground hover:text-destructive"
+                                    onClick={() =>
+                                      setDraft((d) => {
+                                        const rules = [
+                                          ...(d.configureEligibilityRules[plan.productId]?.rules ??
+                                            defaultEligibilityRulesForProduct(plan.productId)),
+                                        ]
+                                        const ri = rules.findIndex((x) => x.id === rule.id)
+                                        if (ri < 0) return d
+                                        const copy = {
+                                          ...rules[ri]!,
+                                          conditions: rules[ri]!.conditions.filter((_, j) => j !== ci),
+                                        }
+                                        rules[ri] = copy
+                                        return {
+                                          ...d,
+                                          configureEligibilityRules: {
+                                            ...d.configureEligibilityRules,
+                                            [plan.productId]: { rules },
+                                          },
+                                        }
+                                      })
+                                    }
+                                  >
+                                    <Minus className="h-4 w-4" aria-hidden />
+                                    <span className="sr-only">Remove condition</span>
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {rule.conditions.length < MAX_ELIGIBILITY_CONDITIONS ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="mt-2 h-8 gap-1 px-2 text-xs text-muted-foreground"
+                            onClick={() =>
+                              setDraft((d) => {
+                                const rules = [
+                                  ...(d.configureEligibilityRules[plan.productId]?.rules ??
+                                    defaultEligibilityRulesForProduct(plan.productId)),
+                                ]
+                                const ri = rules.findIndex((x) => x.id === rule.id)
+                                if (ri < 0) return d
+                                const copy = {
+                                  ...rules[ri]!,
+                                  conditions: [
+                                    ...rules[ri]!.conditions,
+                                    { field: 'days_since_hire' as const, op: 'gte' as const, value: '60' },
+                                  ],
+                                }
+                                rules[ri] = copy
+                                return {
+                                  ...d,
+                                  configureEligibilityRules: {
+                                    ...d.configureEligibilityRules,
+                                    [plan.productId]: { rules },
+                                  },
+                                }
+                              })
+                            }
+                          >
+                            <Plus className="h-3.5 w-3.5" aria-hidden />
+                            Add condition
+                          </Button>
+                        ) : null}
+
+                        <div className="mt-3 flex flex-col gap-2 border-t border-border/50 pt-3 sm:flex-row sm:items-center sm:gap-3">
+                          <span className="text-[11px] font-medium text-muted-foreground">Then</span>
+                          <Select
+                            value={rule.thenKey}
+                            onValueChange={(thenKey) =>
+                              setDraft((d) => {
+                                const rules = [
+                                  ...(d.configureEligibilityRules[plan.productId]?.rules ??
+                                    defaultEligibilityRulesForProduct(plan.productId)),
+                                ]
+                                const ri = rules.findIndex((x) => x.id === rule.id)
+                                if (ri < 0) return d
+                                rules[ri] = { ...rules[ri]!, thenKey }
+                                return {
+                                  ...d,
+                                  configureEligibilityRules: {
+                                    ...d.configureEligibilityRules,
+                                    [plan.productId]: { rules },
+                                  },
+                                }
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-9 w-full text-xs sm:max-w-md">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ELIGIBILITY_OUTCOME_OPTIONS.map((o) => (
+                                <SelectItem key={o.key} value={o.key} className="text-xs">
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    ))}
+
+                    {eligRules.length < MAX_ELIGIBILITY_RULES ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 w-full gap-1 border-dashed text-xs sm:w-auto"
+                        onClick={() =>
+                          setDraft((d) => {
+                            const rules = [
+                              ...(d.configureEligibilityRules[plan.productId]?.rules ??
+                                defaultEligibilityRulesForProduct(plan.productId)),
+                            ]
+                            rules.push({
+                              id: newEligibilityRuleId(),
+                              conditions: [{ field: 'employment_type', op: 'eq', value: 'part-time' }],
+                              thenKey: 'not_eligible',
+                            })
+                            return {
+                              ...d,
+                              configureEligibilityRules: {
+                                ...d.configureEligibilityRules,
+                                [plan.productId]: { rules },
+                              },
+                            }
+                          })
+                        }
+                      >
+                        <Plus className="h-3.5 w-3.5" aria-hidden />
+                        Add rule
+                      </Button>
+                    ) : null}
+                  </div>
+
+                  <details className="group mt-4 rounded-md border border-border/70 bg-background">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-xs font-medium text-foreground [&::-webkit-details-marker]:hidden">
+                      <span>Sample profile simulation</span>
+                      <ChevronDown
+                        className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+                        aria-hidden
+                      />
+                    </summary>
+                    <div className="border-t border-border/60 px-3 py-2">
+                      <table className="w-full border-collapse text-left text-[11px]">
+                        <thead>
+                          <tr className="border-b border-border/60 text-muted-foreground">
+                            <th scope="col" className="py-1.5 pr-3 font-medium">
+                              Profile
+                            </th>
+                            <th scope="col" className="py-1.5 pr-3 font-medium tabular-nums">
+                              Rule
+                            </th>
+                            <th scope="col" className="py-1.5 font-medium">
+                              Outcome
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ELIGIBILITY_SIM_PROFILES.map((p) => {
+                            const hit = firstMatchingEligibilityRule(eligRules, p)
+                            return (
+                              <tr key={p.id} className="border-b border-border/40 last:border-0">
+                                <td className="py-1.5 pr-3 align-top text-foreground">{p.label}</td>
+                                <td className="py-1.5 pr-3 align-top tabular-nums text-muted-foreground">
+                                  {hit ? hit.index + 1 : '—'}
+                                </td>
+                                <td className="py-1.5 align-top text-foreground">
+                                  {hit ? outcomeLabelForKey(hit.rule.thenKey) : 'No match'}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                      <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
+                        Fixed demo profiles only—production would run against your census or sandbox feed.
+                      </p>
+                    </div>
+                  </details>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">4 · COBRA eligibility</CardTitle>
-                <CardDescription>How this plan treats continuation coverage.</CardDescription>
+                <CardTitle className="text-base">3 · Plan requirements</CardTitle>
+                <CardDescription>
+                  Funding arrangement, ACA minimum essential coverage, and whether this plan supports COBRA
+                  continuation.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <label className="flex items-center gap-2">
-                  <input type="radio" name={cobraName} className="accent-primary" />
-                  Not COBRA eligible
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name={cobraName}
-                    defaultChecked={['medical', 'dental', 'vision'].includes(plan.productId)}
-                    className="accent-primary"
-                  />
-                  COBRA eligible — standard 102% rate
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="radio" name={cobraName} className="accent-primary" />
-                  COBRA eligible — custom rates (administrative + tier overrides)
-                </label>
+              <CardContent className="space-y-6 text-sm">
+                <div role="radiogroup" aria-labelledby={`configure-funding-label-${plan.productId}`}>
+                  <p
+                    id={`configure-funding-label-${plan.productId}`}
+                    className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    Funding type
+                  </p>
+                  <ul className="grid gap-2 sm:grid-cols-2" role="presentation">
+                    {(
+                      [
+                        { id: 'fully_insured' as const, label: 'Fully insured' },
+                        { id: 'self_funded' as const, label: 'Self-funded' },
+                      ] as const
+                    ).map(({ id: fundingId, label }) => {
+                      const selected = planReq.fundingType === fundingId
+                      return (
+                        <li key={fundingId}>
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            onClick={() =>
+                              setDraft((d) => {
+                                const r =
+                                  d.configurePlanRequirements[plan.productId] ??
+                                  defaultPlanRequirementsForProduct(plan.productId)
+                                return {
+                                  ...d,
+                                  configurePlanRequirements: {
+                                    ...d.configurePlanRequirements,
+                                    [plan.productId]: { ...r, fundingType: fundingId },
+                                  },
+                                }
+                              })
+                            }
+                            className={cn(
+                              'flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left transition-colors',
+                              selected
+                                ? 'border-primary bg-primary/5 font-medium text-foreground'
+                                : 'border-border bg-muted/20 text-muted-foreground hover:bg-muted/40',
+                            )}
+                          >
+                            {selected ? (
+                              <Check className="h-4 w-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden />
+                            ) : (
+                              <span
+                                className="h-4 w-4 shrink-0 rounded-full border border-muted-foreground/35"
+                                aria-hidden
+                              />
+                            )}
+                            <span>{label}</span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  <p className="mt-2 text-xs leading-snug text-muted-foreground">
+                    Fully insured: premiums and underwriting risk sit with the carrier. Self-funded: the employer
+                    typically bears claim risk (often with stop-loss).
+                  </p>
+                </div>
+
+                <div className="space-y-4 rounded-lg border border-border bg-muted/10 px-3 py-3">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <Checkbox
+                      checked={planReq.acaMeetsMec}
+                      onCheckedChange={(checked) =>
+                        setDraft((d) => {
+                          const r =
+                            d.configurePlanRequirements[plan.productId] ??
+                            defaultPlanRequirementsForProduct(plan.productId)
+                          return {
+                            ...d,
+                            configurePlanRequirements: {
+                              ...d.configurePlanRequirements,
+                              [plan.productId]: { ...r, acaMeetsMec: checked === true },
+                            },
+                          }
+                        })
+                      }
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="text-sm font-medium text-foreground">ACA — Meets MEC</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Mark when this plan qualifies as minimum essential coverage under the ACA, where applicable.
+                      </span>
+                    </span>
+                  </label>
+
+                  <Separator className="bg-border/80" />
+
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <Checkbox
+                      checked={planReq.cobraEligible}
+                      onCheckedChange={(checked) =>
+                        setDraft((d) => {
+                          const r =
+                            d.configurePlanRequirements[plan.productId] ??
+                            defaultPlanRequirementsForProduct(plan.productId)
+                          return {
+                            ...d,
+                            configurePlanRequirements: {
+                              ...d.configurePlanRequirements,
+                              [plan.productId]: { ...r, cobraEligible: checked === true },
+                            },
+                          }
+                        })
+                      }
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="text-sm font-medium text-foreground">COBRA eligible</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        When checked, qualified beneficiaries may elect continuation coverage for this plan when they lose
+                        eligibility.
+                      </span>
+                    </span>
+                  </label>
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">5 · Plan costs & contributions</CardTitle>
-                <CardDescription>Model, employer / employee share, and group-specific logic.</CardDescription>
+                <CardTitle className="text-base">4 · Plan costs & contributions</CardTitle>
+                <CardDescription>
+                  Enter total premium by coverage tier (shared for this plan), then up to {MAX_CONTRIBUTION_SETS}{' '}
+                  contribution rule sets by employee group.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  {['% of premium', 'Flat per tier', 'Defined contribution', 'EE-only (CDH)'].map((m) => (
-                    <Badge key={m} intent="default" className="cursor-default font-normal">
-                      {m}
-                    </Badge>
-                  ))}
+              <CardContent className="space-y-5">
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-foreground">Total plan cost (premium) by tier</p>
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    Enter dollar amounts (decimals allowed). Same totals apply to every contribution set; the sheet compares
+                    employer input to these amounts.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {COVERAGE_TIER_KEYS.map((tierKey) => {
+                      const tierFocusKey = `${plan.productId}:${tierKey}`
+                      const tierValue = planCosts.totalCosts[tierKey]
+                      const showDollarPrefix =
+                        planCostTotalFocusKey === tierFocusKey || tierValue.trim() !== ''
+                      return (
+                        <div key={tierKey} className="relative w-full">
+                          {showDollarPrefix ? (
+                            <span
+                              className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-8 items-center justify-center text-sm font-medium tabular-nums text-muted-foreground"
+                              aria-hidden
+                            >
+                              $
+                            </span>
+                          ) : null}
+                          <FloatLabel
+                            label={COVERAGE_TIER_LABELS[tierKey]}
+                            id={`plan-cost-total-${plan.productId}-${tierKey}`}
+                            className={cn('bg-background', showDollarPrefix ? 'pl-8' : 'pl-3')}
+                            inputMode="decimal"
+                            value={tierValue}
+                            onFocus={() => setPlanCostTotalFocusKey(tierFocusKey)}
+                            onBlur={() =>
+                              setPlanCostTotalFocusKey((k) => (k === tierFocusKey ? null : k))
+                            }
+                            onChange={(e) => {
+                              const v = e.target.value.replace(/^\$/, '').replace(/,/g, '')
+                              setDraft((d) => {
+                                const pc =
+                                  d.configurePlanCosts[plan.productId] ?? defaultConfigurePlanCosts()
+                                return {
+                                  ...d,
+                                  configurePlanCosts: {
+                                    ...d.configurePlanCosts,
+                                    [plan.productId]: {
+                                      ...pc,
+                                      totalCosts: { ...pc.totalCosts, [tierKey]: v },
+                                    },
+                                  },
+                                }
+                              })
+                            }}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Employee group</TableHead>
-                      <TableHead>Employer</TableHead>
-                      <TableHead>Employee</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">Full-time</TableCell>
-                      <TableCell>75% core tier</TableCell>
-                      <TableCell>25% + dependents</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Part-time (25+ hrs)</TableCell>
-                      <TableCell>Buy-up schedule B</TableCell>
-                      <TableCell>Remainder</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
+
+                <Separator className="bg-border/80" />
+
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-foreground">Contribution sets</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1 text-xs"
+                      disabled={planCosts.contributionSets.length >= MAX_CONTRIBUTION_SETS}
+                      onClick={() => {
+                        setDraft((d) => {
+                          const pc =
+                            d.configurePlanCosts[plan.productId] ?? defaultConfigurePlanCosts()
+                          if (pc.contributionSets.length >= MAX_CONTRIBUTION_SETS) return d
+                          const newSet = defaultContributionSet()
+                          return {
+                            ...d,
+                            configurePlanCosts: {
+                              ...d.configurePlanCosts,
+                              [plan.productId]: {
+                                ...pc,
+                                contributionSets: [...pc.contributionSets, newSet],
+                              },
+                            },
+                          }
+                        })
+                      }}
+                    >
+                      <Plus className="h-3.5 w-3.5" aria-hidden />
+                      Add set
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Maximum {MAX_CONTRIBUTION_SETS} sets. Configure each set in the side panel—groups, $ or % of
+                    premium, and employer share per tier.
+                  </p>
+                  <ul className="space-y-2">
+                    {planCosts.contributionSets.map((setRow, idx) => {
+                      const groupSummary = setRow.groupIds
+                        .map((gid) => employeeGroupRows.find((r) => r.id === gid)?.groupLabel ?? gid)
+                        .join(', ')
+                      return (
+                        <li
+                          key={setRow.id}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/80 bg-muted/10 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground">
+                              Set {idx + 1}
+                              <span className="font-normal text-muted-foreground">
+                                {' '}
+                                · {groupSummary || 'No groups'}
+                              </span>
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {setRow.contributionType === 'dollar' ? 'Dollar' : 'Percent'} ·{' '}
+                              {setRow.applySameToAllTiers ? 'Same employer value all tiers' : 'Per-tier employer values'}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1 text-xs"
+                              onClick={() =>
+                                setContributionEditSheet({ productId: plan.productId, setId: setRow.id })
+                              }
+                            >
+                              <Pencil className="h-3.5 w-3.5" aria-hidden />
+                              Configure
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-destructive hover:text-destructive"
+                              disabled={planCosts.contributionSets.length <= 1}
+                              onClick={() => {
+                                const removedId = setRow.id
+                                setDraft((d) => {
+                                  const pc =
+                                    d.configurePlanCosts[plan.productId] ?? defaultConfigurePlanCosts()
+                                  if (pc.contributionSets.length <= 1) return d
+                                  return {
+                                    ...d,
+                                    configurePlanCosts: {
+                                      ...d.configurePlanCosts,
+                                      [plan.productId]: {
+                                        ...pc,
+                                        contributionSets: pc.contributionSets.filter((s) => s.id !== removedId),
+                                      },
+                                    },
+                                  }
+                                })
+                                setContributionEditSheet((cur) =>
+                                  cur?.setId === removedId ? null : cur,
+                                )
+                              }}
+                              aria-label={`Remove contribution set ${idx + 1}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                            </Button>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+
                 <Button
                   type="button"
                   variant="outline"
@@ -2231,6 +3625,240 @@ export default function SetupWizardPage() {
                 </Button>
               </CardContent>
             </Card>
+            </div>
+            {contributionEditSheet &&
+            (() => {
+              const editPc =
+                draft.configurePlanCosts[contributionEditSheet.productId] ?? defaultConfigurePlanCosts()
+              const editSet = editPc.contributionSets.find((s) => s.id === contributionEditSheet.setId)
+              if (!editSet) return null
+              const setIdx = editPc.contributionSets.findIndex((s) => s.id === contributionEditSheet.setId)
+              const patchSet = (next: ContributionSetRow) => {
+                setDraft((d) => {
+                  const pc =
+                    d.configurePlanCosts[contributionEditSheet.productId] ?? defaultConfigurePlanCosts()
+                  return {
+                    ...d,
+                    configurePlanCosts: {
+                      ...d.configurePlanCosts,
+                      [contributionEditSheet.productId]: {
+                        ...pc,
+                        contributionSets: pc.contributionSets.map((s) =>
+                          s.id === editSet.id ? next : s,
+                        ),
+                      },
+                    },
+                  }
+                })
+              }
+              return (
+                <Sheet
+                  open
+                  onOpenChange={(open) => {
+                    if (!open) setContributionEditSheet(null)
+                  }}
+                >
+                  <SheetContent className="flex w-full flex-col gap-4 overflow-y-auto sm:max-w-lg">
+                    <SheetHeader>
+                      <SheetTitle>
+                        Contribution set {setIdx + 1} ·{' '}
+                        {PRODUCT_OPTIONS.find((p) => p.id === contributionEditSheet.productId)?.label ??
+                          contributionEditSheet.productId}
+                      </SheetTitle>
+                    </SheetHeader>
+
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-foreground">Employee groups</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Toggle which groups use this contribution rule (from your employee groups / classes).
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {employeeGroupRows.map((g) => {
+                          const selected = editSet.groupIds.includes(g.id)
+                          return (
+                            <button
+                              key={g.id}
+                              type="button"
+                              onClick={() => {
+                                const has = editSet.groupIds.includes(g.id)
+                                let nextIds = has
+                                  ? editSet.groupIds.filter((x) => x !== g.id)
+                                  : [...editSet.groupIds, g.id]
+                                if (nextIds.length === 0) nextIds = [g.id]
+                                patchSet({ ...editSet, groupIds: nextIds })
+                              }}
+                              className={cn(
+                                'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                                selected
+                                  ? 'border-primary bg-primary/10 text-foreground'
+                                  : 'border-border bg-muted/20 text-muted-foreground hover:bg-muted/40',
+                              )}
+                            >
+                              {selected ? (
+                                <Check className="h-3.5 w-3.5 shrink-0 text-primary" strokeWidth={2.5} aria-hidden />
+                              ) : (
+                                <span
+                                  className="h-3.5 w-3.5 shrink-0 rounded-full border border-muted-foreground/35"
+                                  aria-hidden
+                                />
+                              )}
+                              {g.groupLabel}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-foreground">Employer contribution</p>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant={editSet.contributionType === 'dollar' ? 'solid' : 'outline'}
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={() => patchSet({ ...editSet, contributionType: 'dollar' })}
+                        >
+                          Dollar ($)
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={editSet.contributionType === 'percent' ? 'solid' : 'outline'}
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={() => patchSet({ ...editSet, contributionType: 'percent' })}
+                        >
+                          Percent (%)
+                        </Button>
+                      </div>
+                    </div>
+
+                    <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border/80 bg-muted/10 px-3 py-2">
+                      <Checkbox
+                        checked={editSet.applySameToAllTiers}
+                        onCheckedChange={(checked) => {
+                          const on = checked === true
+                          patchSet({
+                            ...editSet,
+                            applySameToAllTiers: on,
+                            employerByTier: on
+                              ? {
+                                  ee_only: editSet.employerByTier.ee_only,
+                                  ee_spouse: editSet.employerByTier.ee_only,
+                                  ee_one_child: editSet.employerByTier.ee_only,
+                                  ee_family: editSet.employerByTier.ee_only,
+                                }
+                              : { ...editSet.employerByTier },
+                          })
+                        }}
+                        className="mt-0.5"
+                      />
+                      <span className="text-sm leading-snug">
+                        <span className="font-medium text-foreground">Apply same value to all tiers</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          One employer input is copied to every coverage tier; employee share still uses each tier&apos;s
+                          total.
+                        </span>
+                      </span>
+                    </label>
+
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-foreground">Preview by tier</p>
+                      {editSet.applySameToAllTiers ? (
+                        <FloatLabel
+                          label={
+                            editSet.contributionType === 'dollar'
+                              ? 'Employer contribution (all tiers)'
+                              : 'Employer % of premium (all tiers)'
+                          }
+                          id={`contrib-sheet-same-${editSet.id}`}
+                          className="bg-background"
+                          inputMode="decimal"
+                          value={editSet.employerByTier.ee_only}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            patchSet({
+                              ...editSet,
+                              employerByTier: {
+                                ee_only: v,
+                                ee_spouse: v,
+                                ee_one_child: v,
+                                ee_family: v,
+                              },
+                            })
+                          }}
+                        />
+                      ) : null}
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[28%]">Coverage tier</TableHead>
+                            <TableHead>Total</TableHead>
+                            <TableHead>{editSet.contributionType === 'dollar' ? 'Employer ($)' : 'Employer (%)'}</TableHead>
+                            <TableHead>Employee</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {COVERAGE_TIER_KEYS.map((tierKey) => (
+                            <TableRow key={tierKey}>
+                              <TableCell className="font-medium text-foreground">
+                                {COVERAGE_TIER_LABELS[tierKey]}
+                              </TableCell>
+                              <TableCell className="tabular-nums text-xs text-muted-foreground">
+                                {editPc.totalCosts[tierKey].trim() !== ''
+                                  ? editPc.totalCosts[tierKey]
+                                  : '—'}
+                              </TableCell>
+                              <TableCell>
+                                {editSet.applySameToAllTiers ? (
+                                  <span className="text-xs text-muted-foreground">
+                                    {editSet.employerByTier.ee_only.trim() !== ''
+                                      ? editSet.contributionType === 'dollar'
+                                        ? editSet.employerByTier.ee_only
+                                        : `${editSet.employerByTier.ee_only}%`
+                                      : '—'}
+                                  </span>
+                                ) : (
+                                  <FloatLabel
+                                    label={editSet.contributionType === 'dollar' ? '$' : '%'}
+                                    id={`contrib-${editSet.id}-${tierKey}`}
+                                    className="bg-background text-xs"
+                                    inputMode="decimal"
+                                    value={editSet.employerByTier[tierKey]}
+                                    onChange={(e) =>
+                                      patchSet({
+                                        ...editSet,
+                                        employerByTier: {
+                                          ...editSet.employerByTier,
+                                          [tierKey]: e.target.value,
+                                        },
+                                      })
+                                    }
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell className="tabular-nums text-xs font-medium text-foreground">
+                                {employeeContributionDisplay(
+                                  editPc.totalCosts[tierKey],
+                                  editSet.applySameToAllTiers
+                                    ? editSet.employerByTier.ee_only
+                                    : editSet.employerByTier[tierKey],
+                                  editSet.contributionType,
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    <Button type="button" className="mt-auto w-full" onClick={() => setContributionEditSheet(null)}>
+                      Done
+                    </Button>
+                  </SheetContent>
+                </Sheet>
+              )
+            })()}
             {mappingSheet}
           </div>
         )
@@ -2467,81 +4095,267 @@ export default function SetupWizardPage() {
           </div>
         )
       }
-      case 10:
+      case 10: {
+        const envProbes = sandboxEnvironmentProbes(draft)
+        const eligSlot = draft.sandboxVerifyRuns.eligibilityRules
+        const contSlot = draft.sandboxVerifyRuns.contributionMath
+        const verifyBusy = sandboxVerifyRunning !== null
+        const formatVerifyTime = (ms: number | null) =>
+          ms != null
+            ? new Date(ms).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
+            : 'Never'
+
+        const runResultBadge = (
+          slot: SandboxVerifyRunSlot,
+          key: 'eligibility' | 'contributions',
+        ) => {
+          const running =
+            (key === 'eligibility' && sandboxVerifyRunning === 'eligibility') ||
+            (key === 'contributions' && sandboxVerifyRunning === 'contributions') ||
+            sandboxVerifyRunning === 'all'
+          if (running) {
+            return (
+              <Badge intent="outline" className="gap-1 text-[10px] font-medium tabular-nums">
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                Running
+              </Badge>
+            )
+          }
+          if (slot.result === null) {
+            return (
+              <Badge intent="outline" className="text-[10px] font-medium">
+                Not run
+              </Badge>
+            )
+          }
+          if (slot.result === 'pass') {
+            return (
+              <Badge intent="success" className="text-[10px] font-medium">
+                Pass
+              </Badge>
+            )
+          }
+          if (slot.result === 'warning') {
+            return (
+              <Badge intent="warning" className="text-[10px] font-medium">
+                Warning
+              </Badge>
+            )
+          }
+          return (
+            <Badge intent="destructive" className="text-[10px] font-medium">
+              Fail
+            </Badge>
+          )
+        }
+
+        const envStatusBadge = (status: SandboxEnvProbe['status']) => {
+          switch (status) {
+            case 'pass':
+              return (
+                <Badge intent="success" className="text-[10px] font-medium">
+                  Verified
+                </Badge>
+              )
+            case 'warning':
+              return (
+                <Badge intent="warning" className="text-[10px] font-medium">
+                  Not verified
+                </Badge>
+              )
+            case 'attention':
+              return (
+                <Badge intent="warning" className="text-[10px] font-medium">
+                  Needs attention
+                </Badge>
+              )
+            default:
+              return (
+                <Badge intent="outline" className="text-[10px] font-medium text-muted-foreground">
+                  N/A
+                </Badge>
+              )
+          }
+        }
+
         return (
           <div className="space-y-5">
             <p className="text-sm text-muted-foreground">
-              Run eligibility rules and contribution math against test or sandbox data—catch gaps before production
-              enrollment opens.
+              This step does not redefine your plans—it records <strong className="font-medium text-foreground">sandbox</strong>{' '}
+              checks against what you configured. Re-run after you change rules, premiums, or connections. Environment
+              signals below are <strong className="font-medium text-foreground">system-driven</strong> from your draft
+              (demo).
             </p>
+
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Eligibility (test census)</CardTitle>
-                <CardDescription>Re-run rules on sample lives; align language with your SPD.</CardDescription>
+              <CardHeader className="flex flex-col gap-3 space-y-0 pb-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                  <CardTitle className="text-base">Sandbox verification</CardTitle>
+                  <CardDescription>
+                    Engine runs for eligibility and contribution math, plus live integration signals—compact status, dense
+                    evidence.
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="shrink-0 gap-2"
+                  disabled={verifyBusy}
+                  onClick={runAllSandboxVerifications}
+                >
+                  {sandboxVerifyRunning === 'all' ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                      Running…
+                    </>
+                  ) : (
+                    'Run all checks'
+                  )}
+                </Button>
               </CardHeader>
-              <CardContent>
-                <textarea
-                  rows={6}
-                  value={draft.eligibilityNotes}
-                  onChange={(e) => setDraft((d) => ({ ...d, eligibilityNotes: e.target.value }))}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm"
-                />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Contributions & deductions</CardTitle>
-                <CardDescription>Compare expected EE / ER amounts by group against payroll test runs.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Employee</TableHead>
-                      <TableHead>Plan</TableHead>
-                      <TableHead>Expected EE</TableHead>
-                      <TableHead>Expected ER</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">Jordan Lee</TableCell>
-                      <TableCell>Summit PPO — EE+children</TableCell>
-                      <TableCell>$186.40</TableCell>
-                      <TableCell>$412.10</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Priya Shah</TableCell>
-                      <TableCell>Summit PPO — EE only</TableCell>
-                      <TableCell>$102.00</TableCell>
-                      <TableCell>$355.00</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Sandbox checklist</CardTitle>
-                <CardDescription>Light pass—production would tie to your tenant’s test environment.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <label className="flex items-center gap-2">
-                  <Checkbox defaultChecked />
-                  Test tenant reflects latest plan year and classes
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox defaultChecked />
-                  Deduction codes match payroll mapping
-                </label>
-                <label className="flex items-center gap-2">
-                  <Checkbox />
-                  Carrier test file accepted (if applicable)
-                </label>
+              <CardContent className="space-y-6">
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Triggered checks
+                  </p>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[22%]">Check</TableHead>
+                        <TableHead className="w-[14%]">Status</TableHead>
+                        <TableHead className="w-[18%]">Last run</TableHead>
+                        <TableHead>Evidence</TableHead>
+                        <TableHead className="w-[11rem] text-end">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="align-top font-medium text-foreground">
+                          Eligibility rules (test census)
+                        </TableCell>
+                        <TableCell className="align-top">{runResultBadge(eligSlot, 'eligibility')}</TableCell>
+                        <TableCell className="align-top text-xs tabular-nums text-muted-foreground">
+                          {formatVerifyTime(eligSlot.lastRunMs)}
+                        </TableCell>
+                        <TableCell className="align-top text-xs leading-snug text-muted-foreground">
+                          {eligSlot.evidence.trim() !== ''
+                            ? eligSlot.evidence
+                            : 'Run to evaluate configured rule stacks against sample census slices.'}
+                        </TableCell>
+                        <TableCell className="align-top text-end">
+                          <div className="flex flex-wrap justify-end gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs"
+                              disabled={verifyBusy}
+                              onClick={runSandboxEligibilityVerify}
+                            >
+                              {sandboxVerifyRunning === 'eligibility' ? '…' : eligSlot.result === null ? 'Run' : 'Re-run'}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={() => goToTask(7)}
+                            >
+                              Configure
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="align-top font-medium text-foreground">Contribution math</TableCell>
+                        <TableCell className="align-top">{runResultBadge(contSlot, 'contributions')}</TableCell>
+                        <TableCell className="align-top text-xs tabular-nums text-muted-foreground">
+                          {formatVerifyTime(contSlot.lastRunMs)}
+                        </TableCell>
+                        <TableCell className="align-top text-xs leading-snug text-muted-foreground">
+                          {contSlot.evidence.trim() !== ''
+                            ? contSlot.evidence
+                            : 'Run to compare tier premiums and contribution sets against payroll-ready totals (demo).'}
+                        </TableCell>
+                        <TableCell className="align-top text-end">
+                          <div className="flex flex-wrap justify-end gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs"
+                              disabled={verifyBusy}
+                              onClick={runSandboxContributionVerify}
+                            >
+                              {sandboxVerifyRunning === 'contributions'
+                                ? '…'
+                                : contSlot.result === null
+                                  ? 'Run'
+                                  : 'Re-run'}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={() => goToTask(7)}
+                            >
+                              Plan costs
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <Separator className="bg-border/80" />
+
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Environment (system)
+                  </p>
+                  <ul className="space-y-3">
+                    {envProbes.map((probe) => (
+                      <li
+                        key={probe.id}
+                        className="flex flex-col gap-2 rounded-md border border-border/80 bg-muted/10 px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+                      >
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <p className="text-sm font-medium text-foreground">{probe.label}</p>
+                          <p className="text-xs leading-snug text-muted-foreground">{probe.evidence}</p>
+                        </div>
+                        <div className="shrink-0">{envStatusBadge(probe.status)}</div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <Accordion type="single" collapsible className="w-full rounded-md border border-border/80 px-3">
+                  <AccordionItem value="spd-notes" className="border-0">
+                    <AccordionTrigger className="py-3 text-sm font-medium hover:no-underline">
+                      Documentation cross-check (optional)
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-3 pt-0">
+                      <p className="mb-2 text-xs text-muted-foreground">
+                        Plain-language notes for SPD / communications alignment—not a second rule editor. Eligibility
+                        logic lives in <strong className="font-medium text-foreground">Configure plans</strong>.
+                      </p>
+                      <textarea
+                        rows={5}
+                        value={draft.eligibilityNotes}
+                        onChange={(e) => setDraft((d) => ({ ...d, eligibilityNotes: e.target.value }))}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm"
+                        aria-label="Documentation notes for SPD alignment"
+                      />
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               </CardContent>
             </Card>
           </div>
         )
+      }
       case 11:
         return (
           <>
