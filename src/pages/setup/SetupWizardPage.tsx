@@ -26,6 +26,7 @@ import {
   Checkbox,
   FloatLabel,
   ScrollArea,
+  Textarea,
   Select,
   SelectContent,
   SelectItem,
@@ -108,6 +109,15 @@ const TASK_LABELS = [
 
 /** Product ids that use consumer-directed / pre-tax admin (Configure plans carrier hint). */
 const CDH_PRODUCT_IDS = new Set(['hsa', 'fsa', 'lpfsa', 'dcfsa'])
+
+function defaultCarrierLabelForProduct(productId: string): string {
+  if (productId === 'medical') return 'UHC'
+  if (productId === 'dental') return 'Guardian'
+  if (productId === 'vision') return 'VSP'
+  if (CDH_PRODUCT_IDS.has(productId)) return 'WEX (CDH)'
+  if (productId === 'transit-parking') return 'Commuter vendor'
+  return 'Carrier TBD'
+}
 
 /** Bump when default “Choose benefits” selection changes so stored drafts can migrate. */
 const BENEFITS_DEFAULTS_VERSION = 2
@@ -422,6 +432,18 @@ function mergeConfigurePlanNames(
   for (const id of selectedProductIds) {
     const prev = existing?.[id]
     out[id] = typeof prev === 'string' ? prev : ''
+  }
+  return out
+}
+
+function mergeConfigurePlanCarriers(
+  selectedProductIds: readonly string[],
+  existing: Record<string, string> | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const id of selectedProductIds) {
+    const prev = existing?.[id]
+    out[id] = typeof prev === 'string' ? prev : defaultCarrierLabelForProduct(id)
   }
   return out
 }
@@ -1077,9 +1099,118 @@ function migrateOldWizardDraft(parsed: Partial<Draft>): Partial<Draft> {
   return { ...parsed, taskOutcomes, stepIndex }
 }
 
+type CompanyProfileState = {
+  legalName: string
+  dbaName: string
+  ein: string
+  industryNaics: string
+  headquartersAddress: string
+  mailingAddress: string
+  mailingSameAsHeadquarters: boolean
+  businessStructure: string
+}
+
+const COMPANY_BUSINESS_STRUCTURE_OPTIONS = EMPLOYER_BUSINESS_STRUCTURE_OPTIONS as readonly string[]
+
+/** Split legacy single textarea (`EMPLOYER.addresses`) into HQ and mailing lines. */
+function parseLegacyCompanyAddresses(raw: string): { headquartersAddress: string; mailingAddress: string } {
+  const normalized = raw.replace(/\r\n/g, '\n').trim()
+  if (!normalized) return { headquartersAddress: '', mailingAddress: '' }
+
+  const re = /\n\nMailing\n/i
+  const m = re.exec(normalized)
+  if (m && m.index >= 0) {
+    const before = normalized.slice(0, m.index).trim()
+    const after = normalized.slice(m.index + m[0].length).trim()
+    const hq = before.replace(/^Headquarters\n?/i, '').trim()
+    return { headquartersAddress: hq, mailingAddress: after }
+  }
+
+  const hq = normalized.replace(/^Headquarters\n?/i, '').trim()
+  return { headquartersAddress: hq, mailingAddress: '' }
+}
+
+function defaultCompanyProfile(): CompanyProfileState {
+  const { headquartersAddress, mailingAddress } = parseLegacyCompanyAddresses(EMPLOYER.addresses)
+  const mailingSameAsHeadquarters =
+    mailingAddress.trim() === '' || mailingAddress.trim() === headquartersAddress.trim()
+  return {
+    legalName: EMPLOYER.legalName,
+    dbaName: EMPLOYER.dbaName,
+    ein: EMPLOYER.ein,
+    industryNaics: EMPLOYER.industryNaics,
+    headquartersAddress,
+    mailingAddress: mailingSameAsHeadquarters ? headquartersAddress : mailingAddress,
+    mailingSameAsHeadquarters,
+    businessStructure: EMPLOYER.businessStructure,
+  }
+}
+
+function normalizeCompanyProfile(raw: unknown): CompanyProfileState {
+  const d = defaultCompanyProfile()
+  if (!raw || typeof raw !== 'object') return d
+  const o = raw as Record<string, unknown>
+  const str = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback)
+  const bool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fallback)
+
+  let businessStructure = str(o.businessStructure, d.businessStructure)
+  if (!COMPANY_BUSINESS_STRUCTURE_OPTIONS.includes(businessStructure)) {
+    businessStructure = d.businessStructure
+  }
+
+  const base = {
+    legalName: str(o.legalName, d.legalName),
+    dbaName: str(o.dbaName, d.dbaName),
+    ein: str(o.ein, d.ein),
+    industryNaics: str(o.industryNaics, d.industryNaics),
+    businessStructure,
+  }
+
+  if (typeof o.headquartersAddress === 'string' && typeof o.mailingAddress === 'string') {
+    let mailingSameAsHeadquarters = bool(o.mailingSameAsHeadquarters, d.mailingSameAsHeadquarters)
+    const hq = o.headquartersAddress
+    let mailing = o.mailingAddress
+    if (mailingSameAsHeadquarters) {
+      mailing = hq
+    } else if (!mailing.trim() && hq.trim()) {
+      mailingSameAsHeadquarters = true
+      mailing = hq
+    }
+    return {
+      ...base,
+      headquartersAddress: hq,
+      mailingAddress: mailing,
+      mailingSameAsHeadquarters,
+    }
+  }
+
+  if (typeof o.addresses === 'string') {
+    const parsed = parseLegacyCompanyAddresses(o.addresses)
+    let mailingSameAsHeadquarters =
+      parsed.mailingAddress.trim() === '' || parsed.mailingAddress.trim() === parsed.headquartersAddress.trim()
+    const hq = parsed.headquartersAddress
+    const mailing = mailingSameAsHeadquarters ? hq : parsed.mailingAddress
+    return {
+      ...base,
+      headquartersAddress: hq,
+      mailingAddress: mailing,
+      mailingSameAsHeadquarters,
+    }
+  }
+
+  return {
+    ...base,
+    headquartersAddress: d.headquartersAddress,
+    mailingAddress: d.mailingAddress,
+    mailingSameAsHeadquarters: d.mailingSameAsHeadquarters,
+  }
+}
+
 type Draft = {
   stepIndex: number
   taskOutcomes: StoredTaskOutcome[]
+  /** Editable legal entity profile (Company basics). */
+  companyProfile: CompanyProfileState
   selectedProducts: string[]
   eligibilityNotes: string
   mappingStep: number
@@ -1095,6 +1226,8 @@ type Draft = {
   planBenefitDateSettings: Record<string, PlanBenefitDateSettings>
   /** User-entered plan display names in Configure plans (empty until typed). */
   configurePlanNames: Record<string, string>
+  /** Carrier / provider label per product in Configure plans. */
+  configurePlanCarriers: Record<string, string>
   /** Per-product funding, ACA MEC, and COBRA flags in Configure plans. */
   configurePlanRequirements: Record<string, ConfigurePlanRequirements>
   /** Per-product eligibility rule stack (Configure plans → Coverage eligibility). */
@@ -1110,6 +1243,7 @@ type Draft = {
 const defaultDraft: Draft = {
   stepIndex: 0,
   taskOutcomes: defaultTaskOutcomes(),
+  companyProfile: defaultCompanyProfile(),
   selectedProducts: [...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS],
   eligibilityNotes:
     'IF employment type is full-time AND hire date is more than 60 days ago THEN eligible for medical on the first of next month.\nIF average hours are under 30 THEN offer limited medical only.',
@@ -1120,6 +1254,7 @@ const defaultDraft: Draft = {
   defaultBenefitDates: { ...DEFAULT_BENEFIT_DATES },
   planBenefitDateSettings: mergePlanDateSettings([...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS], undefined),
   configurePlanNames: mergeConfigurePlanNames([...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS], undefined),
+  configurePlanCarriers: mergeConfigurePlanCarriers([...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS], undefined),
   configurePlanRequirements: mergeConfigurePlanRequirements([...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS], undefined),
   configureEligibilityRules: mergeConfigureEligibilityRules([...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS], undefined),
   configurePlanCosts: mergeConfigurePlanCosts([...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS], undefined),
@@ -1162,6 +1297,7 @@ function normalizeDraft(parsed: Partial<Draft> & { stepIndex?: number }): Draft 
   }
 
   merged.selectedProducts = selectedProducts
+  merged.companyProfile = normalizeCompanyProfile(merged.companyProfile)
   merged.planBenefitDateSettings = mergePlanDateSettings(
     merged.selectedProducts,
     merged.planBenefitDateSettings as Record<string, PlanBenefitDateSettings> | undefined,
@@ -1169,6 +1305,10 @@ function normalizeDraft(parsed: Partial<Draft> & { stepIndex?: number }): Draft 
   merged.configurePlanNames = mergeConfigurePlanNames(
     merged.selectedProducts,
     merged.configurePlanNames as Record<string, string> | undefined,
+  )
+  merged.configurePlanCarriers = mergeConfigurePlanCarriers(
+    merged.selectedProducts,
+    merged.configurePlanCarriers as Record<string, string> | undefined,
   )
   merged.configurePlanRequirements = mergeConfigurePlanRequirements(
     merged.selectedProducts,
@@ -1517,6 +1657,7 @@ export default function SetupWizardPage() {
         selectedProducts: selected,
         planBenefitDateSettings: mergePlanDateSettings(selected, d.planBenefitDateSettings),
         configurePlanNames: mergeConfigurePlanNames(selected, d.configurePlanNames),
+        configurePlanCarriers: mergeConfigurePlanCarriers(selected, d.configurePlanCarriers),
         configurePlanRequirements: mergeConfigurePlanRequirements(selected, d.configurePlanRequirements),
         configureEligibilityRules: mergeConfigureEligibilityRules(selected, d.configureEligibilityRules),
         configurePlanCosts: mergeConfigurePlanCosts(selected, d.configurePlanCosts),
@@ -2102,18 +2243,53 @@ export default function SetupWizardPage() {
         return (
           <div className="space-y-6">
             <p className="text-sm text-muted-foreground">
-              Confirm your legal entity profile. Values shown are sample data for this preview—production would sync from
-              your implementation files and verified sources.
+              Review and edit your legal entity profile if anything looks wrong. Sample values are shown for this
+              preview—production would sync from your implementation files and verified sources.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <FloatLabel label="Legal Name" readOnly className="bg-muted/50" value={EMPLOYER.legalName} />
-              <FloatLabel label="DBA Name" readOnly className="bg-muted/50" value={EMPLOYER.dbaName} />
-              <FloatLabel label="EIN" readOnly className="bg-muted/50" value={EMPLOYER.ein} />
+              <FloatLabel
+                label="Legal Name"
+                className="bg-background"
+                value={draft.companyProfile.legalName}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    companyProfile: { ...d.companyProfile, legalName: e.target.value },
+                  }))
+                }
+              />
+              <FloatLabel
+                label="DBA Name"
+                className="bg-background"
+                value={draft.companyProfile.dbaName}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    companyProfile: { ...d.companyProfile, dbaName: e.target.value },
+                  }))
+                }
+              />
+              <FloatLabel
+                label="EIN"
+                className="bg-background"
+                value={draft.companyProfile.ein}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    companyProfile: { ...d.companyProfile, ein: e.target.value },
+                  }))
+                }
+              />
               <FloatLabel
                 label="Industry / NAICS Code"
-                readOnly
-                className="bg-muted/50 sm:col-span-2"
-                value={EMPLOYER.industryNaics}
+                className="bg-background sm:col-span-2"
+                value={draft.companyProfile.industryNaics}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    companyProfile: { ...d.companyProfile, industryNaics: e.target.value },
+                  }))
+                }
               />
             </div>
             <Card>
@@ -2121,32 +2297,109 @@ export default function SetupWizardPage() {
                 <CardTitle className="text-base">Addresses</CardTitle>
                 <CardDescription>Headquarters and mailing locations on file.</CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">{EMPLOYER.addresses}</p>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold text-foreground">Headquarters</p>
+                  <p className="text-xs text-muted-foreground">Street, suite, city, state or province, postal code</p>
+                  <Textarea
+                    value={draft.companyProfile.headquartersAddress}
+                    onChange={(e) => {
+                      const hq = e.target.value
+                      setDraft((d) => {
+                        const same = d.companyProfile.mailingSameAsHeadquarters
+                        return {
+                          ...d,
+                          companyProfile: {
+                            ...d.companyProfile,
+                            headquartersAddress: hq,
+                            mailingAddress: same ? hq : d.companyProfile.mailingAddress,
+                          },
+                        }
+                      })
+                    }}
+                    rows={4}
+                    className="resize-y text-sm leading-relaxed"
+                    aria-label="Headquarters address"
+                  />
+                </div>
+
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/80 bg-muted/10 px-3 py-3">
+                  <Checkbox
+                    checked={draft.companyProfile.mailingSameAsHeadquarters}
+                    onCheckedChange={(checked) => {
+                      const on = checked === true
+                      setDraft((d) => {
+                        const hq = d.companyProfile.headquartersAddress
+                        return {
+                          ...d,
+                          companyProfile: {
+                            ...d.companyProfile,
+                            mailingSameAsHeadquarters: on,
+                            mailingAddress: on ? hq : d.companyProfile.mailingAddress,
+                          },
+                        }
+                      })
+                    }}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="text-sm font-medium text-foreground">Mailing address same as headquarters</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Uncheck if correspondence and tax documents go to a P.O. box or different location.
+                    </span>
+                  </span>
+                </label>
+
+                {!draft.companyProfile.mailingSameAsHeadquarters ? (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold text-foreground">Mailing</p>
+                    <p className="text-xs text-muted-foreground">Where mail should be delivered if not the HQ street address</p>
+                    <Textarea
+                      value={draft.companyProfile.mailingAddress}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...d,
+                          companyProfile: { ...d.companyProfile, mailingAddress: e.target.value },
+                        }))
+                      }
+                      rows={4}
+                      className="resize-y text-sm leading-relaxed"
+                      aria-label="Mailing address"
+                    />
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Business structure</p>
               <ul className="grid gap-2 sm:grid-cols-2" role="list">
                 {EMPLOYER_BUSINESS_STRUCTURE_OPTIONS.map((opt) => {
-                  const selected = opt === EMPLOYER.businessStructure
+                  const selected = opt === draft.companyProfile.businessStructure
                   return (
-                    <li
-                      key={opt}
-                      aria-current={selected ? 'true' : undefined}
-                      className={cn(
-                        'flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm',
-                        selected
-                          ? 'border-primary bg-primary/5 font-medium text-foreground'
-                          : 'border-border bg-muted/20 text-muted-foreground',
-                      )}
-                    >
-                      {selected ? (
-                        <Check className="h-4 w-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden />
-                      ) : (
-                        <span className="h-4 w-4 shrink-0 rounded-full border border-muted-foreground/35" aria-hidden />
-                      )}
-                      <span>{opt}</span>
+                    <li key={opt}>
+                      <button
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() =>
+                          setDraft((d) => ({
+                            ...d,
+                            companyProfile: { ...d.companyProfile, businessStructure: opt },
+                          }))
+                        }
+                        className={cn(
+                          'flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors',
+                          selected
+                            ? 'border-primary bg-primary/5 font-medium text-foreground'
+                            : 'border-border bg-muted/20 text-muted-foreground hover:bg-muted/35',
+                        )}
+                      >
+                        {selected ? (
+                          <Check className="h-4 w-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden />
+                        ) : (
+                          <span className="h-4 w-4 shrink-0 rounded-full border border-muted-foreground/35" aria-hidden />
+                        )}
+                        <span>{opt}</span>
+                      </button>
                     </li>
                   )
                 })}
@@ -2631,18 +2884,8 @@ export default function SetupWizardPage() {
           )
         }
         const plan = benefitPlansForConfig[benefitsActivePlanIndex]!
-        const carrierLabel =
-          plan.productId === 'medical'
-            ? 'UHC'
-            : plan.productId === 'dental'
-              ? 'Guardian'
-              : plan.productId === 'vision'
-                ? 'VSP'
-                : CDH_PRODUCT_IDS.has(plan.productId)
-                  ? 'WEX (CDH)'
-                  : plan.productId === 'transit-parking'
-                    ? 'Commuter vendor'
-                    : 'Carrier TBD'
+        const carrierValue =
+          draft.configurePlanCarriers[plan.productId] ?? defaultCarrierLabelForProduct(plan.productId)
         const planDates =
           draft.planBenefitDateSettings[plan.productId] ?? defaultPlanDateEntry()
         const planReq =
@@ -2777,7 +3020,21 @@ export default function SetupWizardPage() {
                       }))
                     }
                   />
-                  <FloatLabel label="Carrier / provider" readOnly className="bg-muted/50 sm:col-span-2" value={carrierLabel} />
+                  <FloatLabel
+                    label="Carrier / provider"
+                    id={`configure-plan-carrier-${plan.productId}`}
+                    className="bg-background sm:col-span-2"
+                    value={carrierValue}
+                    onChange={(e) =>
+                      setDraft((d) => ({
+                        ...d,
+                        configurePlanCarriers: {
+                          ...d.configurePlanCarriers,
+                          [plan.productId]: e.target.value,
+                        },
+                      }))
+                    }
+                  />
                 </div>
 
                 <div className="rounded-lg border border-border bg-muted/15 px-3 py-3">
