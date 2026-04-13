@@ -38,6 +38,7 @@ import {
   AlertCircle,
   Building2,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -65,6 +66,7 @@ import {
   LIFE_EVENT_DEFAULT_FUTURE_DAYS,
   LIFE_EVENT_DEFAULT_RETRO_DAYS,
   LIFE_EVENTS_DEFAULT_ROWS,
+  DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS,
   PRODUCT_OPTIONS,
   type EmployeeGroupClassRow,
   type EmployerRolesUserRow,
@@ -76,7 +78,7 @@ import {
   writeEmployerSetup,
 } from '@/hooks/useEmployerSetup'
 
-/** Linear task order (18 tasks). */
+/** Linear task order (14 tasks). */
 const TASK_LABELS = [
   'Company basics',
   'Roles and Permissions',
@@ -87,22 +89,27 @@ const TASK_LABELS = [
   'Set default benefit dates',
   'Configure plans',
   'Marketplace',
-  'Connect employee system',
-  'Connect benefit/provider system',
-  'Enable EDI',
-  'Configure carrier feeds',
-  'Review connected systems status',
+  'Connect systems',
   'Verify rules and calculations in a safe environment',
   'Preview employee experience',
   'Spot-check migrated/imported data',
   'Review launch status',
 ] as const
 
-/** Full-bleed embedded theming / preview surface. */
-const PREVIEW_EMPLOYEE_TASK_INDEX = 15
+/** Product ids that use consumer-directed / pre-tax admin (Configure plans carrier hint). */
+const CDH_PRODUCT_IDS = new Set(['hsa', 'fsa', 'lpfsa', 'dcfsa'])
 
-/** Waiting-on-others for vendor / feed work while reviewing connections. */
-const CONNECT_STATUS_REVIEW_TASK_INDEX = 13
+/** Bump when default “Choose benefits” selection changes so stored drafts can migrate. */
+const BENEFITS_DEFAULTS_VERSION = 2
+
+/** Older guided-setup default before expanded catalog + six default checks. */
+const LEGACY_DEFAULT_BENEFIT_PRODUCT_IDS = new Set(['medical', 'dental', 'hsa'])
+
+/** Full-bleed embedded theming / preview surface. */
+const PREVIEW_EMPLOYEE_TASK_INDEX = 11
+
+/** Single Connect systems task — waiting-on-others for vendor / feed work. */
+const CONNECT_SYSTEMS_TASK_INDEX = 9
 
 type WizardStepDef = {
   title: string
@@ -138,16 +145,16 @@ const WIZARD_STEPS: readonly WizardStepDef[] = [
   {
     title: 'Connect Systems',
     description:
-      'Optional deeper integrations and health checks—skip or confirm if you already connected during Employee setup or while configuring plans.',
-    navHint: 'Optional integrations—skip if you already linked payroll or carriers.',
-    taskIndices: [9, 10, 11, 12, 13],
+      'EDI, carrier eligibility, and payroll / HRIS in one place. Each line shows status here—expand to troubleshoot. Skip anything you already linked during Employee setup or Configure plans.',
+    navHint: 'EDI, carrier feeds, then payroll—optional integrations.',
+    taskIndices: [9],
   },
   {
     title: 'Test & Launch',
     description:
       'Verify rules in a safe environment first, then optional employee preview and data spot-check, then confirm launch readiness.',
     navHint: 'Verify in a safe environment, then preview, spot-check, launch.',
-    taskIndices: [14, 15, 16, 17],
+    taskIndices: [10, 11, 12, 13],
   },
 ] as const
 
@@ -190,9 +197,9 @@ type StoredTaskOutcome = 'pending' | 'complete' | 'skipped' | 'waiting_on_others
 const TASK_COUNT = TASK_LABELS.length
 
 /**
- * Optional: Marketplace (8); Connect Systems (9–13); employee preview (15); spot-check (16). Skipped never counts as complete.
+ * Optional: Marketplace (8); Connect systems (9); employee preview (11); spot-check (12). Skipped never counts as complete.
  */
-const OPTIONAL_TASK_IDS = new Set<number>([8, 9, 10, 11, 12, 13, 15, 16])
+const OPTIONAL_TASK_IDS = new Set<number>([8, 9, 11, 12])
 
 /** Connect Systems tasks stay optional for progress; the nav shows one “optional step” label instead of per-task badges. */
 const CONNECT_SYSTEMS_TASK_IDS = new Set(
@@ -209,10 +216,10 @@ const TASK_BLOCKER: Partial<Record<number, number>> = {
   6: 5,
   7: 6,
   8: 7,
-  /** Test & Launch: verify (14) first; optional preview / spot-check after; launch (17) after verify. */
-  15: 14,
-  16: 14,
-  17: 14,
+  /** Test & Launch: verify (10) first; optional preview / spot-check after; launch (13) after verify. */
+  11: 10,
+  12: 10,
+  13: 10,
 }
 
 function isTaskRequired(taskIndex: number): boolean {
@@ -346,6 +353,23 @@ function mergePlanDateSettings(
   return out
 }
 
+function mergeConfigurePlanNames(
+  selectedProductIds: readonly string[],
+  existing: Record<string, string> | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const id of selectedProductIds) {
+    const prev = existing?.[id]
+    out[id] = typeof prev === 'string' ? prev : ''
+  }
+  return out
+}
+
+/** Configure plans: plan name entered (non-whitespace) counts as ready for status UI. */
+function isConfigurePlanNameFilled(names: Record<string, string>, productId: string): boolean {
+  return (names[productId] ?? '').trim().length > 0
+}
+
 function normalizeDefaultBenefitDates(raw: unknown): DefaultBenefitDatesState {
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_BENEFIT_DATES }
   const o = raw as Record<string, unknown>
@@ -355,6 +379,51 @@ function normalizeDefaultBenefitDates(raw: unknown): DefaultBenefitDatesState {
     openEnrollment: typeof o.openEnrollment === 'string' ? o.openEnrollment : DEFAULT_BENEFIT_DATES.openEnrollment,
     firstDeduction: typeof o.firstDeduction === 'string' ? o.firstDeduction : DEFAULT_BENEFIT_DATES.firstDeduction,
   }
+}
+
+type ConnectSystemsLineKey = 'edi' | 'carrier' | 'payroll'
+type ConnectLineUiState = 'not_configured' | 'connected' | 'needs_attention'
+
+type ConnectSystemsLineStateMap = Record<ConnectSystemsLineKey, ConnectLineUiState>
+
+function defaultConnectSystemsLineState(): ConnectSystemsLineStateMap {
+  return { edi: 'not_configured', carrier: 'not_configured', payroll: 'not_configured' }
+}
+
+function normalizeConnectSystemsLineState(raw: unknown): ConnectSystemsLineStateMap {
+  const d = defaultConnectSystemsLineState()
+  if (!raw || typeof raw !== 'object') return d
+  const o = raw as Record<string, unknown>
+  const norm = (v: unknown): ConnectLineUiState =>
+    v === 'connected' || v === 'needs_attention' || v === 'not_configured' ? v : 'not_configured'
+  return {
+    edi: norm(o.edi),
+    carrier: norm(o.carrier),
+    payroll: norm(o.payroll),
+  }
+}
+
+/** Migrate localStorage drafts from 18-task wizard (5 connect tasks) to 14 tasks (1 connect task). */
+function migrateOldWizardDraft(parsed: Partial<Draft>): Partial<Draft> {
+  if (parsed.taskOutcomes?.length !== 18) return parsed
+  const old = parsed.taskOutcomes
+  const taskOutcomes: StoredTaskOutcome[] = []
+  for (let i = 0; i < 9; i++) taskOutcomes.push(old[i]!)
+  const slice = old.slice(9, 14)
+  let agg: StoredTaskOutcome = 'pending'
+  if (slice.every((o) => o === 'complete' || o === 'skipped')) agg = 'complete'
+  else if (slice.some((o) => o === 'waiting_on_others')) agg = 'waiting_on_others'
+  else if (slice.some((o) => o === 'needs_review')) agg = 'needs_review'
+  taskOutcomes.push(agg)
+  for (let n = 10; n < 14; n++) taskOutcomes.push(old[n + 4]!)
+
+  let stepIndex = parsed.stepIndex
+  if (typeof stepIndex === 'number') {
+    if (stepIndex >= 9 && stepIndex <= 13) stepIndex = 9
+    else if (stepIndex >= 14) stepIndex = stepIndex - 4
+    stepIndex = Math.min(Math.max(0, stepIndex), TASK_COUNT - 1)
+  }
+  return { ...parsed, taskOutcomes, stepIndex }
 }
 
 type Draft = {
@@ -367,37 +436,76 @@ type Draft = {
   linkedPayrollFromEmployeeSetup: boolean
   /** Benefit/provider link initiated from Configure plans (optional path). */
   linkedBenefitFeedsFromBenefits: boolean
+  /** Per integration line on Connect systems (EDI → carrier → payroll). */
+  connectSystemsLineState: ConnectSystemsLineStateMap
   /** Shared effective / plan-year style defaults for most benefits. */
   defaultBenefitDates: DefaultBenefitDatesState
   /** Per-product date behavior inside Configure plans. */
   planBenefitDateSettings: Record<string, PlanBenefitDateSettings>
+  /** User-entered plan display names in Configure plans (empty until typed). */
+  configurePlanNames: Record<string, string>
+  /** Stored draft version for benefit checkbox defaults (migration). */
+  benefitsDefaultsVersion: number
 }
 
 const defaultDraft: Draft = {
   stepIndex: 0,
   taskOutcomes: defaultTaskOutcomes(),
-  selectedProducts: ['medical', 'dental', 'hsa'],
+  selectedProducts: [...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS],
   eligibilityNotes:
     'IF employment type is full-time AND hire date is more than 60 days ago THEN eligible for medical on the first of next month.\nIF average hours are under 30 THEN offer limited medical only.',
   mappingStep: 0,
   linkedPayrollFromEmployeeSetup: false,
   linkedBenefitFeedsFromBenefits: false,
+  connectSystemsLineState: defaultConnectSystemsLineState(),
   defaultBenefitDates: { ...DEFAULT_BENEFIT_DATES },
-  planBenefitDateSettings: mergePlanDateSettings(['medical', 'dental', 'hsa'], undefined),
+  planBenefitDateSettings: mergePlanDateSettings([...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS], undefined),
+  configurePlanNames: mergeConfigurePlanNames([...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS], undefined),
+  benefitsDefaultsVersion: BENEFITS_DEFAULTS_VERSION,
 }
 
 function normalizeDraft(parsed: Partial<Draft> & { stepIndex?: number }): Draft {
-  const merged: Draft = { ...defaultDraft, ...parsed }
+  const parsedMigrated = migrateOldWizardDraft(parsed)
+  const savedBenefitsDefaultsVersion = parsedMigrated.benefitsDefaultsVersion
+  const merged: Draft = { ...defaultDraft, ...parsedMigrated }
   if (!merged.taskOutcomes || merged.taskOutcomes.length !== TASK_COUNT) {
     merged.taskOutcomes = defaultTaskOutcomes()
   }
   merged.stepIndex = Math.min(Math.max(0, merged.stepIndex), TASK_COUNT - 1)
   if (typeof merged.linkedPayrollFromEmployeeSetup !== 'boolean') merged.linkedPayrollFromEmployeeSetup = false
   if (typeof merged.linkedBenefitFeedsFromBenefits !== 'boolean') merged.linkedBenefitFeedsFromBenefits = false
+  merged.connectSystemsLineState = normalizeConnectSystemsLineState(merged.connectSystemsLineState)
   merged.defaultBenefitDates = normalizeDefaultBenefitDates(merged.defaultBenefitDates)
+  const validProductIds = new Set<string>(PRODUCT_OPTIONS.map((p) => p.id))
+  let selectedProducts = (merged.selectedProducts ?? []).filter((id) => validProductIds.has(id))
+
+  const matchesLegacyDefaultTrio = (() => {
+    if (selectedProducts.length !== LEGACY_DEFAULT_BENEFIT_PRODUCT_IDS.size) return false
+    const s = new Set(selectedProducts)
+    if (s.size !== LEGACY_DEFAULT_BENEFIT_PRODUCT_IDS.size) return false
+    for (const id of LEGACY_DEFAULT_BENEFIT_PRODUCT_IDS) {
+      if (!s.has(id)) return false
+    }
+    return true
+  })()
+
+  if (savedBenefitsDefaultsVersion !== BENEFITS_DEFAULTS_VERSION) {
+    if (selectedProducts.length === 0 || matchesLegacyDefaultTrio) {
+      selectedProducts = [...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS]
+    }
+    merged.benefitsDefaultsVersion = BENEFITS_DEFAULTS_VERSION
+  } else if (selectedProducts.length === 0) {
+    selectedProducts = [...DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS]
+  }
+
+  merged.selectedProducts = selectedProducts
   merged.planBenefitDateSettings = mergePlanDateSettings(
     merged.selectedProducts,
     merged.planBenefitDateSettings as Record<string, PlanBenefitDateSettings> | undefined,
+  )
+  merged.configurePlanNames = mergeConfigurePlanNames(
+    merged.selectedProducts,
+    merged.configurePlanNames as Record<string, string> | undefined,
   )
   return merged
 }
@@ -703,6 +811,7 @@ export default function SetupWizardPage() {
         ...d,
         selectedProducts: selected,
         planBenefitDateSettings: mergePlanDateSettings(selected, d.planBenefitDateSettings),
+        configurePlanNames: mergeConfigurePlanNames(selected, d.configurePlanNames),
       }
     })
   }
@@ -738,15 +847,6 @@ export default function SetupWizardPage() {
   )
 
   const benefitPlansForConfig = useMemo(() => {
-    const nameById: Record<string, string> = {
-      medical: 'Summit PPO Gold',
-      dental: 'Bright Smile PPO',
-      vision: 'Clear View Select',
-      hsa: 'HSA election (CDH)',
-      lpfsa: 'Limited purpose FSA',
-      commuter: 'Commuter pre-tax',
-      voluntary: 'Voluntary supplemental bundle',
-    }
     return draft.selectedProducts
       .map((pid) => {
         const opt = PRODUCT_OPTIONS.find((p) => p.id === pid)
@@ -754,11 +854,11 @@ export default function SetupWizardPage() {
         return {
           productId: pid,
           benefitType: opt.label,
-          planName: nameById[pid] ?? `${opt.label} plan`,
+          planName: draft.configurePlanNames[pid] ?? '',
         }
       })
       .filter((x): x is NonNullable<typeof x> => x !== null)
-  }, [draft.selectedProducts])
+  }, [draft.selectedProducts, draft.configurePlanNames])
 
   const [benefitsActivePlanIndex, setBenefitsActivePlanIndex] = useState(0)
 
@@ -799,12 +899,29 @@ export default function SetupWizardPage() {
     futureDays: String(LIFE_EVENT_DEFAULT_FUTURE_DAYS),
   })
 
+  const [connectMappingLine, setConnectMappingLine] = useState<ConnectSystemsLineKey | null>(null)
+  const [connectExpandLine, setConnectExpandLine] = useState<ConnectSystemsLineKey | null>(null)
+
   const stepBody = (() => {
     const mappingSheet = (
-      <Sheet open={mappingOpen} onOpenChange={setMappingOpen}>
+      <Sheet
+        open={mappingOpen}
+        onOpenChange={(open) => {
+          setMappingOpen(open)
+          if (!open) setConnectMappingLine(null)
+        }}
+      >
         <SheetContent className="flex w-full flex-col gap-4 overflow-y-auto sm:max-w-md">
           <SheetHeader>
-            <SheetTitle>Mapping wizard (ADP)</SheetTitle>
+            <SheetTitle>
+              {connectMappingLine === 'edi'
+                ? 'EDI mapping'
+                : connectMappingLine === 'carrier'
+                  ? 'Carrier feed mapping'
+                  : connectMappingLine === 'payroll'
+                    ? 'Payroll / HRIS mapping'
+                    : 'Mapping wizard (ADP)'}
+            </SheetTitle>
           </SheetHeader>
           <ol className="space-y-2 text-sm">
             {mappingSteps.map((label, i) => (
@@ -818,32 +935,66 @@ export default function SetupWizardPage() {
               </li>
             ))}
           </ol>
-          <div className="mt-auto flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1"
-              onClick={() =>
-                setDraft((d) => ({
-                  ...d,
-                  mappingStep: Math.max(0, d.mappingStep - 1),
-                }))
-              }
-            >
-              Back
-            </Button>
-            <Button
-              type="button"
-              className="flex-1"
-              onClick={() => {
-                setDraft((d) => {
-                  const next = Math.min(mappingSteps.length - 1, d.mappingStep + 1)
-                  return { ...d, mappingStep: next }
-                })
-              }}
-            >
-              Next
-            </Button>
+          <div className="mt-auto flex flex-col gap-3">
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() =>
+                  setDraft((d) => ({
+                    ...d,
+                    mappingStep: Math.max(0, d.mappingStep - 1),
+                  }))
+                }
+              >
+                Back
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                onClick={() => {
+                  setDraft((d) => {
+                    const next = Math.min(mappingSteps.length - 1, d.mappingStep + 1)
+                    return { ...d, mappingStep: next }
+                  })
+                }}
+              >
+                Next
+              </Button>
+            </div>
+            {connectMappingLine ? (
+              <div className="flex gap-2 border-t border-border pt-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setMappingOpen(false)
+                    setConnectMappingLine(null)
+                  }}
+                >
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1"
+                  onClick={() => {
+                    const line = connectMappingLine
+                    setDraft((d) => ({
+                      ...d,
+                      connectSystemsLineState: { ...d.connectSystemsLineState, [line]: 'connected' },
+                      ...(line === 'payroll' ? { linkedPayrollFromEmployeeSetup: true } : {}),
+                      ...(line === 'carrier' ? { linkedBenefitFeedsFromBenefits: true } : {}),
+                    }))
+                    setMappingOpen(false)
+                    setConnectMappingLine(null)
+                  }}
+                >
+                  Save connection
+                </Button>
+              </div>
+            ) : null}
           </div>
         </SheetContent>
       </Sheet>
@@ -1106,7 +1257,7 @@ export default function SetupWizardPage() {
     const waitingOnMappingsToggle = (
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2 border-t border-border/60 pt-3">
         <span className="text-xs text-muted-foreground">Waiting on a vendor or file feed?</span>
-        {draft.taskOutcomes[CONNECT_STATUS_REVIEW_TASK_INDEX] === 'waiting_on_others' ? (
+        {draft.taskOutcomes[CONNECT_SYSTEMS_TASK_INDEX] === 'waiting_on_others' ? (
           <Button
             type="button"
             variant="ghost"
@@ -1115,7 +1266,7 @@ export default function SetupWizardPage() {
             onClick={() =>
               setDraft((d) => {
                 const next = [...d.taskOutcomes]
-                next[CONNECT_STATUS_REVIEW_TASK_INDEX] = 'pending'
+                next[CONNECT_SYSTEMS_TASK_INDEX] = 'pending'
                 return { ...d, taskOutcomes: next }
               })
             }
@@ -1131,7 +1282,7 @@ export default function SetupWizardPage() {
             onClick={() =>
               setDraft((d) => {
                 const next = [...d.taskOutcomes]
-                next[CONNECT_STATUS_REVIEW_TASK_INDEX] = 'waiting_on_others'
+                next[CONNECT_SYSTEMS_TASK_INDEX] = 'waiting_on_others'
                 return { ...d, taskOutcomes: next }
               })
             }
@@ -1588,7 +1739,7 @@ export default function SetupWizardPage() {
               Select every benefit category you offer. Each selection becomes a plan you configure in{' '}
               <strong className="font-medium text-foreground">Configure plans</strong>—you can add more categories later.
             </p>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {PRODUCT_OPTIONS.map((p) => (
                 <label
                   key={p.id}
@@ -1683,47 +1834,26 @@ export default function SetupWizardPage() {
               ? 'Guardian'
               : plan.productId === 'vision'
                 ? 'VSP'
-                : plan.productId === 'hsa' || plan.productId === 'lpfsa'
+                : CDH_PRODUCT_IDS.has(plan.productId)
                   ? 'WEX (CDH)'
-                  : plan.productId === 'commuter'
+                  : plan.productId === 'transit-parking'
                     ? 'Commuter vendor'
                     : 'Carrier TBD'
         const cobraName = `cobra-${plan.productId}`
         const planDates =
           draft.planBenefitDateSettings[plan.productId] ?? defaultPlanDateEntry()
         const def = draft.defaultBenefitDates
+        const configurePlansTotal = benefitPlansForConfig.length
+        const configurePlansWithName = benefitPlansForConfig.filter((p) =>
+          isConfigurePlanNameFilled(draft.configurePlanNames, p.productId),
+        ).length
+        const configurePlansNeedName = configurePlansTotal - configurePlansWithName
         return (
           <div className="space-y-5">
             <p className="text-sm text-muted-foreground">
               Configure one plan at a time. Dates follow your employer defaults unless you turn off “Use default benefit
               dates” for an exception (for example, calendar-year FSA vs plan-year medical).
             </p>
-            <div
-              className="flex flex-wrap gap-2 border-b border-border pb-3"
-              role="tablist"
-              aria-label="Plans to configure"
-            >
-              {benefitPlansForConfig.map((p, i) => (
-                <button
-                  key={p.productId}
-                  type="button"
-                  role="tab"
-                  aria-selected={i === benefitsActivePlanIndex}
-                  onClick={() => setBenefitsActivePlanIndex(i)}
-                  className={cn(
-                    'rounded-md border px-3 py-2 text-left text-xs transition-colors',
-                    i === benefitsActivePlanIndex
-                      ? 'border-primary bg-primary/10 font-medium text-foreground'
-                      : 'border-transparent bg-muted/35 text-muted-foreground hover:bg-muted/60',
-                  )}
-                >
-                  <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {p.benefitType}
-                  </span>
-                  <span className="block">{p.planName}</span>
-                </button>
-              ))}
-            </div>
 
             <Card>
               <CardHeader className="pb-2">
@@ -1734,8 +1864,80 @@ export default function SetupWizardPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <FloatLabel label="Benefit type" readOnly className="bg-muted/50" value={plan.benefitType} />
-                  <FloatLabel label="Plan name" readOnly className="bg-muted/50" value={plan.planName} />
+                  <div className="space-y-2 sm:col-span-2">
+                    <label htmlFor="configure-benefit-type" className="text-sm font-medium text-foreground">
+                      Benefit type
+                    </label>
+                    <Select
+                      value={plan.productId}
+                      onValueChange={(pid) => {
+                        const idx = benefitPlansForConfig.findIndex((p) => p.productId === pid)
+                        if (idx >= 0) setBenefitsActivePlanIndex(idx)
+                      }}
+                    >
+                      <SelectTrigger id="configure-benefit-type" className="w-full max-w-md">
+                        <SelectValue placeholder="Select benefit type" />
+                      </SelectTrigger>
+                      <SelectContent className="min-w-[var(--radix-select-trigger-width)] max-w-[min(100vw-2rem,28rem)]">
+                        {benefitPlansForConfig.map((p) => {
+                          const filled = isConfigurePlanNameFilled(draft.configurePlanNames, p.productId)
+                          return (
+                            <SelectItem key={p.productId} value={p.productId} className="pr-2">
+                              <span className="flex w-full min-w-0 items-center justify-between gap-3">
+                                <span className="truncate">{p.benefitType}</span>
+                                <span
+                                  className={cn(
+                                    'flex shrink-0 items-center gap-1 text-xs',
+                                    filled ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-600',
+                                  )}
+                                >
+                                  {filled ? (
+                                    <>
+                                      <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                                      <span>Ready</span>
+                                    </>
+                                  ) : (
+                                    <span>Needs name</span>
+                                  )}
+                                </span>
+                              </span>
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs leading-snug text-muted-foreground" aria-live="polite">
+                      {configurePlansNeedName === 0 ? (
+                        <>
+                          All {configurePlansTotal} selected benefit{' '}
+                          {configurePlansTotal === 1 ? 'type has' : 'types have'} a plan name.
+                        </>
+                      ) : (
+                        <>
+                          {configurePlansWithName} of {configurePlansTotal} have a plan name
+                          <span className="text-muted-foreground/80"> · </span>
+                          <span className="font-medium text-foreground">
+                            {configurePlansNeedName} still need{configurePlansNeedName === 1 ? 's' : ''} a name
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  <FloatLabel
+                    label="Plan name"
+                    id={`configure-plan-name-${plan.productId}`}
+                    className="bg-background sm:col-span-2"
+                    value={plan.planName}
+                    onChange={(e) =>
+                      setDraft((d) => ({
+                        ...d,
+                        configurePlanNames: {
+                          ...d.configurePlanNames,
+                          [plan.productId]: e.target.value,
+                        },
+                      }))
+                    }
+                  />
                   <FloatLabel label="Carrier / provider" readOnly className="bg-muted/50 sm:col-span-2" value={carrierLabel} />
                 </div>
 
@@ -2061,161 +2263,211 @@ export default function SetupWizardPage() {
             </div>
           </div>
         )
-      case 9:
-        return (
-          <div className="space-y-4">
-            {draft.linkedPayrollFromEmployeeSetup ? (
-              <div className="rounded-lg border border-emerald-600/30 bg-emerald-600/5 px-3 py-2 text-sm text-foreground">
-                <strong className="font-medium">Already in progress:</strong> you started payroll / HRIS from Employee
-                setup. Use this task to extend mappings or confirm production cutover—no need to repeat the same setup.
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Optional deep-dive for payroll / HRIS. Connect here if you did not use ADP or Workday during Employee setup.
-              </p>
+      case 9: {
+        const ediStatus = draft.connectSystemsLineState.edi
+        const carrierStatus: ConnectLineUiState =
+          draft.connectSystemsLineState.carrier === 'needs_attention'
+            ? 'needs_attention'
+            : draft.connectSystemsLineState.carrier === 'connected' || draft.linkedBenefitFeedsFromBenefits
+              ? 'connected'
+              : 'not_configured'
+        const payrollStatus: ConnectLineUiState =
+          draft.connectSystemsLineState.payroll === 'needs_attention'
+            ? 'needs_attention'
+            : draft.connectSystemsLineState.payroll === 'connected' || draft.linkedPayrollFromEmployeeSetup
+              ? 'connected'
+              : 'not_configured'
+
+        const connectLineBadge = (state: ConnectLineUiState) => (
+          <Badge
+            intent="outline"
+            className={cn(
+              'shrink-0 font-medium',
+              state === 'connected' &&
+                'border-emerald-600/35 bg-emerald-600/10 text-emerald-950 dark:text-emerald-50',
+              state === 'needs_attention' &&
+                'border-amber-600/40 bg-amber-500/12 text-amber-950 dark:text-amber-100',
             )}
-            <div className="grid gap-3 sm:grid-cols-2">
-              {(payrollHrisConnectors.length ? payrollHrisConnectors : CONNECTORS.slice(0, 2)).map((c) => (
-                <Card key={c.id}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">{c.name}</CardTitle>
-                    <CardDescription>
-                      {c.category} · {c.direction}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button type="button" variant="outline" size="sm" onClick={() => setMappingOpen(true)}>
-                      {draft.linkedPayrollFromEmployeeSetup ? 'Review / extend' : 'Configure'}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            {mappingSheet}
-          </div>
+          >
+            {state === 'connected' ? 'Connected' : state === 'needs_attention' ? 'Needs attention' : 'Not connected'}
+          </Badge>
         )
-      case 10:
-        return (
-          <div className="space-y-4">
-            {draft.linkedBenefitFeedsFromBenefits ? (
-              <div className="rounded-lg border border-emerald-600/30 bg-emerald-600/5 px-3 py-2 text-sm text-foreground">
-                <strong className="font-medium">Already in progress:</strong> you configured a benefit or carrier feed
-                while configuring plans. Confirm or extend those connections here instead of starting from scratch.
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Optional—link healthcare and ancillary carriers or broker feeds if you did not connect them while configuring plans.
-              </p>
-            )}
-            <div className="grid gap-3 sm:grid-cols-2">
-              {(carrierFeedConnectors.length ? carrierFeedConnectors : CONNECTORS.slice(2, 4)).map((c) => (
-                <Card key={c.id}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">{c.name}</CardTitle>
-                    <CardDescription>
-                      {c.category} · {c.direction}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button type="button" variant="outline" size="sm" onClick={() => setMappingOpen(true)}>
-                      {draft.linkedBenefitFeedsFromBenefits ? 'Review / extend' : 'Configure'}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            {mappingSheet}
-          </div>
-        )
-      case 11:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Turn on file-based eligibility and census delivery where your vendors support EDI or WEX unified files.
-            </p>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">WEX unified EDI</CardTitle>
-                <CardDescription>Census & eligibility · Inbound / Outbound</CardDescription>
+
+        const openConnectMap = (line: ConnectSystemsLineKey) => {
+          setConnectMappingLine(line)
+          setMappingOpen(true)
+        }
+
+        const markLineAttention = (line: ConnectSystemsLineKey) =>
+          setDraft((d) => ({
+            ...d,
+            connectSystemsLineState: { ...d.connectSystemsLineState, [line]: 'needs_attention' },
+          }))
+
+        const ediRows = CONNECTORS.filter((c) => c.id === 'edi')
+        const carrierRows = carrierFeedConnectors.length ? carrierFeedConnectors : CONNECTORS.slice(2, 4)
+        const payrollRows = payrollHrisConnectors.length ? payrollHrisConnectors : CONNECTORS.slice(0, 2)
+
+        const lineCard = (
+          lineKey: ConnectSystemsLineKey,
+          title: string,
+          description: string,
+          status: ConnectLineUiState,
+          hint: string | null,
+          children: ReactNode,
+        ) => {
+          const expanded = connectExpandLine === lineKey
+          return (
+            <Card key={lineKey} className="overflow-hidden border-border/80">
+              <CardHeader className="space-y-3 pb-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <CardTitle className="text-base">{title}</CardTitle>
+                    <CardDescription className="text-sm">{description}</CardDescription>
+                  </div>
+                  {connectLineBadge(status)}
+                </div>
+                {status === 'connected' ? (
+                  <p className="text-xs text-muted-foreground">
+                    Last check OK · sample sync ·{' '}
+                    {lineKey === 'payroll' && draft.linkedPayrollFromEmployeeSetup && draft.connectSystemsLineState.payroll !== 'connected'
+                      ? 'Linked from Employee setup'
+                      : lineKey === 'carrier' && draft.linkedBenefitFeedsFromBenefits && draft.connectSystemsLineState.carrier !== 'connected'
+                        ? 'Started from Configure plans'
+                        : 'Ready for production cutover'}
+                  </p>
+                ) : null}
+                {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
               </CardHeader>
-              <CardContent>
-                <Button type="button" variant="outline" size="sm" onClick={() => setMappingOpen(true)}>
-                  Enable EDI lane
-                </Button>
+              <CardContent className="space-y-3 pt-0">
+                {children}
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => openConnectMap(lineKey)}>
+                    {status === 'connected' ? 'Review / extend' : 'Configure'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setConnectExpandLine((x) => (x === lineKey ? null : lineKey))}
+                    aria-expanded={expanded}
+                  >
+                    {expanded ? (
+                      <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+                    )}
+                    Diagnose
+                  </Button>
+                </div>
+                {expanded ? (
+                  <div
+                    className="rounded-lg border border-border/80 bg-muted/20 px-3 py-3 text-sm"
+                    role="region"
+                    aria-label={`${title} diagnostics`}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Connection checks</p>
+                    <ul className="mt-2 list-inside list-disc space-y-1 text-muted-foreground">
+                      <li>Handshake and credentials validated against your tenant (demo).</li>
+                      <li>File or API schema version matches the latest WEX template.</li>
+                      <li>Test payload accepted; errors surface in carrier or payroll logs.</li>
+                    </ul>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => markLineAttention(lineKey)}
+                    >
+                      Mark needs attention (demo)
+                    </Button>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
-            {mappingSheet}
-          </div>
-        )
-      case 12:
+          )
+        }
+
         return (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <p className="text-sm text-muted-foreground">
-              Schedule and test carrier eligibility files—timing should match payroll deductions and your plan effective
-              dates.
+              <strong className="font-medium text-foreground">Optional.</strong> Set up EDI, carrier eligibility, and payroll
+              in the order below. Status updates on this screen—expand <strong className="font-medium">Diagnose</strong> for
+              quick checks or open the mapping flow to record a connection.
             </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {(carrierFeedConnectors.length ? carrierFeedConnectors : CONNECTORS.slice(2, 4)).map((c) => (
-                <Card key={c.id}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">{c.name}</CardTitle>
-                    <CardDescription>
-                      {c.category} · {c.direction}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button type="button" variant="outline" size="sm" onClick={() => setMappingOpen(true)}>
-                      Open feed settings
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            {mappingSheet}
-          </div>
-        )
-      case 13:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              One place to see what is live, what is still testing, and what you started earlier in the wizard.
-            </p>
-            <ul className="space-y-1.5 rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm text-foreground">
-              <li>
-                Employee system:{' '}
-                <span className="font-medium">
-                  {draft.linkedPayrollFromEmployeeSetup ? 'Linked from Employee setup' : 'Not linked from Employee setup'}
-                </span>
-              </li>
-              <li>
-                Benefit / provider feeds:{' '}
-                <span className="font-medium">
-                  {draft.linkedBenefitFeedsFromBenefits ? 'Touched while configuring plans' : 'Not configured in plan setup'}
-                </span>
-              </li>
-            </ul>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {CONNECTORS.map((c) => (
-                <Card key={c.id}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">{c.name}</CardTitle>
-                    <CardDescription>
-                      {c.category} · {c.direction}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button type="button" variant="outline" size="sm" onClick={() => setMappingOpen(true)}>
-                      View status
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="space-y-4">
+              {lineCard(
+                'edi',
+                'EDI',
+                'File-based census and eligibility—WEX unified EDI or vendor-specific lanes.',
+                ediStatus,
+                null,
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {ediRows.map((c) => (
+                    <div
+                      key={c.id}
+                      className="rounded-md border border-border/80 bg-background/50 px-3 py-2 text-xs text-muted-foreground"
+                    >
+                      <p className="font-medium text-foreground">{c.name}</p>
+                      <p>
+                        {c.category} · {c.direction}
+                      </p>
+                    </div>
+                  ))}
+                </div>,
+              )}
+              {lineCard(
+                'carrier',
+                'Carrier',
+                'Healthcare and ancillary carrier feeds—eligibility, enrollment, and reconciliation.',
+                carrierStatus,
+                draft.linkedBenefitFeedsFromBenefits
+                  ? 'You already started a feed while configuring plans—you can extend it here.'
+                  : null,
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {carrierRows.map((c) => (
+                    <div
+                      key={c.id}
+                      className="rounded-md border border-border/80 bg-background/50 px-3 py-2 text-xs text-muted-foreground"
+                    >
+                      <p className="font-medium text-foreground">{c.name}</p>
+                      <p>
+                        {c.category} · {c.direction}
+                      </p>
+                    </div>
+                  ))}
+                </div>,
+              )}
+              {lineCard(
+                'payroll',
+                'Payroll (employee system)',
+                'Payroll / HRIS for deductions, classes, and census—bi-directional where supported.',
+                payrollStatus,
+                draft.linkedPayrollFromEmployeeSetup
+                  ? 'Payroll link started from Employee setup—confirm mappings or production cutover here.'
+                  : null,
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {payrollRows.map((c) => (
+                    <div
+                      key={c.id}
+                      className="rounded-md border border-border/80 bg-background/50 px-3 py-2 text-xs text-muted-foreground"
+                    >
+                      <p className="font-medium text-foreground">{c.name}</p>
+                      <p>
+                        {c.category} · {c.direction}
+                      </p>
+                    </div>
+                  ))}
+                </div>,
+              )}
             </div>
             {waitingOnMappingsToggle}
             {mappingSheet}
           </div>
         )
-      case 14:
+      }
+      case 10:
         return (
           <div className="space-y-5">
             <p className="text-sm text-muted-foreground">
@@ -2290,7 +2542,7 @@ export default function SetupWizardPage() {
             </Card>
           </div>
         )
-      case 15:
+      case 11:
         return (
           <>
             <div className="shrink-0 space-y-2 px-6 pb-3 pt-0">
@@ -2306,7 +2558,7 @@ export default function SetupWizardPage() {
             </div>
           </>
         )
-      case 16:
+      case 12:
         return (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -2345,7 +2597,7 @@ export default function SetupWizardPage() {
             </Card>
           </div>
         )
-      case 17:
+      case 13:
         return (
           <div className="space-y-5">
             <p className="text-sm text-muted-foreground">
@@ -2608,7 +2860,7 @@ export default function SetupWizardPage() {
                                         title={
                                           taskIdx === 8
                                             ? 'Marketplace — optional third-party add-ons'
-                                            : taskIdx === 15
+                                            : taskIdx === 11
                                               ? 'Employee experience preview — optional; run after verify when you want'
                                               : 'Optional — does not count toward required setup progress'
                                         }

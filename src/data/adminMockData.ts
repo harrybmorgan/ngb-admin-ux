@@ -179,15 +179,47 @@ export const EMPLOYER_BUSINESS_STRUCTURE_OPTIONS = [
   'Non-Profit',
 ] as const
 
+/**
+ * Benefit / plan categories for guided setup “Choose benefits to offer” (task 5).
+ * Distinct names from employer plan roster; hyphen suffixes (e.g. plan year) omitted.
+ */
 export const PRODUCT_OPTIONS = [
-  { id: 'hsa', label: 'HSA' },
-  { id: 'lpfsa', label: 'Limited purpose FSA' },
-  { id: 'commuter', label: 'Commuter' },
-  { id: 'medical', label: 'Medical' },
+  { id: 'accident-insurance', label: 'Accident Insurance' },
+  { id: 'associate-critical-illness', label: 'Associate Critical Illness' },
+  { id: 'basic-term-adnd', label: 'Basic Term AD&D' },
+  { id: 'basic-term-life', label: 'Basic Term Life' },
+  { id: 'bicycle', label: 'Bicycle' },
+  { id: 'dcfsa', label: 'Child / Elder Care Flexible Spending Account' },
   { id: 'dental', label: 'Dental' },
+  { id: 'eap', label: 'Employee Assistance Plan' },
+  { id: 'fsa', label: 'Health Care Flexible Spending Account' },
+  { id: 'hsa', label: 'Health Savings Account' },
+  { id: 'hospital-indemnity', label: 'Hospital Indemnity' },
+  { id: 'identity-theft', label: 'Identity Theft' },
+  { id: 'legal-plan', label: 'Legal Plan' },
+  { id: 'lpfsa', label: 'Limited FSA' },
+  { id: 'ltd-buy-up', label: 'Long-Term Disability Buy Up' },
+  { id: 'medical', label: 'Medical' },
+  { id: 'std', label: 'Short Term Disability' },
+  { id: 'spousal-surcharge', label: 'Spousal Surcharge' },
+  { id: 'spouse-critical-illness', label: 'Spouse Critical Illness' },
+  { id: 'supplemental-adnd', label: 'Supplemental AD&D' },
+  { id: 'supplemental-child-life', label: 'Supplemental Child Life' },
+  { id: 'supplemental-life', label: 'Supplemental Life' },
+  { id: 'supplemental-spouse-life', label: 'Supplemental Spouse Life' },
+  { id: 'transit-parking', label: 'Transit & Parking' },
   { id: 'vision', label: 'Vision' },
-  { id: 'voluntary', label: 'Voluntary' },
 ] as const
+
+/** Pre-checked categories in the guided setup prototype. */
+export const DEFAULT_SELECTED_BENEFIT_PRODUCT_IDS: readonly string[] = [
+  'medical',
+  'dental',
+  'vision',
+  'fsa',
+  'lpfsa',
+  'basic-term-life',
+]
 
 export type EnrollmentRow = {
   id: string
