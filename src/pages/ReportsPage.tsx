@@ -29,12 +29,12 @@ import {
   TabsTrigger,
 } from '@wexinc-healthbenefits/ben-ui-kit'
 import { toast } from 'sonner'
-import { ArrowUpRight, Clock, Download } from 'lucide-react'
+import { ArrowUpRight, BarChart3, ChevronRight, Download, Sparkles } from 'lucide-react'
 import { AdminAiChatInput } from '@/components/dashboard/AdminAiChatInput'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import { WexAiSparkleMark } from '@/components/ui/WexAiSparkleMark'
-import { EMPLOYER, REPORT_LIBRARY } from '@/data/adminMockData'
+import { REPORT_LIBRARY } from '@/data/adminMockData'
 import { cn } from '@/lib/utils'
 
 const PINNED_REPORTS_STORAGE_KEY = 'ngb-admin-ux-pinned-report-ids'
@@ -61,6 +61,20 @@ type ServiceMetric = {
   /** When set, shows a green up arrow and this percentage to the right of the value. */
   trendPercent?: string
 }
+
+/** Match DashboardPage “Data & reports” surfaces */
+const cardSurface =
+  'overflow-hidden rounded-[24px] border border-white/60 bg-white shadow-[0_3px_9px_rgba(43,49,78,0.04),0_6px_18px_rgba(43,49,78,0.06)] transition-shadow'
+
+const outlineSpark =
+  'rounded-xl border-[#3958c3] font-medium text-[#3958c3] hover:bg-[#3958c3]/5'
+
+const keyInsights = [
+  'Life-event volume is up 18% vs last month — most are dependent adds tied to your new medical tier.',
+  'Payroll sync last ran successfully; 3 employees still need a valid address before OE comms go out.',
+  'COBRA notices and premium subsidy reports are the most opened items by your team this week.',
+  'HSA and FSA enrollment is trending up in Accounts Payments; consider highlighting contribution limits in your next employer update.',
+] as const
 
 const kpis: { service: string; metrics: ServiceMetric[] }[] = [
   {
@@ -97,13 +111,6 @@ const kpis: { service: string; metrics: ServiceMetric[] }[] = [
   },
 ]
 
-function greetingLabel() {
-  const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 17) return 'Good afternoon'
-  return 'Good evening'
-}
-
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState('overview')
   const [nl, setNl] = useState('')
@@ -115,8 +122,6 @@ export default function ReportsPage() {
   const [managePinnedOpen, setManagePinnedOpen] = useState(false)
   const [reportDetailOpen, setReportDetailOpen] = useState(false)
   const [selectedReport, setSelectedReport] = useState<ReportRow | null>(null)
-
-  const firstName = EMPLOYER.hrAdminName.split(' ')[0]
 
   useEffect(() => {
     localStorage.setItem(PINNED_REPORTS_STORAGE_KEY, JSON.stringify(pinnedReportIds))
@@ -167,7 +172,7 @@ export default function ReportsPage() {
         if (byDate !== 0) return byDate
         return b.updatedTime.localeCompare(a.updatedTime)
       })
-      .slice(0, 5)
+      .slice(0, 3)
   }, [])
 
   return (
@@ -178,48 +183,42 @@ export default function ReportsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Reporting & Analytics</h1>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="flex h-auto w-full flex-wrap gap-1 sm:w-auto">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="report-library">Report Library</TabsTrigger>
-            <TabsTrigger value="custom-report">Custom Report</TabsTrigger>
-          </TabsList>
+        <div className="space-y-8">
+          <div
+            className={cn(
+              'rounded-[18px] bg-gradient-to-r from-[#7c6ad8] via-[#c06ba8] to-[#e85d4c] p-px shadow-[0_4px_20px_rgba(43,49,78,0.08)]',
+              'transition-shadow duration-300 hover:shadow-[0_8px_26px_rgba(43,49,78,0.11)]',
+            )}
+          >
+            <div className="spark-hero-root relative flex flex-col overflow-hidden rounded-[17px]">
+              <div className="spark-hero-bg-base" aria-hidden />
+              <div className="spark-hero-bg-layer-a" aria-hidden />
+              <div className="spark-hero-bg-layer-b" aria-hidden />
 
-          <TabsContent value="overview" className="mt-6 space-y-8">
-            <div
-              className={cn(
-                'rounded-[26px] bg-gradient-to-r from-[#7c6ad8] via-[#c06ba8] to-[#e85d4c] p-px shadow-[0_8px_32px_rgba(43,49,78,0.1)]',
-                'transition-shadow duration-300 hover:shadow-[0_12px_40px_rgba(43,49,78,0.14)]',
-              )}
-            >
-              <div className="spark-hero-root relative overflow-hidden rounded-[25px]">
-                <div className="spark-hero-bg-base" aria-hidden />
-                <div className="spark-hero-bg-layer-a" aria-hidden />
-                <div className="spark-hero-bg-layer-b" aria-hidden />
-
-                <div className="spark-hero-content flex flex-col gap-6 px-6 py-6 sm:px-8 sm:py-8">
-                  <div className="flex flex-col gap-4">
-                    <div
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-[0_1.057px_3.17px_rgba(2,13,36,0.2),0_0_0.528px_rgba(2,13,36,0.3)]"
-                      style={{
-                        backgroundImage:
-                          'linear-gradient(133.514deg, rgb(37, 20, 111) 2.4625%, rgb(200, 16, 46) 100%)',
-                      }}
-                      aria-hidden
-                    >
-                      <WexAiSparkleMark size="16.9px" />
-                    </div>
-                    <div className="flex min-w-0 flex-col gap-2">
-                      <h2 className="text-[40px] font-semibold leading-[56px] tracking-[-0.88px] text-[#14182c]">
-                        {greetingLabel()}, {firstName}
-                      </h2>
-                      <p className="text-[19px] leading-[32px] tracking-[-0.304px] text-[#5f6a94]">
-                        Ask about reports, metrics, and trends in natural language—same assistant experience as your home
-                        dashboard.
-                      </p>
-                    </div>
+              <div className="spark-hero-content flex flex-col gap-4 px-4 py-4 sm:px-5 sm:py-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3.5">
+                  <div
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-[0_1.057px_3.17px_rgba(2,13,36,0.2),0_0_0.528px_rgba(2,13,36,0.3)]"
+                    style={{
+                      backgroundImage:
+                        'linear-gradient(133.514deg, rgb(37, 20, 111) 2.4625%, rgb(200, 16, 46) 100%)',
+                    }}
+                    aria-hidden
+                  >
+                    <WexAiSparkleMark size="14px" />
                   </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <h2 className="text-lg font-semibold leading-snug tracking-tight text-[#14182c] sm:text-xl">
+                      Reporting assistant
+                    </h2>
+                    <p className="text-sm leading-relaxed text-[#5f6a94]">
+                      Look up a report, decode a KPI, or compare periods in plain language—scoped to reporting and
+                      analytics here.
+                    </p>
+                  </div>
+                </div>
 
+                <div className="min-h-0 w-full pt-1">
                   <AdminAiChatInput
                     value={nl}
                     onChange={setNl}
@@ -235,7 +234,104 @@ export default function ReportsPage() {
                 </div>
               </div>
             </div>
+          </div>
 
+          <section>
+            <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
+              <Card className={cn(cardSurface, 'group/card flex h-full min-h-0 flex-col hover:shadow-md')}>
+                <CardHeader className="flex flex-row items-start gap-2.5 space-y-0 px-5 pb-1.5 pt-4">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3] transition-transform group-hover/card:scale-110">
+                    <Sparkles className="h-4 w-4" aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <CardTitle className="text-sm font-bold leading-tight text-[#14182c] sm:text-base sm:leading-snug">
+                      WEX Insights
+                    </CardTitle>
+                    <CardDescription className="text-xs leading-snug text-[#5f6a94] sm:text-sm sm:leading-5">
+                      Tailored for your benefits program
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-1">
+                  <ul className="space-y-2.5 text-[13px] leading-snug text-[#374056] sm:text-[14px] sm:leading-[1.5]">
+                    {keyInsights.map((line) => (
+                      <li key={line} className="flex gap-2.5">
+                        <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#3958c3] sm:h-4 sm:w-4" aria-hidden />
+                        <span className="min-w-0">{line}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card className={cn(cardSurface, 'group/card flex h-full min-h-0 flex-col hover:shadow-md')}>
+                <CardHeader className="flex flex-row items-start gap-2.5 space-y-0 px-5 pb-1.5 pt-4">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3] transition-transform group-hover/card:scale-110">
+                    <BarChart3 className="h-4 w-4" aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <CardTitle className="text-sm font-bold leading-tight text-[#14182c] sm:text-base sm:leading-snug">
+                      Your most recent reports
+                    </CardTitle>
+                    <CardDescription className="text-xs leading-snug text-[#5f6a94] sm:text-sm sm:leading-5">
+                      Ordered by last update in your library — open for details.
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col space-y-3 px-5 pb-4">
+                  <ul className="flex flex-col gap-1.5">
+                    {overviewRecentReports.map((r) => {
+                      const rowClass =
+                        'flex w-full items-center justify-between gap-2 rounded-lg border border-[#e8ecf4] bg-[#f8f9fc] px-3 py-2 text-left transition-colors hover:border-[#3958c3]/35 hover:bg-[#f0f3ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-2'
+                      return (
+                        <li key={r.id}>
+                          <button
+                            type="button"
+                            className={cn(rowClass, 'group/row')}
+                            onClick={() => {
+                              setSelectedReport(r)
+                              setReportDetailOpen(true)
+                            }}
+                          >
+                            <span className="min-w-0">
+                              <span className="block text-sm font-semibold text-[#14182c] group-hover/row:text-[#3958c3]">
+                                {r.name}
+                              </span>
+                              <span className="mt-0.5 block text-xs text-[#5f6a94]">
+                                {r.service} · Updated {r.updated}
+                              </span>
+                            </span>
+                            <ChevronRight
+                              className="h-4 w-4 shrink-0 text-[#9aa3bd] transition-transform group-hover/row:translate-x-0.5 group-hover/row:text-[#3958c3]"
+                              aria-hidden
+                            />
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={cn('mt-auto w-full rounded-xl sm:w-auto', outlineSpark)}
+                    onClick={() => setActiveTab('report-library')}
+                  >
+                    View all reports
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="flex h-auto w-full flex-wrap gap-1 sm:w-auto">
+            <TabsTrigger value="overview">Services Overview</TabsTrigger>
+            <TabsTrigger value="report-library">Report Library</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="mt-6 space-y-8">
             <section>
               <h2 className="mb-4 text-lg font-semibold">Services dashboard</h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -271,49 +367,6 @@ export default function ReportsPage() {
                   </Card>
                 ))}
               </div>
-            </section>
-
-            <section className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-primary" aria-hidden />
-                    Your most recent reports
-                  </CardTitle>
-                  <CardDescription>
-                    Reports in your library, ordered by most recently updated.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <ul className="divide-y divide-border">
-                    {overviewRecentReports.map((r) => (
-                      <li key={r.id}>
-                        <button
-                          type="button"
-                          className="flex w-full flex-col gap-1 px-6 py-4 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          onClick={() => {
-                            setSelectedReport(r)
-                            setReportDetailOpen(true)
-                          }}
-                        >
-                          <span className="font-medium leading-snug">{r.name}</span>
-                          <span className="text-sm text-muted-foreground">
-                            {r.service} · {r.category}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            Last updated {r.updated} at {r.updatedTime}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="border-t border-border px-6 py-4">
-                    <Button type="button" variant="outline" onClick={() => setActiveTab('report-library')}>
-                      Browse report library
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
             </section>
           </TabsContent>
 
@@ -476,26 +529,6 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
             </div>
-          </TabsContent>
-
-          <TabsContent value="custom-report" className="mt-6 space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Custom report</CardTitle>
-                <CardDescription>
-                  Build a one-off or saved custom report with filters, columns, and scheduling (coming soon).
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  This area will let you define custom datasets, preview results, and save report definitions for your
-                  team.
-                </p>
-                <Button type="button" disabled>
-                  Create custom report
-                </Button>
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
 

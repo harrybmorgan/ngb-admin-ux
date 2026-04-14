@@ -342,4 +342,22 @@ export const REPORT_LIBRARY = [
     updated: '2026-02-18',
     updatedTime: '11:05 AM',
   },
+  {
+    id: 'r5',
+    name: 'Company card activity',
+    author: 'System',
+    service: 'BenAdmin',
+    category: 'Platform & Engagement',
+    updated: '2026-04-07',
+    updatedTime: '8:20 AM',
+  },
+  {
+    id: 'r6',
+    name: 'Full Plan Enrollments',
+    author: 'System',
+    service: 'BenAdmin',
+    category: 'Member & Benefits',
+    updated: '2026-04-08',
+    updatedTime: '3:15 PM',
+  },
 ] as const
