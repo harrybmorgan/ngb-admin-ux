@@ -8,7 +8,6 @@ import {
   CardTitle,
   Checkbox,
   FloatLabel,
-  Input,
   Select,
   SelectContent,
   SelectItem,
@@ -29,10 +28,14 @@ import {
   TabsList,
   TabsTrigger,
 } from '@wexinc-healthbenefits/ben-ui-kit'
-import { ArrowUpRight, Download, Sparkles } from 'lucide-react'
+import { toast } from 'sonner'
+import { ArrowUpRight, Clock, Download } from 'lucide-react'
+import { AdminAiChatInput } from '@/components/dashboard/AdminAiChatInput'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
-import { REPORT_LIBRARY } from '@/data/adminMockData'
+import { WexAiSparkleMark } from '@/components/ui/WexAiSparkleMark'
+import { EMPLOYER, REPORT_LIBRARY } from '@/data/adminMockData'
+import { cn } from '@/lib/utils'
 
 const PINNED_REPORTS_STORAGE_KEY = 'ngb-admin-ux-pinned-report-ids'
 const DEFAULT_PINNED_IDS = ['r1', 'r2', 'r3', 'r4'] as const
@@ -94,6 +97,13 @@ const kpis: { service: string; metrics: ServiceMetric[] }[] = [
   },
 ]
 
+function greetingLabel() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState('overview')
   const [nl, setNl] = useState('')
@@ -105,6 +115,8 @@ export default function ReportsPage() {
   const [managePinnedOpen, setManagePinnedOpen] = useState(false)
   const [reportDetailOpen, setReportDetailOpen] = useState(false)
   const [selectedReport, setSelectedReport] = useState<ReportRow | null>(null)
+
+  const firstName = EMPLOYER.hrAdminName.split(' ')[0]
 
   useEffect(() => {
     localStorage.setItem(PINNED_REPORTS_STORAGE_KEY, JSON.stringify(pinnedReportIds))
@@ -147,6 +159,17 @@ export default function ReportsPage() {
     })
   }, [reportSearch, authorFilter, serviceFocusFilter])
 
+  /** Most recently updated reports first (prototype: derived from library metadata). */
+  const overviewRecentReports = useMemo(() => {
+    return [...REPORT_LIBRARY]
+      .sort((a, b) => {
+        const byDate = b.updated.localeCompare(a.updated)
+        if (byDate !== 0) return byDate
+        return b.updatedTime.localeCompare(a.updatedTime)
+      })
+      .slice(0, 5)
+  }, [])
+
   return (
     <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
@@ -163,29 +186,55 @@ export default function ReportsPage() {
           </TabsList>
 
           <TabsContent value="overview" className="mt-6 space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  Your AI Assistant
-                </CardTitle>
-                <CardDescription>
-                  Ask questions in natural language to gain insights into your data
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Input
-                  value={nl}
-                  onChange={(e) => setNl(e.target.value)}
-                  placeholder="Ask a question about your benefits data..."
-                />
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" size="sm" disabled={!nl.trim()}>
-                    Ask
-                  </Button>
+            <div
+              className={cn(
+                'rounded-[26px] bg-gradient-to-r from-[#7c6ad8] via-[#c06ba8] to-[#e85d4c] p-px shadow-[0_8px_32px_rgba(43,49,78,0.1)]',
+                'transition-shadow duration-300 hover:shadow-[0_12px_40px_rgba(43,49,78,0.14)]',
+              )}
+            >
+              <div className="spark-hero-root relative overflow-hidden rounded-[25px]">
+                <div className="spark-hero-bg-base" aria-hidden />
+                <div className="spark-hero-bg-layer-a" aria-hidden />
+                <div className="spark-hero-bg-layer-b" aria-hidden />
+
+                <div className="spark-hero-content flex flex-col gap-6 px-6 py-6 sm:px-8 sm:py-8">
+                  <div className="flex flex-col gap-4">
+                    <div
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-[0_1.057px_3.17px_rgba(2,13,36,0.2),0_0_0.528px_rgba(2,13,36,0.3)]"
+                      style={{
+                        backgroundImage:
+                          'linear-gradient(133.514deg, rgb(37, 20, 111) 2.4625%, rgb(200, 16, 46) 100%)',
+                      }}
+                      aria-hidden
+                    >
+                      <WexAiSparkleMark size="16.9px" />
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-2">
+                      <h2 className="text-[40px] font-semibold leading-[56px] tracking-[-0.88px] text-[#14182c]">
+                        {greetingLabel()}, {firstName}
+                      </h2>
+                      <p className="text-[19px] leading-[32px] tracking-[-0.304px] text-[#5f6a94]">
+                        Ask about reports, metrics, and trends in natural language—same assistant experience as your home
+                        dashboard.
+                      </p>
+                    </div>
+                  </div>
+
+                  <AdminAiChatInput
+                    value={nl}
+                    onChange={setNl}
+                    onMicClick={() => toast.message('Voice input is not enabled in this prototype.')}
+                    onSendClick={() => {
+                      toast.message(
+                        nl.trim()
+                          ? 'Search and assistant features are not enabled in this prototype.'
+                          : 'Type a question to get started (prototype).',
+                      )
+                    }}
+                  />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             <section>
               <h2 className="mb-4 text-lg font-semibold">Services dashboard</h2>
@@ -222,6 +271,49 @@ export default function ReportsPage() {
                   </Card>
                 ))}
               </div>
+            </section>
+
+            <section className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-primary" aria-hidden />
+                    Your most recent reports
+                  </CardTitle>
+                  <CardDescription>
+                    Reports in your library, ordered by most recently updated.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ul className="divide-y divide-border">
+                    {overviewRecentReports.map((r) => (
+                      <li key={r.id}>
+                        <button
+                          type="button"
+                          className="flex w-full flex-col gap-1 px-6 py-4 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          onClick={() => {
+                            setSelectedReport(r)
+                            setReportDetailOpen(true)
+                          }}
+                        >
+                          <span className="font-medium leading-snug">{r.name}</span>
+                          <span className="text-sm text-muted-foreground">
+                            {r.service} · {r.category}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Last updated {r.updated} at {r.updatedTime}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="border-t border-border px-6 py-4">
+                    <Button type="button" variant="outline" onClick={() => setActiveTab('report-library')}>
+                      Browse report library
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </section>
           </TabsContent>
 
