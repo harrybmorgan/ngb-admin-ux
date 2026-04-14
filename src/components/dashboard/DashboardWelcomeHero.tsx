@@ -196,19 +196,27 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady }: Dashboar
       )}
     >
       <motion.div
-        className="spark-hero-root relative overflow-hidden rounded-[25px]"
+        className="relative overflow-visible rounded-[25px]"
         layout
         transition={{ layout: layoutSpring }}
         initial={shouldAnimate ? 'hidden' : 'instant'}
         animate={animateState}
         variants={containerVariants}
       >
-        <div className="spark-hero-bg-base" aria-hidden />
-        <div className="spark-hero-bg-layer-a" aria-hidden />
-        <div className="spark-hero-bg-layer-b" aria-hidden />
+        {/* Clip animated layers only so popovers (AI search suggestions) can extend past this frame */}
+        <div
+          className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[25px]"
+          aria-hidden
+        >
+          <div className="relative min-h-full w-full">
+            <div className="spark-hero-bg-base" />
+            <div className="spark-hero-bg-layer-a" />
+            <div className="spark-hero-bg-layer-b" />
+          </div>
+        </div>
 
         <motion.div
-          className="spark-hero-content flex flex-col lg:flex-row lg:items-stretch"
+          className="spark-hero-content relative z-[1] flex flex-col overflow-visible lg:flex-row lg:items-stretch"
           layout
           transition={{ layout: layoutSpring }}
         >
@@ -296,7 +304,7 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady }: Dashboar
 
             {!planReady && (
               <p className="text-sm leading-5 text-[#5f6a94]">
-                Complete plan design in setup to unlock shortcuts in frequent tasks below.
+                Complete plan design in setup to unlock data, reports, and frequent tasks below.
               </p>
             )}
           </motion.div>

@@ -13,6 +13,7 @@ import {
 } from '@wexinc-healthbenefits/ben-ui-kit'
 import type { LucideIcon } from 'lucide-react'
 import {
+  ArrowRightLeft,
   BarChart3,
   Building2,
   ChevronDown,
@@ -29,6 +30,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useEmployerSetup } from '@/hooks/useEmployerSetup'
 import { EMPLOYER } from '@/data/adminMockData'
 
 type MainNavItem = { to: string; label: string; icon: LucideIcon }
@@ -36,8 +38,8 @@ type MainNavItem = { to: string; label: string; icon: LucideIcon }
 const mainNav: MainNavItem[] = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/enrollment', label: 'People', icon: Users },
-  { to: '/billing', label: 'Billing & Invoicing', icon: CreditCard },
   { to: '/reports', label: 'Reporting & Analytics', icon: BarChart3 },
+  { to: '/billing', label: 'Billing & Invoicing', icon: CreditCard },
   { to: '/content', label: 'Content', icon: FolderOpen },
   { to: '/communications', label: 'Communications', icon: Mail },
 ]
@@ -50,6 +52,7 @@ export function AdminNavigation({ hideNav = false }: AdminNavigationProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { logout } = useAuth()
+  const { launchComplete } = useEmployerSetup()
   const [open, setOpen] = useState(false)
   const wexLogoUrl = `${import.meta.env.BASE_URL}WEX_Logo_Red_Vector.svg`
 
@@ -168,6 +171,15 @@ export function AdminNavigation({ hideNav = false }: AdminNavigationProps) {
                     Branding studio
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  {launchComplete ? (
+                    <>
+                      <DropdownMenuItem onClick={() => navigate('/member-handoff')}>
+                        <ArrowRightLeft className="mr-2 h-4 w-4" />
+                        Switch to employee account
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  ) : null}
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign out

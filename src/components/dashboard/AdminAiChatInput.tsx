@@ -3,18 +3,21 @@ import { Mic, Send, Clock, Sparkles } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { useReducedMotion } from 'framer-motion'
 
-const PLACEHOLDER_PREFIX = 'Ask me… '
+const PLACEHOLDER_PREFIX = 'Ask me... '
 
+/** Text shown after the prefix in the rotating placeholder and suggestions. */
 const QUERIES = [
-  'how do I sync payroll?',
-  'where do I upload census data?',
-  'how do I invite employees?',
-  'what is my open enrollment status?',
-  'how do I configure plan tiers?',
-  'where do I find billing reports?',
-  'how do I update employer branding?',
-  'what tasks are left in setup?',
+  'how do I process a life event?',
+  "how do I update an employee's address?",
+  'what is our plan renewal checklist?',
+  'why is my payroll contribution file wrong?',
+  'how do I grant admin access?',
+  'where is my admin fee invoice?',
 ]
+
+function fullSuggestion(suffix: string) {
+  return `${PLACEHOLDER_PREFIX}${suffix}`
+}
 
 const placeholderContainerVariants = {
   initial: {},
@@ -86,7 +89,7 @@ export function AdminAiChatInput({ value, onChange, onMicClick, onSendClick }: A
   }, [prefersReducedMotion, showPlaceholder])
 
   const handleSuggestionClick = (query: string) => {
-    onChange(query)
+    onChange(fullSuggestion(query))
     setIsDropdownOpen(false)
     setIsFocused(true)
     inputRef.current?.focus()
@@ -156,25 +159,25 @@ export function AdminAiChatInput({ value, onChange, onMicClick, onSendClick }: A
         </div>
 
         {isDropdownOpen && (
-          <div className="absolute left-0 right-0 top-full z-[60] mt-2 overflow-hidden rounded-[24px] border border-[#e3e7f4] bg-white py-2 shadow-[0_4px_20px_rgba(43,49,78,0.08)]">
+          <div className="absolute left-0 right-0 top-full z-[80] mt-2 max-h-[min(70vh,28rem)] overflow-y-auto rounded-[24px] border border-[#e3e7f4] bg-white py-2 shadow-[0_4px_20px_rgba(43,49,78,0.08)]">
             <button
               type="button"
-              className="flex w-full items-center gap-3 px-6 py-3 text-left transition-colors hover:bg-[#f8f9fe]"
+              className="flex w-full items-start gap-3 px-6 py-3 text-left transition-colors hover:bg-[#f8f9fe]"
               onClick={() => handleSuggestionClick(QUERIES[0])}
             >
-              <Clock className="h-4 w-4 shrink-0 text-[#7a87b2]" />
-              <span className="truncate text-[14px] text-[#14182c]">{QUERIES[0]}</span>
+              <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#7a87b2]" />
+              <span className="text-[14px] leading-snug text-[#14182c]">{fullSuggestion(QUERIES[0])}</span>
             </button>
             <div className="mx-4 my-1 h-px bg-[#e3e7f4]" />
-            {QUERIES.slice(1, 5).map((query, i) => (
+            {QUERIES.slice(1).map((query, i) => (
               <button
                 key={i}
                 type="button"
-                className="flex w-full items-center gap-3 px-6 py-3 text-left transition-colors hover:bg-[#f8f9fe]"
+                className="flex w-full items-start gap-3 px-6 py-3 text-left transition-colors hover:bg-[#f8f9fe]"
                 onClick={() => handleSuggestionClick(query)}
               >
-                <Sparkles className="h-4 w-4 shrink-0 text-[#3958c3]" />
-                <span className="truncate text-[14px] text-[#5f6a94]">{query}</span>
+                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#3958c3]" />
+                <span className="text-[14px] leading-snug text-[#5f6a94]">{fullSuggestion(query)}</span>
               </button>
             ))}
           </div>
@@ -322,26 +325,26 @@ export function AdminAiChatInput({ value, onChange, onMicClick, onSendClick }: A
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="absolute left-0 right-0 top-full z-[60] mt-2 overflow-hidden rounded-[24px] border border-[#e3e7f4] bg-white py-2 shadow-[0_4px_20px_rgba(43,49,78,0.08)]"
+            className="absolute left-0 right-0 top-full z-[80] mt-2 max-h-[min(70vh,28rem)] overflow-y-auto rounded-[24px] border border-[#e3e7f4] bg-white py-2 shadow-[0_4px_20px_rgba(43,49,78,0.08)]"
           >
             <button
               type="button"
-              className="flex w-full items-center gap-3 px-6 py-3 text-left transition-colors hover:bg-[#f8f9fe]"
+              className="flex w-full items-start gap-3 px-6 py-3 text-left transition-colors hover:bg-[#f8f9fe]"
               onClick={() => handleSuggestionClick(QUERIES[0])}
             >
-              <Clock className="h-4 w-4 shrink-0 text-[#7a87b2]" />
-              <span className="truncate text-[14px] text-[#14182c]">{QUERIES[0]}</span>
+              <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#7a87b2]" />
+              <span className="text-[14px] leading-snug text-[#14182c]">{fullSuggestion(QUERIES[0])}</span>
             </button>
             <div className="mx-4 my-1 h-px bg-[#e3e7f4]" />
-            {QUERIES.slice(1, 5).map((query, i) => (
+            {QUERIES.slice(1).map((query, i) => (
               <button
                 key={i}
                 type="button"
-                className="flex w-full items-center gap-3 px-6 py-3 text-left transition-colors hover:bg-[#f8f9fe]"
+                className="flex w-full items-start gap-3 px-6 py-3 text-left transition-colors hover:bg-[#f8f9fe]"
                 onClick={() => handleSuggestionClick(query)}
               >
-                <Sparkles className="h-4 w-4 shrink-0 text-[#3958c3]" />
-                <span className="truncate text-[14px] text-[#5f6a94]">{query}</span>
+                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#3958c3]" />
+                <span className="text-[14px] leading-snug text-[#5f6a94]">{fullSuggestion(query)}</span>
               </button>
             ))}
           </motion.div>
