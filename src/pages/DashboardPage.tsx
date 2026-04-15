@@ -6,6 +6,7 @@ import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import { useEmployerSetup } from '@/hooks/useEmployerSetup'
 import { REPORT_LIBRARY } from '@/data/adminMockData'
+import { relativeUpdatedFromIsoDate } from '@/lib/relativeUpdatedDate'
 import { cn } from '@/lib/utils'
 
 /** Spark / cxr-ux homepage–style elevated surface */
@@ -127,7 +128,7 @@ export default function DashboardPage() {
                         <span className="min-w-0">
                           <span className="block text-sm font-semibold text-[#14182c]">{r.name}</span>
                           <span className="mt-0.5 block text-xs text-[#5f6a94]">
-                            {r.service} · Updated {r.updated}
+                            {r.service} · Updated {relativeUpdatedFromIsoDate(r.updated)}
                           </span>
                         </span>
                         <ChevronRight className="h-4 w-4 shrink-0 text-[#9aa3bd]" aria-hidden />
@@ -148,7 +149,7 @@ export default function DashboardPage() {
                                 {r.name}
                               </span>
                               <span className="mt-0.5 block text-xs text-[#5f6a94]">
-                                {r.service} · Updated {r.updated}
+                                {r.service} · Updated {relativeUpdatedFromIsoDate(r.updated)}
                               </span>
                             </span>
                             <ChevronRight
