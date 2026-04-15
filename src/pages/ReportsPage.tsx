@@ -35,6 +35,7 @@ import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import { WexAiSparkleMark } from '@/components/ui/WexAiSparkleMark'
 import { REPORT_LIBRARY } from '@/data/adminMockData'
+import { relativeUpdatedFromIsoDate } from '@/lib/relativeUpdatedDate'
 import { cn } from '@/lib/utils'
 
 const PINNED_REPORTS_STORAGE_KEY = 'ngb-admin-ux-pinned-report-ids'
@@ -212,8 +213,7 @@ export default function ReportsPage() {
                       Reporting assistant
                     </h2>
                     <p className="text-sm leading-relaxed text-[#5f6a94]">
-                      Look up a report, decode a KPI, or compare periods in plain language—scoped to reporting and
-                      analytics here.
+                    Explore reports, understand what's happening, and identify next steps.
                     </p>
                   </div>
                 </div>
@@ -298,7 +298,7 @@ export default function ReportsPage() {
                                 {r.name}
                               </span>
                               <span className="mt-0.5 block text-xs text-[#5f6a94]">
-                                {r.service} · Updated {r.updated}
+                                {r.service} · Updated {relativeUpdatedFromIsoDate(r.updated)}
                               </span>
                             </span>
                             <ChevronRight
@@ -377,7 +377,7 @@ export default function ReportsPage() {
             <div>
               <h2 className="text-lg font-semibold">Pinned reports</h2>
               <p className="text-sm text-muted-foreground">
-                Top reports for quick access. Click a card to view details.
+                Reports you've saved for quick access. Click a card to view details.
               </p>
             </div>
             <Button
@@ -421,9 +421,9 @@ export default function ReportsPage() {
                     </CardHeader>
                     <CardContent className="pt-0">
                       <p className="text-xs text-muted-foreground">
-                        Last updated {r.updated} at {r.updatedTime}
+                        Last updated {relativeUpdatedFromIsoDate(r.updated)}
                       </p>
-                      <p className="mt-3 text-sm font-medium text-primary">View details →</p>
+                      <p className="mt-3 text-sm font-medium text-primary">Open report</p>
                     </CardContent>
                   </button>
                 </Card>
@@ -440,7 +440,7 @@ export default function ReportsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-3">
               <FloatLabel
-                label="Search reports"
+                label="Search by report name, topic, or keyword"
                 containerClassName="w-full"
                 value={reportSearch}
                 onChange={(e) => setReportSearch(e.target.value)}
@@ -499,9 +499,7 @@ export default function ReportsPage() {
                     <TableCell>{r.author}</TableCell>
                     <TableCell>{r.service}</TableCell>
                     <TableCell>{r.category}</TableCell>
-                    <TableCell>
-                      {r.updated} · {r.updatedTime}
-                    </TableCell>
+                    <TableCell>{relativeUpdatedFromIsoDate(r.updated)}</TableCell>
                     <TableCell className="text-right">
                       <Button
                         type="button"
@@ -590,9 +588,7 @@ export default function ReportsPage() {
                   </div>
                   <div className="grid gap-1">
                     <span className="text-xs font-medium text-muted-foreground">Last updated</span>
-                    <span>
-                      {selectedReport.updated} at {selectedReport.updatedTime}
-                    </span>
+                    <span>{relativeUpdatedFromIsoDate(selectedReport.updated)}</span>
                   </div>
                   <p className="rounded-md border border-border bg-muted/30 p-3 text-muted-foreground">
                     Summary, filters, and export options for this report would appear here. This is a prototype view.
