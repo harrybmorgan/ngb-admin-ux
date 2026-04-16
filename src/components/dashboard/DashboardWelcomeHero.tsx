@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { EMPLOYER } from '@/data/adminMockData'
 import { cn } from '@/lib/utils'
 import { AdminAiChatInput } from '@/components/dashboard/AdminAiChatInput'
+import { ShineBorder } from '@/components/ui/ShineBorder'
 import { WexAiSparkleMark } from '@/components/ui/WexAiSparkleMark'
 
 const MotionLink = motion(Link)
@@ -191,18 +192,29 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady }: Dashboar
   return (
     <div
       className={cn(
-        'rounded-[26px] bg-gradient-to-r from-[#7c6ad8] via-[#c06ba8] to-[#e85d4c] p-px shadow-[0_8px_32px_rgba(43,49,78,0.1)]',
+        'rounded-[25px] shadow-[0_8px_32px_rgba(43,49,78,0.1)]',
         'transition-shadow duration-300 hover:shadow-[0_12px_40px_rgba(43,49,78,0.14)]',
       )}
     >
       <motion.div
-        className="relative overflow-visible rounded-[25px]"
+        className={cn(
+          'relative isolate z-40 overflow-visible rounded-[25px] border border-[#e3e7f4]',
+          'shadow-[0_1.5px_4.5px_rgba(43,49,78,0.04)] [filter:drop-shadow(0_0_0_transparent)]',
+        )}
         layout
         transition={{ layout: layoutSpring }}
         initial={shouldAnimate ? 'hidden' : 'instant'}
         animate={animateState}
         variants={containerVariants}
       >
+        <ShineBorder
+          borderWidth={1.5}
+          duration={18}
+          color={['#25146f', '#c8102e', '#25146f']}
+          className="pointer-events-none absolute inset-0 z-[45] rounded-[inherit] border-none bg-transparent p-0 shadow-none dark:bg-transparent"
+        >
+          {null}
+        </ShineBorder>
         {/* Clip animated layers only so popovers (AI search suggestions) can extend past this frame */}
         <div
           className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[25px]"
