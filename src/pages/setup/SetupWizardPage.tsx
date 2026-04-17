@@ -894,6 +894,24 @@ function normalizeSandboxVerifyRuns(raw: unknown): SandboxVerifyRuns {
   }
 }
 
+/** Task index for “Verify rules and calculations…” — used for left-rail verify failure hints. */
+const VERIFY_RULES_TASK_INDEX = 10
+
+/** True when a sandbox check has been run and reported `fail` (drives left-rail error affordances). */
+function sandboxVerifyHasFailure(runs: SandboxVerifyRuns): boolean {
+  return runs.eligibilityRules.result === 'fail' || runs.contributionMath.result === 'fail'
+}
+
+/** Short label for which sandbox check(s) failed — for nav / aria. */
+function sandboxVerifyFailureHintLine(runs: SandboxVerifyRuns): string | null {
+  const eligFail = runs.eligibilityRules.result === 'fail'
+  const contFail = runs.contributionMath.result === 'fail'
+  if (!eligFail && !contFail) return null
+  if (eligFail && contFail) return 'Eligibility and contribution checks failed'
+  if (eligFail) return 'Eligibility rules check failed'
+  return 'Contribution math check failed'
+}
+
 /** Prototype: derive sandbox eligibility check from configure-plan state + notes. */
 function computeEligibilitySandboxOutcome(d: Draft): { result: SandboxVerifyCheckResult; evidence: string } {
   const products = d.selectedProducts
@@ -4945,6 +4963,10 @@ export default function SetupWizardPage() {
                           : `${optionalComplete}/${optionalTotal} optional done`
                         : 'All optional'
                   const StepNavIcon = WIZARD_STEP_NAV_ICONS[stepIdx] ?? Building2
+                  const sandboxVerifyFailHint = sandboxVerifyFailureHintLine(draft.sandboxVerifyRuns)
+                  const showVerifyFailOnStep =
+                    wizardStep.taskIndices.includes(VERIFY_RULES_TASK_INDEX) &&
+                    sandboxVerifyHasFailure(draft.sandboxVerifyRuns)
 
                   return (
                     <li key={wizardStep.title} className="rounded-lg">
@@ -4957,7 +4979,7 @@ export default function SetupWizardPage() {
                         )}
                         aria-pressed={stepRowSelected}
                         aria-controls={stepRowSelected ? `setup-step-panel-${stepIdx}` : undefined}
-                        aria-label={`${wizardStep.title}, ${reqProgress.total > 0 ? `${reqProgress.complete} of ${reqProgress.total} required complete` : isConnectSystemsStep ? 'optional step, no required tasks' : 'all tasks optional in this step'}`}
+                        aria-label={`${wizardStep.title}, ${showVerifyFailOnStep && sandboxVerifyFailHint ? `${sandboxVerifyFailHint}. ` : ''}${reqProgress.total > 0 ? `${reqProgress.complete} of ${reqProgress.total} required complete` : isConnectSystemsStep ? 'optional step, no required tasks' : 'all tasks optional in this step'}`}
                         id={`setup-step-trigger-${stepIdx}`}
                       >
                         <span
@@ -4970,7 +4992,14 @@ export default function SetupWizardPage() {
                           aria-hidden
                         >
                           <StepNavIcon className="h-[18px] w-[18px]" strokeWidth={1.75} />
-                          {stepInd.showRequiredSuccess ? (
+                          {showVerifyFailOnStep ? (
+                            <span
+                              className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-600 text-white shadow-sm ring-2 ring-background dark:bg-red-500"
+                              title={sandboxVerifyFailHint ?? 'Sandbox check failed'}
+                            >
+                              <AlertCircle className="h-2 w-2" strokeWidth={3} aria-hidden />
+                            </span>
+                          ) : stepInd.showRequiredSuccess ? (
                             <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm">
                               <Check className="h-2 w-2" strokeWidth={3} aria-hidden />
                             </span>
@@ -5034,6 +5063,9 @@ export default function SetupWizardPage() {
                               const blocked = navStatus === 'blocked'
                               const showOptionalTaskBadge =
                                 OPTIONAL_TASK_IDS.has(taskIdx) && !CONNECT_SYSTEMS_TASK_IDS.has(taskIdx)
+                              const verifyFailOnTask =
+                                taskIdx === VERIFY_RULES_TASK_INDEX ? sandboxVerifyFailHint : null
+                              const verifyFailAria = verifyFailOnTask ? ` Sandbox verification: ${verifyFailOnTask}.` : ''
                               return (
                                 <li key={label}>
                                   <button
@@ -5050,21 +5082,28 @@ export default function SetupWizardPage() {
                                       !current && 'border-l-[3px] border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground',
                                     )}
                                     aria-current={current ? 'step' : undefined}
-                                    aria-label={`${label}, ${showOptionalTaskBadge ? 'Optional. ' : CONNECT_SYSTEMS_TASK_IDS.has(taskIdx) ? 'Part of optional Connect Systems step. ' : ''}${TASK_STATUS_LABEL[navStatus]}${blocked ? '. You can open this to preview; finish earlier steps to complete it.' : ''}`}
+                                    aria-label={`${label}, ${showOptionalTaskBadge ? 'Optional. ' : CONNECT_SYSTEMS_TASK_IDS.has(taskIdx) ? 'Part of optional Connect Systems step. ' : ''}${TASK_STATUS_LABEL[navStatus]}${blocked ? '. You can open this to preview; finish earlier steps to complete it.' : ''}${verifyFailAria}`}
                                   >
                                     <span className="shrink-0 self-start pt-px">
                                       <TaskStatusGlyph status={navStatus} taskNumber={taskOrd + 1} />
                                     </span>
-                                    <span
-                                      className={cn(
-                                        'min-w-0 flex-1 break-words',
-                                        current && !blocked && 'text-primary',
-                                        navStatus === 'skipped' && 'text-amber-900 line-through decoration-amber-700/50 dark:text-amber-200',
-                                        navStatus === 'waiting_on_others' && 'text-sky-900 dark:text-sky-100',
-                                        navStatus === 'needs_review' && 'text-amber-800 dark:text-amber-200',
-                                      )}
-                                    >
-                                      {label}
+                                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                      <span
+                                        className={cn(
+                                          'break-words',
+                                          current && !blocked && 'text-primary',
+                                          navStatus === 'skipped' && 'text-amber-900 line-through decoration-amber-700/50 dark:text-amber-200',
+                                          navStatus === 'waiting_on_others' && 'text-sky-900 dark:text-sky-100',
+                                          navStatus === 'needs_review' && 'text-amber-800 dark:text-amber-200',
+                                        )}
+                                      >
+                                        {label}
+                                      </span>
+                                      {verifyFailOnTask ? (
+                                        <span className="text-[10px] font-semibold leading-tight text-red-600 dark:text-red-400">
+                                          {verifyFailOnTask}
+                                        </span>
+                                      ) : null}
                                     </span>
                                     {showOptionalTaskBadge ? (
                                       <Badge
