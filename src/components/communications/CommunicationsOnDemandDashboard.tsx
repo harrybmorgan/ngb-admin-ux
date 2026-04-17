@@ -11,8 +11,6 @@ import {
   Button,
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -48,18 +46,20 @@ import {
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
-/** Surface card — matches design tokens: padding 24px, gap 32px, 8px radius, border #E4E6E9, surface #FFF. */
-const commPageCard =
-  'flex w-full flex-col items-end gap-8 self-stretch rounded-lg border border-[#E4E6E9] bg-white p-6'
-const commCardHeader =
-  'w-full space-y-0 border-b border-[#E4E6E9] pb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4'
+/** Figma Communications dash — outer "Communactions Dash" (24px pad, 32px gap). */
+const commCommunicationsDash =
+  'flex w-full flex-col gap-8 rounded-lg border border-[#E4E6E9] bg-white p-6'
+/** Inner History Card on Automations — border #D1D6D8, 16px pad, 24px gap. */
+const commAutomationInnerCard =
+  'flex w-full flex-col gap-6 rounded-lg border border-[#d1d6d8] bg-white p-4'
+const commAutoTh =
+  'whitespace-nowrap px-4 py-2 text-left text-sm font-semibold leading-6 text-[#1d2c38]'
+const commAutoTd = 'px-4 py-3 text-sm font-normal leading-6 text-[#12181d]'
+const commAutoTrHead = 'border-[#E4E6E9] bg-[#fbfbfb] hover:bg-[#fbfbfb]'
+const commAutoTr = 'border-[#E4E6E9] bg-white transition-colors hover:bg-[#f7f8fc]/80'
 const commTableWrap = 'overflow-x-auto'
 const commTableBase =
   '[&_td]:border-x-0 [&_th]:border-x-0 [&_tbody_tr]:border-[#E4E6E9] [&_thead_tr]:border-[#E4E6E9]'
-const commTh = 'text-[11px] font-bold uppercase tracking-[0.1em] text-[#5f6a94]'
-const commTdBody = 'text-sm leading-snug text-[#374056]'
-const commTdTitle = 'text-sm font-semibold leading-snug text-[#14182c]'
-const commTr = 'border-[#E4E6E9] transition-colors hover:bg-[#f7f8fc]/80'
 
 type TopMode = 'self-service' | 'automations'
 
@@ -400,6 +400,46 @@ function TablePaginationBar({
   )
 }
 
+function CommunicationsSearchFilter({
+  value,
+  onChange,
+  placeholder,
+  filterAriaLabel,
+  searchAriaLabel,
+}: {
+  value: string
+  onChange: (next: string) => void
+  placeholder: string
+  filterAriaLabel: string
+  searchAriaLabel: string
+}) {
+  return (
+    <div className="flex w-full max-w-full shrink-0 sm:max-w-[368px]">
+      <Button
+        type="button"
+        variant="outline"
+        className="h-10 shrink-0 rounded-l-lg rounded-r-none border border-[#a5aeb4] border-r-0 bg-[#fbfbfb] px-0 text-[#515f6b] shadow-none hover:bg-[#f5f5f5]"
+        aria-label={filterAriaLabel}
+        onClick={() => toast.message('Filters (prototype).')}
+      >
+        <span className="flex h-full items-center justify-center px-3 py-3">
+          <Filter className="h-4 w-4" aria-hidden />
+        </span>
+      </Button>
+      <div className="relative min-w-0 flex-1">
+        <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-[#243746]" aria-hidden />
+        <Input
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-10 rounded-l-none rounded-r-lg border border-[#a5aeb4] bg-white pl-9 text-sm text-[#12181d] placeholder:text-[#8b94b8] focus-visible:z-10"
+          aria-label={searchAriaLabel}
+        />
+      </div>
+    </div>
+  )
+}
+
 function AutomatedCommunicationsSection() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -423,75 +463,60 @@ function AutomatedCommunicationsSection() {
   const rows = filtered.slice(pageStart, pageStart + pageSizeNum)
 
   return (
-    <Card className={commPageCard}>
-      <CardHeader className={cn('flex flex-col gap-8 sm:flex-row sm:items-center sm:justify-end sm:gap-4', commCardHeader)}>
-        <div className="flex w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-10 w-10 shrink-0 rounded-lg border-[#E4E6E9] bg-white text-[#5f6a94] hover:border-[#c8d0ef] hover:bg-[#f8f9fc]"
-            aria-label="Filter automations"
-            onClick={() => toast.message('Filters (prototype).')}
-          >
-            <Filter className="h-4 w-4" />
-          </Button>
-          <div className="relative min-w-0 flex-1 sm:max-w-md">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b94b8]" aria-hidden />
-            <Input
-              placeholder="Search by Automation name"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value)
-                setPage(1)
-              }}
-              className="h-10 rounded-lg border-[#E4E6E9] bg-white pl-9 text-sm placeholder:text-[#8b94b8]"
-              aria-label="Search automations by name"
-            />
-          </div>
-        </div>
-      </CardHeader>
+    <Card className={commAutomationInnerCard}>
+      <div className="flex w-full justify-end">
+        <CommunicationsSearchFilter
+          value={query}
+          onChange={(v) => {
+            setQuery(v)
+            setPage(1)
+          }}
+          placeholder="Search by Automation name"
+          filterAriaLabel="Filter automations"
+          searchAriaLabel="Search automations by name"
+        />
+      </div>
       <CardContent className="w-full min-w-0 p-0">
         <div className={commTableWrap}>
           <Table className={cn('min-w-[880px]', commTableBase)}>
             <TableHeader>
-              <TableRow className={cn(commTr, 'hover:bg-transparent')}>
-                <TableHead className={cn(commTh, 'py-3.5')}>Automation Name</TableHead>
-                <TableHead className={cn(commTh, 'py-3.5')}>Type</TableHead>
-                <TableHead className={cn(commTh, 'py-3.5')}>Configured By</TableHead>
-                <TableHead className={cn(commTh, 'py-3.5')}>
+              <TableRow className={cn(commAutoTrHead, 'hover:bg-transparent')}>
+                <TableHead className={commAutoTh}>Automation Name</TableHead>
+                <TableHead className={commAutoTh}>Type</TableHead>
+                <TableHead className={commAutoTh}>Configured By</TableHead>
+                <TableHead className={commAutoTh}>
                   <span className="inline-flex items-center gap-1">
                     Status
                     <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
                   </span>
                 </TableHead>
-                <TableHead className={cn(commTh, 'py-3.5')}>
+                <TableHead className={commAutoTh}>
                   <span className="inline-flex items-center gap-1">
                     Start Date (CT)
                     <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
                   </span>
                 </TableHead>
-                <TableHead className={cn(commTh, 'w-[56px] py-3.5 text-center')}>Action</TableHead>
+                <TableHead className={cn(commAutoTh, 'w-[56px] text-center')}>Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((row) => (
-                <TableRow key={row.id} className={commTr}>
-                  <TableCell className={cn('max-w-[220px] py-3.5', commTdTitle)}>
-                    <span className="block truncate" title={row.name}>
+                <TableRow key={row.id} className={commAutoTr}>
+                  <TableCell className={cn('max-w-[220px]', commAutoTd)}>
+                    <span className="block truncate font-normal text-[#12181d]" title={row.name}>
                       {row.name}
                     </span>
                   </TableCell>
-                  <TableCell className={cn('py-3.5', commTdBody)}>{row.type}</TableCell>
-                  <TableCell className={cn('py-3.5', commTdBody)}>{row.configuredBy}</TableCell>
-                  <TableCell className="py-3.5">{automationStatusBadge(row.status)}</TableCell>
-                  <TableCell className={cn('whitespace-nowrap py-3.5', commTdBody)}>
+                  <TableCell className={commAutoTd}>{row.type}</TableCell>
+                  <TableCell className={commAutoTd}>{row.configuredBy}</TableCell>
+                  <TableCell className={commAutoTd}>{automationStatusBadge(row.status)}</TableCell>
+                  <TableCell className={cn('whitespace-nowrap', commAutoTd)}>
                     <span className="inline-flex items-center gap-1.5">
                       <Clock3 className="h-4 w-4 shrink-0 text-[#8b94b8]" aria-hidden />
                       {row.startDate}
                     </span>
                   </TableCell>
-                  <TableCell className="py-3.5 text-center">{AutomationRowActionsMenu(row.name)}</TableCell>
+                  <TableCell className={cn(commAutoTd, 'text-center')}>{AutomationRowActionsMenu(row.name)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -564,28 +589,23 @@ export function CommunicationsOnDemandDashboard() {
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-        <header className="flex flex-col gap-4">
-          <div className="flex justify-end">
+        <div className={commCommunicationsDash}>
+          <div className="flex w-full justify-end border-b border-[#E4E6E9]">
             <ModeToggle mode={topMode} onChange={setTopMode} />
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-            <div className="min-w-0 flex-1 space-y-1">
-              <h1 className="text-2xl font-bold tracking-tight text-[#14182c] sm:text-[28px] sm:leading-tight">Automated Communications</h1>
-              <p className="max-w-2xl text-sm leading-relaxed text-[#5f6a94]">
-                Create and manage triggered messages tied to enrollment, life events, and compliance milestones.
-              </p>
-            </div>
+          <div className="flex min-h-10 w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-2xl font-semibold leading-8 tracking-tight text-[#14182c]">Automated Communications</h1>
             <Button
               type="button"
               intent="primary"
-              className="w-full shrink-0 rounded-lg px-5 py-2.5 text-[15px] font-semibold shadow-sm sm:mt-0 sm:w-auto sm:self-start"
+              className="w-full shrink-0 rounded-lg px-4 py-2 text-sm font-medium shadow-sm sm:w-auto"
               onClick={() => toast.message('Add new automation (prototype).')}
             >
               Add New Automation
             </Button>
           </div>
-        </header>
-        <AutomatedCommunicationsSection />
+          <AutomatedCommunicationsSection />
+        </div>
       </div>
     )
   }
@@ -612,196 +632,162 @@ export function CommunicationsOnDemandDashboard() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <header className="flex flex-col gap-4">
-        <div className="flex justify-end">
+      <div className={commCommunicationsDash}>
+        <div className="flex w-full justify-end border-b border-[#E4E6E9]">
           <ModeToggle mode={topMode} onChange={setTopMode} />
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-          <div className="min-w-0 flex-1 space-y-1">
-            <h1 className="text-2xl font-bold tracking-tight text-[#14182c] sm:text-[28px] sm:leading-tight">On-Demand Communications</h1>
-            <p className="max-w-2xl text-sm leading-relaxed text-[#5f6a94]">
-              Schedule one-time sends and review delivery history. Exclusions and plan rules apply per audience segment.
-            </p>
-          </div>
+        <div className="flex min-h-10 w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl font-semibold leading-8 tracking-tight text-[#14182c]">Self Service Communications</h1>
           <Button
             type="button"
             intent="primary"
-            className="w-full shrink-0 rounded-lg px-5 py-2.5 text-[15px] font-semibold shadow-sm sm:mt-0 sm:w-auto sm:self-start"
+            className="w-full shrink-0 rounded-lg px-4 py-2 text-sm font-medium shadow-sm sm:w-auto"
             onClick={() => toast.message('Add new communication (prototype).')}
           >
-            + Add New Communication
+            Add New Communication
           </Button>
         </div>
-      </header>
 
-      <Card className={commPageCard}>
-        <CardHeader className={cn('flex flex-col gap-8', commCardHeader)}>
-          <CardTitle className="w-full text-left text-lg font-semibold tracking-tight text-[#14182c] sm:w-auto">
-            Scheduled Communications
-          </CardTitle>
-          <div className="flex w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-10 w-10 shrink-0 rounded-lg border-[#E4E6E9] bg-white text-[#5f6a94] hover:border-[#c8d0ef] hover:bg-[#f8f9fc]"
-              aria-label="Filter scheduled communications"
-              onClick={() => toast.message('Filters (prototype).')}
-            >
-              <Filter className="h-4 w-4" />
-            </Button>
-            <div className="relative min-w-0 flex-1 sm:max-w-md">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b94b8]" aria-hidden />
-              <Input
-                placeholder="Search Scheduled Communications"
-                value={scheduledQuery}
-                onChange={(e) => setScheduledQuery(e.target.value)}
-                className="h-10 rounded-lg border-[#E4E6E9] bg-white pl-9 text-sm placeholder:text-[#8b94b8]"
-                aria-label="Search scheduled communications"
-              />
-            </div>
+        <Card className={commAutomationInnerCard}>
+          <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl font-semibold leading-8 tracking-tight text-[#1d2c38]">Scheduled Communications</h2>
+            <CommunicationsSearchFilter
+              value={scheduledQuery}
+              onChange={setScheduledQuery}
+              placeholder="Search Scheduled Communications"
+              filterAriaLabel="Filter scheduled communications"
+              searchAriaLabel="Search scheduled communications"
+            />
           </div>
-        </CardHeader>
-        <CardContent className="w-full min-w-0 p-0">
-          <div className={commTableWrap}>
-            <Table className={cn('min-w-[720px]', commTableBase)}>
-              <TableHeader>
-                <TableRow className={cn(commTr, 'hover:bg-transparent')}>
-                  <TableHead className={cn(commTh, 'py-3.5')}>Communication</TableHead>
-                  <TableHead className={cn(commTh, 'py-3.5')}>Type</TableHead>
-                  <TableHead className={cn(commTh, 'py-3.5')}>Schedule Date (CT)</TableHead>
-                  <TableHead className={cn(commTh, 'py-3.5')}>
-                    <span className="inline-flex items-center gap-1">
-                      Status
-                      <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
-                    </span>
-                  </TableHead>
-                  <TableHead className={cn(commTh, 'w-[56px] py-3.5 text-right')}>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredScheduled.map((row) => (
-                  <TableRow key={row.id} className={commTr}>
-                    <TableCell className={cn('max-w-[240px] py-3.5', commTdTitle)}>
-                      <span className="line-clamp-2">{row.communication}</span>
-                    </TableCell>
-                    <TableCell className={cn('py-3.5', commTdBody)}>{row.type}</TableCell>
-                    <TableCell className={cn('whitespace-nowrap py-3.5', commTdBody)}>
-                      <span className="inline-flex items-center gap-1.5">
-                        <Clock3 className="h-4 w-4 shrink-0 text-[#8b94b8]" aria-hidden />
-                        {row.scheduleDate}
+          <CardContent className="w-full min-w-0 p-0">
+            <div className={commTableWrap}>
+              <Table className={cn('min-w-[720px]', commTableBase)}>
+                <TableHeader>
+                  <TableRow className={cn(commAutoTrHead, 'hover:bg-transparent')}>
+                    <TableHead className={commAutoTh}>Communication</TableHead>
+                    <TableHead className={commAutoTh}>Type</TableHead>
+                    <TableHead className={commAutoTh}>
+                      <span className="inline-flex items-center gap-1">
+                        Schedule Date (CT)
+                        <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
                       </span>
-                    </TableCell>
-                    <TableCell className="py-3.5">{scheduledBadge()}</TableCell>
-                    <TableCell className="py-3.5 text-right">{RowActionsMenu(row.communication)}</TableCell>
+                    </TableHead>
+                    <TableHead className={commAutoTh}>
+                      <span className="inline-flex items-center gap-1">
+                        Status
+                        <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                      </span>
+                    </TableHead>
+                    <TableHead className={cn(commAutoTh, 'w-[56px] text-right')}>Action</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className={commPageCard}>
-        <CardHeader className={cn('flex flex-col gap-8', commCardHeader)}>
-          <CardTitle className="w-full text-left text-lg font-semibold tracking-tight text-[#14182c] sm:w-auto">
-            Sent Communications
-          </CardTitle>
-          <div className="flex w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-10 w-10 shrink-0 rounded-lg border-[#E4E6E9] bg-white text-[#5f6a94] hover:border-[#c8d0ef] hover:bg-[#f8f9fc]"
-              aria-label="Filter sent communications"
-              onClick={() => toast.message('Filters (prototype).')}
-            >
-              <Filter className="h-4 w-4" />
-            </Button>
-            <div className="relative min-w-0 flex-1 sm:max-w-md">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b94b8]" aria-hidden />
-              <Input
-                placeholder="Search Sent Communications"
-                value={sentQuery}
-                onChange={(e) => {
-                  setSentQuery(e.target.value)
-                  setSentPage(1)
-                }}
-                className="h-10 rounded-lg border-[#E4E6E9] bg-white pl-9 text-sm placeholder:text-[#8b94b8]"
-                aria-label="Search sent communications"
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="w-full min-w-0 p-0">
-          <div className={commTableWrap}>
-            <Table className={cn('min-w-[900px]', commTableBase)}>
-              <TableHeader>
-                <TableRow className={cn(commTr, 'hover:bg-transparent')}>
-                  <TableHead className={cn(commTh, 'py-3.5')}>Communication</TableHead>
-                  <TableHead className={cn(commTh, 'py-3.5')}>Type</TableHead>
-                  <TableHead className={cn(commTh, 'py-3.5')}>Employee Count</TableHead>
-                  <TableHead className={cn(commTh, 'py-3.5')}>Send Date (CT)</TableHead>
-                  <TableHead className={cn(commTh, 'py-3.5')}>
-                    <span className="inline-flex items-center gap-1">
-                      Status
-                      <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
-                    </span>
-                  </TableHead>
-                  <TableHead className={cn(commTh, 'w-[56px] py-3.5 text-right')}>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sentPageRows.map((row) => (
-                  <TableRow key={row.id} className={commTr}>
-                    <TableCell className={cn('max-w-[280px] py-3.5', commTdTitle)}>
-                      <span className="line-clamp-2" title={row.communication}>
-                        {row.communication}
-                      </span>
-                    </TableCell>
-                    <TableCell className={cn('py-3.5', commTdBody)}>{row.type}</TableCell>
-                    <TableCell className={cn('py-3.5', commTdBody)}>
-                      <EmployeeCountCell row={row} />
-                    </TableCell>
-                    <TableCell className={cn('whitespace-nowrap py-3.5', commTdBody)}>
-                      {row.sendDate ? (
+                </TableHeader>
+                <TableBody>
+                  {filteredScheduled.map((row) => (
+                    <TableRow key={row.id} className={commAutoTr}>
+                      <TableCell className={cn('max-w-[240px]', commAutoTd)}>
+                        <span className="line-clamp-2">{row.communication}</span>
+                      </TableCell>
+                      <TableCell className={commAutoTd}>{row.type}</TableCell>
+                      <TableCell className={cn('whitespace-nowrap', commAutoTd)}>
                         <span className="inline-flex items-center gap-1.5">
                           <Clock3 className="h-4 w-4 shrink-0 text-[#8b94b8]" aria-hidden />
-                          {row.sendDate}
+                          {row.scheduleDate}
                         </span>
-                      ) : (
-                        <span className="text-[#8b94b8]">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="py-3.5">{sentStatusBadge(row.status)}</TableCell>
-                    <TableCell className="py-3.5 text-right">{RowActionsMenu(row.communication)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                      </TableCell>
+                      <TableCell className={commAutoTd}>{scheduledBadge()}</TableCell>
+                      <TableCell className={cn(commAutoTd, 'text-right')}>{RowActionsMenu(row.communication)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
 
-          <TablePaginationBar
-            currentPage={sentPage}
-            pageCount={pageCount}
-            onPageChange={setSentPage}
-            pageSize={pageSize}
-            onPageSizeChange={(v) => {
-              setPageSize(v)
-              setSentPage(1)
-            }}
-          />
-        </CardContent>
-      </Card>
+        <Card className={commAutomationInnerCard}>
+          <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl font-semibold leading-8 tracking-tight text-[#1d2c38]">Sent Communications</h2>
+            <CommunicationsSearchFilter
+              value={sentQuery}
+              onChange={(v) => {
+                setSentQuery(v)
+                setSentPage(1)
+              }}
+              placeholder="Search Sent Communications"
+              filterAriaLabel="Filter sent communications"
+              searchAriaLabel="Search sent communications"
+            />
+          </div>
+          <CardContent className="w-full min-w-0 p-0">
+            <div className={commTableWrap}>
+              <Table className={cn('min-w-[900px]', commTableBase)}>
+                <TableHeader>
+                  <TableRow className={cn(commAutoTrHead, 'hover:bg-transparent')}>
+                    <TableHead className={commAutoTh}>Communication</TableHead>
+                    <TableHead className={commAutoTh}>Type</TableHead>
+                    <TableHead className={commAutoTh}>Employee Count</TableHead>
+                    <TableHead className={commAutoTh}>Send Date (CT)</TableHead>
+                    <TableHead className={commAutoTh}>
+                      <span className="inline-flex items-center gap-1">
+                        Status
+                        <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                      </span>
+                    </TableHead>
+                    <TableHead className={cn(commAutoTh, 'w-[56px] text-right')}>Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sentPageRows.map((row) => (
+                    <TableRow key={row.id} className={commAutoTr}>
+                      <TableCell className={cn('max-w-[280px]', commAutoTd)}>
+                        <span className="line-clamp-2 font-normal text-[#12181d]" title={row.communication}>
+                          {row.communication}
+                        </span>
+                      </TableCell>
+                      <TableCell className={commAutoTd}>{row.type}</TableCell>
+                      <TableCell className={commAutoTd}>
+                        <EmployeeCountCell row={row} />
+                      </TableCell>
+                      <TableCell className={cn('whitespace-nowrap', commAutoTd)}>
+                        {row.sendDate ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <Clock3 className="h-4 w-4 shrink-0 text-[#8b94b8]" aria-hidden />
+                            {row.sendDate}
+                          </span>
+                        ) : (
+                          <span className="text-[#8b94b8]">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className={commAutoTd}>{sentStatusBadge(row.status)}</TableCell>
+                      <TableCell className={cn(commAutoTd, 'text-right')}>{RowActionsMenu(row.communication)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <TablePaginationBar
+              currentPage={sentPage}
+              pageCount={pageCount}
+              onPageChange={setSentPage}
+              pageSize={pageSize}
+              onPageSizeChange={(v) => {
+                setPageSize(v)
+                setSentPage(1)
+              }}
+            />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
 
 function ModeToggle({ mode, onChange }: { mode: TopMode; onChange: (m: TopMode) => void }) {
   const tabBase =
-    'inline-flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-2 rounded-t-md'
+    'inline-flex h-10 min-h-10 items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-2'
   return (
-    <div className="flex items-center gap-0 border-b border-[#e8ecf4]" role="tablist" aria-label="Communications mode">
+    <div className="flex items-center gap-0" role="tablist" aria-label="Communications mode">
       <button
         type="button"
         role="tab"
@@ -809,7 +795,7 @@ function ModeToggle({ mode, onChange }: { mode: TopMode; onChange: (m: TopMode) 
         className={cn(
           tabBase,
           mode === 'self-service'
-            ? 'border-[#3958c3] text-[#3958c3]'
+            ? 'gap-1 border-[#0058a3] text-[#0058a3]'
             : 'border-transparent text-[#5f6a94] hover:text-[#14182c]',
         )}
         onClick={() => onChange('self-service')}
@@ -824,7 +810,7 @@ function ModeToggle({ mode, onChange }: { mode: TopMode; onChange: (m: TopMode) 
         className={cn(
           tabBase,
           mode === 'automations'
-            ? 'border-[#3958c3] text-[#3958c3]'
+            ? 'gap-1 border-[#0058a3] text-[#0058a3]'
             : 'border-transparent text-[#5f6a94] hover:text-[#14182c]',
         )}
         onClick={() => onChange('automations')}
