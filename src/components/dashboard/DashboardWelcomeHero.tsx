@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Badge } from '@wexinc-healthbenefits/ben-ui-kit'
-import { Bell, Check, ChevronRight, CircleHelp, FileText, RefreshCw, Upload } from 'lucide-react'
+import { Bell, Check, ChevronRight, CircleHelp, FileText, Landmark, Receipt, RefreshCw, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { EMPLOYER } from '@/data/adminMockData'
 import { useGuidedSetupHomeState } from '@/hooks/useGuidedSetupHomeState'
@@ -347,17 +347,44 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
             <motion.div variants={pillsContainerVariants} className="flex flex-col gap-4">
               <p className={sectionEyebrow}>Quick actions</p>
               <motion.div variants={pillsWrapperVariants} className="flex flex-wrap gap-2">
-                <motion.button
-                  variants={pillVariants}
-                  type="button"
-                  onClick={() => navigate('/enrollment')}
-                  whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
-                  transition={{ duration: 0.2, ease: softEaseOut }}
-                  className={pillClass}
-                >
-                  <RefreshCw className="h-4 w-4 text-[#5f6a94]" aria-hidden />
-                  Sync payroll data
-                </motion.button>
+                {launchComplete ? (
+                  <>
+                    <motion.button
+                      variants={pillVariants}
+                      type="button"
+                      onClick={() => navigate('/billing')}
+                      whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
+                      transition={{ duration: 0.2, ease: softEaseOut }}
+                      className={pillClass}
+                    >
+                      <Landmark className="h-4 w-4 text-[#5f6a94]" aria-hidden />
+                      Fund accounts
+                    </motion.button>
+                    <motion.button
+                      variants={pillVariants}
+                      type="button"
+                      onClick={() => navigate('/billing')}
+                      whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
+                      transition={{ duration: 0.2, ease: softEaseOut }}
+                      className={pillClass}
+                    >
+                      <Receipt className="h-4 w-4 text-[#5f6a94]" aria-hidden />
+                      Submit COBRA remittance
+                    </motion.button>
+                  </>
+                ) : (
+                  <motion.button
+                    variants={pillVariants}
+                    type="button"
+                    onClick={() => navigate('/enrollment')}
+                    whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
+                    transition={{ duration: 0.2, ease: softEaseOut }}
+                    className={pillClass}
+                  >
+                    <RefreshCw className="h-4 w-4 text-[#5f6a94]" aria-hidden />
+                    Sync payroll data
+                  </motion.button>
+                )}
                 <motion.button
                   variants={pillVariants}
                   type="button"
@@ -610,6 +637,7 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
       <GetHelpDialog
         open={getHelpOpen}
         onOpenChange={setGetHelpOpen}
+        openToRequest
         onPrefillAssistantQuestion={(text) => setAskValue(text)}
       />
     </div>

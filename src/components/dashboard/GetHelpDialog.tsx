@@ -24,13 +24,15 @@ export type GetHelpDialogProps = {
   onOpenChange: (open: boolean) => void
   /** Prefills the hero “ask” field and closes this dialog (prototype). */
   onPrefillAssistantQuestion?: (text: string) => void
+  /** When true, opening the dialog skips the hub and shows Submit a request (step 1) immediately. */
+  openToRequest?: boolean
 }
 
 type HubView = 'hub' | 'assistant' | 'secure' | 'contact' | 'request'
 
 const SAMPLE_QUESTION = 'When does open enrollment start for our medical plan?'
 
-export function GetHelpDialog({ open, onOpenChange, onPrefillAssistantQuestion }: GetHelpDialogProps) {
+export function GetHelpDialog({ open, onOpenChange, onPrefillAssistantQuestion, openToRequest = false }: GetHelpDialogProps) {
   const [view, setView] = useState<HubView>('hub')
   const [requestKey, setRequestKey] = useState(0)
   const [secureReason, setSecureReason] = useState<SecureMessageReason | ''>('')
@@ -41,8 +43,13 @@ export function GetHelpDialog({ open, onOpenChange, onPrefillAssistantQuestion }
       setView('hub')
       setSecureReason('')
       setSecureBody('')
+      return
     }
-  }, [open])
+    if (openToRequest) {
+      setRequestKey((k) => k + 1)
+      setView('request')
+    }
+  }, [open, openToRequest])
 
   const goRequest = () => {
     setRequestKey((k) => k + 1)
@@ -61,7 +68,7 @@ export function GetHelpDialog({ open, onOpenChange, onPrefillAssistantQuestion }
       case 'contact':
         return 'Contact us'
       case 'request':
-        return 'Submit a request'
+        return 'Get help'
       default:
         return 'Get help'
     }
@@ -255,6 +262,7 @@ export function GetHelpDialog({ open, onOpenChange, onPrefillAssistantQuestion }
           <div className="py-2">
             <EmployerRequestWizard
               key={requestKey}
+              hideHubBack={openToRequest}
               onBack={() => setView('hub')}
               onSuccess={() => setView('hub')}
             />

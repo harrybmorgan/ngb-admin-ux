@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@wexinc-healthbenefits/ben-ui-kit'
-import { BarChart3, ChevronRight, CreditCard, FileSpreadsheet, Palette, Sparkles, Users } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import { BarChart3, ChevronRight, CreditCard, FileSpreadsheet, Lock, Palette, Sparkles, Users } from 'lucide-react'
 import { DashboardWelcomeHero } from '@/components/dashboard/DashboardWelcomeHero'
 import { DashboardManageSetupSection } from '@/components/dashboard/DashboardManageSetupSection'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
@@ -54,16 +55,24 @@ const secondaryTasks = [
   },
 ] as const
 
-const placeholderInsightLines = [
-  'Program signals and trends will appear here once the employer portal is live.',
-  'Payroll and enrollment activity summaries will populate from connected systems.',
-  'No insights to show yet — launch unlocks this experience.',
-] as const
-
-const placeholderReportRows = [
-  { title: 'Enrollment snapshot', hint: 'Not available until launch' },
-  { title: 'Payroll reconciliation', hint: 'Not available until launch' },
-] as const
+function PrelaunchUnlockSpotlight({ icon: Icon, headline, body }: { icon: LucideIcon; headline: string; body: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 py-10 text-center sm:py-12" role="status" aria-live="polite">
+      <div className="relative" aria-hidden>
+        <div className="flex h-[72px] w-[72px] items-center justify-center rounded-2xl border-2 border-dashed border-[#c8d0ef] bg-gradient-to-b from-[#f8f9fc] to-[#eef2ff]/50 text-[#9aa3bd]">
+          <Icon className="h-9 w-9" strokeWidth={1.25} />
+        </div>
+        <div className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#e8ecf4] text-[#5f6a94] shadow-sm">
+          <Lock className="h-3.5 w-3.5" strokeWidth={2.5} />
+        </div>
+      </div>
+      <div className="mx-auto max-w-[min(100%,288px)] space-y-1.5 px-2">
+        <p className="text-sm font-semibold text-[#374056]">{headline}</p>
+        <p className="text-xs leading-relaxed text-[#5f6a94]">{body}</p>
+      </div>
+    </div>
+  )
+}
 
 export default function DashboardPage() {
   const { onboardingComplete, planReady, launchComplete } = useEmployerSetup()
@@ -99,9 +108,11 @@ export default function DashboardPage() {
                 </div>
                 <div className="min-w-0 flex-1 space-y-1">
                   <CardTitle className="text-base font-bold leading-6 text-[#14182c]">WEX Insights</CardTitle>
-                  <CardDescription className="text-sm leading-5 text-[#5f6a94]">
-                    Tailored for your benefits program
-                  </CardDescription>
+                  {portalLive ? (
+                    <CardDescription className="text-sm leading-5 text-[#5f6a94]">
+                      Tailored for your benefits program
+                    </CardDescription>
+                  ) : null}
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 px-6 pb-6 pt-2">
@@ -121,20 +132,11 @@ export default function DashboardPage() {
                     </p>
                   </>
                 ) : (
-                  <>
-                    <ul className="space-y-5 text-[15px] leading-[1.65] text-[#9aa3bd]" aria-label="Insights placeholders">
-                      {placeholderInsightLines.map((line) => (
-                        <li key={line} className="flex gap-3.5">
-                          <Sparkles className="mt-1 h-4 w-4 shrink-0 text-[#c8d0ef]" aria-hidden />
-                          <span className="min-w-0">{line}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="border-t border-[#e8ecf4] pt-5 text-xs leading-relaxed text-[#5f6a94]">
-                      Launch the employer portal from Guided setup (Test &amp; Launch) to populate insights and the rest of
-                      your dashboard.
-                    </p>
-                  </>
+                  <PrelaunchUnlockSpotlight
+                    icon={Sparkles}
+                    headline="Insights will appear here after launch"
+                    body="Program trends and tailored signals for your benefits program show up once the employer portal is live."
+                  />
                 )}
               </CardContent>
             </Card>
@@ -151,15 +153,18 @@ export default function DashboardPage() {
                 </div>
                 <div className="min-w-0 flex-1 space-y-1">
                   <CardTitle className="text-base font-bold leading-6 text-[#14182c]">Your top reports</CardTitle>
-                  <CardDescription className="text-sm leading-5 text-[#5f6a94]">
-                    Most used by your team — open in Reports.
-                  </CardDescription>
+                  {portalLive ? (
+                    <CardDescription className="text-sm leading-5 text-[#5f6a94]">
+                      Most used by your team — open in Reports.
+                    </CardDescription>
+                  ) : null}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4 px-6 pb-6">
-                <ul className="flex flex-col gap-2">
-                  {portalLive
-                    ? topReports.map((r) => {
+                {portalLive ? (
+                  <>
+                    <ul className="flex flex-col gap-2">
+                      {topReports.map((r) => {
                         const rowClass =
                           'flex items-center justify-between gap-3 rounded-xl border border-[#e8ecf4] bg-[#f8f9fc] px-4 py-3 text-left'
                         return (
@@ -186,36 +191,22 @@ export default function DashboardPage() {
                             </Link>
                           </li>
                         )
-                      })
-                    : placeholderReportRows.map((row) => (
-                        <li key={row.title}>
-                          <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[#e8ecf4] bg-[#f8f9fc]/80 px-4 py-3 text-left opacity-90">
-                            <span className="min-w-0">
-                              <span className="block text-sm font-semibold text-[#9aa3bd]">{row.title}</span>
-                              <span className="mt-0.5 block text-xs text-[#b4bcd4]">{row.hint}</span>
-                            </span>
-                            <ChevronRight className="h-4 w-4 shrink-0 text-[#d8deef]" aria-hidden />
-                          </div>
-                        </li>
-                      ))}
-                </ul>
-                {portalLive ? (
-                  <Button asChild variant="outline" size="sm" className={cn('w-full rounded-xl sm:w-auto', outlineSpark)}>
-                    <Link to="/reports">View all reports</Link>
-                  </Button>
+                      })}
+                    </ul>
+                    <Button asChild variant="outline" size="sm" className={cn('w-full rounded-xl sm:w-auto', outlineSpark)}>
+                      <Link to="/reports">View all reports</Link>
+                    </Button>
+                  </>
                 ) : (
-                  <Button type="button" variant="outline" size="sm" disabled className="w-full rounded-xl sm:w-auto">
-                    Available after portal launch
-                  </Button>
+                  <PrelaunchUnlockSpotlight
+                    icon={BarChart3}
+                    headline="Report shortcuts will appear after launch"
+                    body="Your team’s most-used reports and quick links to the library unlock when the employer portal is live."
+                  />
                 )}
               </CardContent>
             </Card>
           </div>
-          {!portalLive && (
-            <p className="text-xs leading-4 text-[#5f6a94]">
-              Data and report shortcuts unlock after you launch the employer portal from Guided setup → Test &amp; Launch.
-            </p>
-          )}
         </section>
 
         <section className="space-y-4">
@@ -231,36 +222,33 @@ export default function DashboardPage() {
                     locked ? 'pointer-events-none opacity-60' : 'group/card hover:shadow-md',
                   )}
                 >
-                  <CardHeader className="flex flex-row items-start gap-3 space-y-0 px-6 pb-2 pt-6">
+                  <CardHeader
+                    className={cn(
+                      'flex flex-row items-start gap-3 space-y-0 px-6 pt-6',
+                      locked ? 'pb-6' : 'pb-2',
+                    )}
+                  >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3] transition-transform group-hover/card:scale-110">
                       <Icon className="h-5 w-5" />
                     </div>
                     <div className="min-w-0 flex-1 space-y-1">
                       <CardTitle className="text-base font-bold leading-6 text-[#14182c]">{title}</CardTitle>
-                      <CardDescription className="text-sm leading-5 text-[#5f6a94]">{description}</CardDescription>
+                      <CardDescription className="text-sm leading-5 text-[#5f6a94]">
+                        {locked ? 'Launch employer portal to unlock' : description}
+                      </CardDescription>
                     </div>
                   </CardHeader>
-                  <CardContent className="px-6 pb-6">
-                    {locked ? (
-                      <Button type="button" variant="outline" size="sm" disabled className="w-full rounded-xl sm:w-auto">
-                        Launch employer portal to unlock
-                      </Button>
-                    ) : (
+                  {!locked ? (
+                    <CardContent className="px-6 pb-6">
                       <Button asChild variant="outline" size="sm" className={cn('w-full sm:w-auto', outlineSpark)}>
                         <Link to={to}>Open</Link>
                       </Button>
-                    )}
-                  </CardContent>
+                    </CardContent>
+                  ) : null}
                 </Card>
               )
             })}
           </div>
-          {!portalLive && (
-            <p className="text-xs leading-4 text-[#5f6a94]">
-              Tasks open after launch. Finish configuration in Guided setup, then use Test &amp; Launch when you are ready to go
-              live.
-            </p>
-          )}
         </section>
       </main>
 

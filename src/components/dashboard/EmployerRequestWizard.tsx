@@ -23,9 +23,11 @@ export type EmployerRequestWizardProps = {
   onBack: () => void
   /** After a successful prototype submit. */
   onSuccess: () => void
+  /** When true, step 1 hides “Back to help options” (e.g. opened straight to submit from the hero). */
+  hideHubBack?: boolean
 }
 
-export function EmployerRequestWizard({ onBack, onSuccess }: EmployerRequestWizardProps) {
+export function EmployerRequestWizard({ onBack, onSuccess, hideHubBack = false }: EmployerRequestWizardProps) {
   const [step, setStep] = useState<1 | 2>(1)
   const [requestType, setRequestType] = useState<EmployerRequestType | ''>('')
   const [details, setDetails] = useState('')
@@ -89,9 +91,6 @@ export function EmployerRequestWizard({ onBack, onSuccess }: EmployerRequestWiza
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       {step === 1 ? (
         <>
-          <p className="text-sm text-muted-foreground">
-            Choose the type of change or action. You will add details and optional attachments on the next step.
-          </p>
           <div className="space-y-2">
             <Label htmlFor="employer-request-type" className="text-sm font-medium">
               Request type
@@ -113,10 +112,12 @@ export function EmployerRequestWizard({ onBack, onSuccess }: EmployerRequestWiza
             </Select>
           </div>
           <div className="flex flex-wrap gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={handleWizardBack}>
-              Back to help options
-            </Button>
-            <Button type="button" variant="solid" onClick={handleContinue}>
+            {!hideHubBack ? (
+              <Button type="button" variant="outline" onClick={handleWizardBack}>
+                Back to help options
+              </Button>
+            ) : null}
+            <Button type="button" variant="solid" onClick={handleContinue} className={hideHubBack ? 'w-full sm:w-auto' : undefined}>
               Continue
             </Button>
           </div>
