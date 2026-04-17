@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Badge } from '@wexinc-healthbenefits/ben-ui-kit'
 import { Bell, Check, FileText, RefreshCw, Ticket, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { EMPLOYER } from '@/data/adminMockData'
+import { useGuidedSetupHomeState } from '@/hooks/useGuidedSetupHomeState'
+import { formatStepsLeftPhrase, getWizardHeroMeta } from '@/lib/guidedSetupHome'
 import { cn } from '@/lib/utils'
 import { AdminAiChatInput } from '@/components/dashboard/AdminAiChatInput'
 import { WexAiSparkleMark } from '@/components/ui/WexAiSparkleMark'
@@ -161,6 +163,7 @@ const HERO_VISITED_KEY = 'ngb-admin-dashboard-hero-visited'
 export function DashboardWelcomeHero({ onboardingComplete, planReady }: DashboardWelcomeHeroProps) {
   const navigate = useNavigate()
   const prefersReducedMotion = useReducedMotion()
+  const guidedSnapshot = useGuidedSetupHomeState()
   const [askValue, setAskValue] = useState('')
   const firstName = EMPLOYER.hrAdminName.split(' ')[0]
 
@@ -181,12 +184,47 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady }: Dashboar
   const shouldAnimate = isFirstVisit && !prefersReducedMotion
   const animateState = shouldAnimate ? 'visible' : 'instant'
 
-  const setupTitle = onboardingComplete ? 'Guided employer setup' : 'Start guided setup'
-  const setupDescription = onboardingComplete
-    ? 'You can revisit any step or adjust branding from your profile menu. Dashboard widgets below will fill in after setup.'
-    : 'First time here? Walk through low-touch steps for plans, eligibility, integrations, and branding. Save anytime and pick up later.'
-
-  const taskCount = onboardingComplete ? 0 : 1
+  const setupCard = useMemo(() => {
+    const hasDraft = guidedSnapshot !== null
+    if (onboardingComplete) {
+      return {
+        state: 'complete' as const,
+        title: 'Setup complete',
+        description:
+          'Your core setup is ready. Review setup anytime or make updates as needed.',
+        ctaLabel: 'Review setup',
+        headerBadge: { label: 'All set', intent: 'default' as const },
+        pill: { label: 'Complete', className: 'bg-emerald-100 text-emerald-950' },
+        metaLine: null as string | null,
+      }
+    }
+    if (hasDraft && guidedSnapshot) {
+      const { stepTitle, stepsLeft } = getWizardHeroMeta(guidedSnapshot)
+      const metaLine =
+        stepsLeft > 0
+          ? `${stepTitle} · ${formatStepsLeftPhrase(stepsLeft)}`
+          : "Required steps complete — wrap up launch when you're ready."
+      return {
+        state: 'in_progress' as const,
+        title: 'Continue guided setup',
+        description: 'Pick up where you left off and finish the remaining setup steps.',
+        ctaLabel: 'Continue',
+        headerBadge: { label: 'In progress', intent: 'info' as const },
+        pill: { label: 'In progress', className: 'bg-[#eef2ff] text-[#3958c3]' },
+        metaLine,
+      }
+    }
+    return {
+      state: 'not_started' as const,
+      title: 'Start guided setup',
+      description:
+        'First time here? Walk through low-touch steps for plans, eligibility, integrations, and branding. Save anytime and pick up later.',
+      ctaLabel: 'Get started',
+      headerBadge: { label: '1 task', intent: 'info' as const },
+      pill: { label: 'Recommended', className: 'bg-amber-100 text-amber-950' },
+      metaLine: null as string | null,
+    }
+  }, [guidedSnapshot, onboardingComplete])
 
   return (
     <div
@@ -332,15 +370,15 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady }: Dashboar
                 <Bell className="h-4 w-4 text-[#5f6a94]" aria-hidden />
                 <span className={sectionEyebrow}>Your next steps</span>
               </div>
-              {taskCount > 0 ? (
-                <Badge intent="info" className="rounded-full border-0 bg-[#eef2ff] px-2.5 py-0.5 text-[11px] font-semibold text-[#3958c3]">
-                  {taskCount} task
-                </Badge>
-              ) : (
-                <Badge intent="default" className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
-                  All set
-                </Badge>
-              )}
+              <Badge
+                intent={setupCard.headerBadge.intent}
+                className={cn(
+                  'rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+                  setupCard.headerBadge.intent === 'info' && 'border-0 bg-[#eef2ff] text-[#3958c3]',
+                )}
+              >
+                {setupCard.headerBadge.label}
+              </Badge>
             </motion.div>
 
             <motion.div
@@ -352,11 +390,19 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady }: Dashboar
                 'transition-shadow duration-300 hover:shadow-md',
               )}
             >
-              <span className="mb-3 inline-flex w-fit rounded-md bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-950">
-                Recommended
+              <span
+                className={cn(
+                  'mb-3 inline-flex w-fit rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide',
+                  setupCard.pill.className,
+                )}
+              >
+                {setupCard.pill.label}
               </span>
-              <h2 className="text-base font-bold leading-6 text-[#14182c]">{setupTitle}</h2>
-              <p className="mt-2 text-sm leading-5 text-[#5f6a94]">{setupDescription}</p>
+              <h2 className="text-base font-bold leading-6 text-[#14182c]">{setupCard.title}</h2>
+              <p className="mt-2 text-sm leading-5 text-[#5f6a94]">{setupCard.description}</p>
+              {setupCard.metaLine ? (
+                <p className="mt-2 text-xs font-medium leading-snug text-[#374056]">{setupCard.metaLine}</p>
+              ) : null}
 
               <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#e8ecf4] bg-[#f7f8fc] px-3 py-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-[#3958c3] shadow-sm">
@@ -379,18 +425,20 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady }: Dashboar
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5b21b6]/50 focus-visible:ring-offset-2',
                 )}
               >
-                Get started
+                {setupCard.ctaLabel}
               </MotionLink>
 
-              <motion.button
-                type="button"
-                onClick={() => toast.message('Reminder set (prototype only — not saved).')}
-                whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
-                transition={{ duration: 0.2, ease: softEaseOut }}
-                className="mt-3 w-full text-center text-[13px] font-semibold text-[#5f6a94] underline-offset-2 transition-colors hover:text-[#3958c3] hover:underline"
-              >
-                Remind me tomorrow
-              </motion.button>
+              {setupCard.state !== 'complete' ? (
+                <motion.button
+                  type="button"
+                  onClick={() => toast.message('Reminder set (prototype only — not saved).')}
+                  whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
+                  transition={{ duration: 0.2, ease: softEaseOut }}
+                  className="mt-3 w-full text-center text-[13px] font-semibold text-[#5f6a94] underline-offset-2 transition-colors hover:text-[#3958c3] hover:underline"
+                >
+                  Remind me tomorrow
+                </motion.button>
+              ) : null}
             </motion.div>
 
             <p className="mt-4 flex items-center justify-center gap-2 text-center text-[13px] text-[#5f6a94]">

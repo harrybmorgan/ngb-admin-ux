@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@wexinc-healthbenefits/ben-ui-kit'
 import { BarChart3, ChevronRight, CreditCard, FileSpreadsheet, Palette, Sparkles, Users } from 'lucide-react'
 import { DashboardWelcomeHero } from '@/components/dashboard/DashboardWelcomeHero'
+import { DashboardManageSetupSection } from '@/components/dashboard/DashboardManageSetupSection'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import { useEmployerSetup } from '@/hooks/useEmployerSetup'
@@ -64,6 +65,8 @@ export default function DashboardPage() {
         <section>
           <DashboardWelcomeHero onboardingComplete={onboardingComplete} planReady={planReady} />
         </section>
+
+        <DashboardManageSetupSection />
 
         <section className="space-y-4">
           <h2 className={sectionEyebrow}>Data & reports</h2>

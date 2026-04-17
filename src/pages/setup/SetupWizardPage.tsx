@@ -1186,7 +1186,7 @@ function normalizeCompanyProfile(raw: unknown): CompanyProfileState {
 
   if (typeof o.addresses === 'string') {
     const parsed = parseLegacyCompanyAddresses(o.addresses)
-    let mailingSameAsHeadquarters =
+    const mailingSameAsHeadquarters =
       parsed.mailingAddress.trim() === '' || parsed.mailingAddress.trim() === parsed.headquartersAddress.trim()
     const hq = parsed.headquartersAddress
     const mailing = mailingSameAsHeadquarters ? hq : parsed.mailingAddress
@@ -1339,6 +1339,48 @@ function loadDraft(): Draft {
 function saveDraft(d: Draft) {
   localStorage.setItem(GUIDED_SETUP_WIZARD_DRAFT_KEY, JSON.stringify(d))
   emitSetupChanged()
+}
+
+/**
+ * One-shot deep link: `/setup?task=8` (0-based task index) or `/setup?wizardStep=2` (0-based top-level step).
+ * Strips recognized params after applying so reload stays clean.
+ */
+function applyUrlIntentToDraft(base: Draft): Draft {
+  if (typeof window === 'undefined') return base
+  const params = new URLSearchParams(window.location.search)
+  const taskRaw = params.get('task')
+  const wizardStepRaw = params.get('wizardStep')
+  const hadDeepLink = params.has('task') || params.has('wizardStep')
+
+  let nextIndex = base.stepIndex
+
+  if (taskRaw !== null && taskRaw !== '') {
+    const n = Number.parseInt(taskRaw, 10)
+    if (!Number.isNaN(n) && n >= 0 && n < TASK_COUNT) nextIndex = n
+  } else if (wizardStepRaw !== null && wizardStepRaw !== '') {
+    const n = Number.parseInt(wizardStepRaw, 10)
+    if (!Number.isNaN(n) && n >= 0 && n < WIZARD_STEPS.length) {
+      const step = WIZARD_STEPS[n]
+      if (step) nextIndex = firstNonCompleteTaskIndexInStep(step, base.taskOutcomes)
+    }
+  }
+
+  if (hadDeepLink) {
+    queueMicrotask(() => {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('task')
+      url.searchParams.delete('wizardStep')
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+    })
+  }
+
+  if (nextIndex === base.stepIndex) return base
+  return { ...base, stepIndex: nextIndex }
+}
+
+function loadDraftForMount(): { draft: Draft; selectedStepIndex: number } {
+  const draft = applyUrlIntentToDraft(loadDraft())
+  return { draft, selectedStepIndex: stepGroupIndexForTask(draft.stepIndex) }
 }
 
 const TASK_STATUS_LABEL: Record<TaskNavStatus, string> = {
@@ -1554,9 +1596,10 @@ function unlockGuidanceForPrereq(prereqIndex: number, outcomes: readonly StoredT
 }
 
 export default function SetupWizardPage() {
-  const [draft, setDraft] = useState<Draft>(() => loadDraft())
+  const boot = useMemo(() => loadDraftForMount(), [])
+  const [draft, setDraft] = useState<Draft>(boot.draft)
   const [mappingOpen, setMappingOpen] = useState(false)
-  const [selectedStepIndex, setSelectedStepIndex] = useState(() => stepGroupIndexForTask(loadDraft().stepIndex))
+  const [selectedStepIndex, setSelectedStepIndex] = useState(boot.selectedStepIndex)
   const benefitsOfferGridRef = useRef<HTMLDivElement>(null)
   const [benefitsOfferGridCols, setBenefitsOfferGridCols] = useState(1)
 
