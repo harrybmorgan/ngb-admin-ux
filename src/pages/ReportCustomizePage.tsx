@@ -28,6 +28,7 @@ import { ReportViewToggle } from '@/components/reports/ReportViewToggle'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import {
+  COMBINED_OVERVIEW_REPORT_ID,
   REPORT_DETAIL_CLAIM_ROWS,
   REPORT_LIBRARY,
   type ReportDetailClaimRow,
@@ -82,6 +83,12 @@ export default function ReportCustomizePage() {
     })
     setDescriptionEditing(false)
   }, [reportId, report])
+
+  useEffect(() => {
+    if (reportId === COMBINED_OVERVIEW_REPORT_ID) {
+      navigate(`/reports/${COMBINED_OVERVIEW_REPORT_ID}`, { replace: true })
+    }
+  }, [reportId, navigate])
 
   const reportAsOf = useMemo(() => maxSubmitDate(REPORT_DETAIL_CLAIM_ROWS), [])
 
@@ -338,15 +345,7 @@ export default function ReportCustomizePage() {
             />
 
             {draft.defaultView === 'table' ? (
-              <ReportClaimTable
-                rows={pageRows}
-                columns={tableColumns}
-                onRowClick={openClaim}
-                onClaimNumberClick={(row, e) => {
-                  e.stopPropagation()
-                  openClaim(row)
-                }}
-              />
+              <ReportClaimTable rows={pageRows} columns={tableColumns} onRowClick={openClaim} />
             ) : (
               <ReportClaimChart rows={filteredRows} />
             )}
