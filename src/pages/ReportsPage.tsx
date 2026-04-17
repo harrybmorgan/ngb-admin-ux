@@ -181,7 +181,7 @@ export default function ReportsPage() {
       <AdminNavigation />
       <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-8 px-4 py-8 sm:px-6 lg:px-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Reporting & Analytics</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
         </div>
 
         <div className="space-y-8">
@@ -599,7 +599,7 @@ export default function ReportsPage() {
                     Download PDF
                   </Button>
                   <Button type="button" variant="outline">
-                    Download CSV
+                    Download CSV/Excel
                   </Button>
                 </div>
               </>

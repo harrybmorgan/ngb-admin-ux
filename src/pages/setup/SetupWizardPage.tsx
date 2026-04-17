@@ -8,7 +8,7 @@ import {
   type ComponentType,
   type ReactNode,
 } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { EmbeddedThemingStudio } from '@/pages/theming-engine/EmbeddedThemingStudio'
 import {
   Accordion,
@@ -67,6 +67,7 @@ import {
 import { cn } from '@/lib/utils'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
+import { EmployerPortalLaunchDialog } from '@/components/setup/EmployerPortalLaunchDialog'
 import {
   CONNECTORS,
   EMPLOYER,
@@ -202,7 +203,7 @@ const WIZARD_STEPS: readonly WizardStepDef[] = [
   {
     title: 'Employee setup',
     description:
-      'Add employees with payroll, CSV, or manual entry—any path is valid. Connecting payroll here carries forward to Connect Systems so you are not asked to start over.',
+      'Add employees with payroll, CSV/Excel, or manual entry—any path is valid. Connecting payroll here carries forward to Connect Systems so you are not asked to start over.',
     navHint: 'Add people, then groups/classes, then waiting periods & life events.',
     taskIndices: [2, 3, 4],
   },
@@ -1554,8 +1555,10 @@ function unlockGuidanceForPrereq(prereqIndex: number, outcomes: readonly StoredT
 }
 
 export default function SetupWizardPage() {
+  const navigate = useNavigate()
   const [draft, setDraft] = useState<Draft>(() => loadDraft())
   const [mappingOpen, setMappingOpen] = useState(false)
+  const [launchSuccessOpen, setLaunchSuccessOpen] = useState(false)
   const [selectedStepIndex, setSelectedStepIndex] = useState(() => stepGroupIndexForTask(loadDraft().stepIndex))
   const benefitsOfferGridRef = useRef<HTMLDivElement>(null)
   const [benefitsOfferGridCols, setBenefitsOfferGridCols] = useState(1)
@@ -1676,7 +1679,13 @@ export default function SetupWizardPage() {
       stepIndex: totalTasks - 1,
       taskOutcomes: d.taskOutcomes.map(() => 'complete'),
     }))
+    setLaunchSuccessOpen(true)
   }
+
+  const handleLaunchGoHome = useCallback(() => {
+    setLaunchSuccessOpen(false)
+    navigate('/')
+  }, [navigate])
 
   const currentBlocked = isTaskBlocked(stepIndex, taskOutcomes)
   const prereqForCurrent = blockerPrereqIndex(stepIndex)
@@ -2534,14 +2543,14 @@ export default function SetupWizardPage() {
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Upload CSV</CardTitle>
-                  <CardDescription>Bulk import with employee census data.</CardDescription>
+                  <CardTitle className="text-base">Upload CSV/Excel</CardTitle>
+                  <CardDescription>Bulk import with employee census data from a CSV or Excel file.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-2">
                   <Button type="button" variant="outline">
                     Download template
                   </Button>
-                  <Button type="button">Upload CSV</Button>
+                  <Button type="button">Upload CSV/Excel</Button>
                 </CardContent>
               </Card>
               <Card>
@@ -4735,7 +4744,7 @@ export default function SetupWizardPage() {
                   Open sample roster
                 </Button>
                 <Button type="button" variant="outline">
-                  Upload test CSV
+                  Upload test CSV/Excel
                 </Button>
               </CardContent>
             </Card>
@@ -4793,11 +4802,12 @@ export default function SetupWizardPage() {
                     <div className="h-full w-[88%] rounded-full bg-primary" />
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
-                  <Button type="button" size="lg" className="gap-2" onClick={launch}>
+                <div className="flex flex-col gap-2 border-t border-border/60 pt-4 sm:flex-row sm:items-stretch">
+                  <Button type="button" size="lg" className="w-full gap-2 sm:flex-1" onClick={launch}>
+                    <Rocket className="h-4 w-4" aria-hidden />
                     Launch employer portal
                   </Button>
-                  <Button type="button" variant="outline" asChild>
+                  <Button type="button" variant="outline" size="lg" asChild className="w-full sm:flex-1">
                     <Link to="/">Go to admin home</Link>
                   </Button>
                 </div>
@@ -5175,6 +5185,11 @@ export default function SetupWizardPage() {
           </div>
         </div>
       </main>
+      <EmployerPortalLaunchDialog
+        open={launchSuccessOpen}
+        onOpenChange={setLaunchSuccessOpen}
+        onGoHome={handleLaunchGoHome}
+      />
       <AdminFooter />
     </div>
   )

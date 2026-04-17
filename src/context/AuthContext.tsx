@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
-import { clearGuidedSetupWizardDraft } from '@/hooks/useEmployerSetup'
+import { clearGuidedSetupWizardDraft, writeEmployerSetup } from '@/hooks/useEmployerSetup'
 
 interface AuthContextType {
   isAuthenticated: boolean
@@ -17,7 +17,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-  const login = () => setIsAuthenticated(true)
+  const login = () => {
+    if (typeof window !== 'undefined') {
+      /** New sign-in starts pre-launch on the home hero; launch persists only until logout (localStorage otherwise outlives auth). */
+      writeEmployerSetup({ launchComplete: false })
+    }
+    setIsAuthenticated(true)
+  }
   const logout = () => {
     clearGuidedSetupWizardDraft()
     setIsAuthenticated(false)

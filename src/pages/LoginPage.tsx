@@ -14,6 +14,23 @@ type Step = 'credentials' | 'mfa' | 'selectAccount' | 'resetPassword'
 const PROTOTYPE_USERNAME = 'Shelly'
 const PROTOTYPE_TEMP_PASSWORD = 'NGB123'
 
+const MIN_PASSWORD_LENGTH = 12
+
+function passwordCharTypes(password: string) {
+  return {
+    upper: /[A-Z]/.test(password),
+    lower: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    /** Non-alphanumeric (symbols, punctuation, etc.) */
+    special: /[^A-Za-z0-9]/.test(password),
+  }
+}
+
+function passwordComplexityCount(password: string) {
+  const t = passwordCharTypes(password)
+  return [t.upper, t.lower, t.number, t.special].filter(Boolean).length
+}
+
 function maskLoginIdentifier(value: string): string {
   const v = value.trim()
   if (!v) return '••••••••'
@@ -47,8 +64,10 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [passwordSubmitAttempted, setPasswordSubmitAttempted] = useState(false)
 
-  const passwordMinLengthMet = newPassword.length >= 10
+  const passwordMinLengthMet = newPassword.length >= MIN_PASSWORD_LENGTH
+  const passwordComplexityMet = passwordComplexityCount(newPassword) >= 3
   const passwordsMatchMet = confirmPassword.length > 0 && newPassword === confirmPassword
+  const charTypes = passwordCharTypes(newPassword)
 
   const issueMfaCode = () => {
     const code = String(Math.floor(10000 + Math.random() * 90000))
@@ -111,7 +130,7 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
     setPasswordSubmitAttempted(true)
-    if (!passwordMinLengthMet || !passwordsMatchMet) {
+    if (!passwordMinLengthMet || !passwordComplexityMet || !passwordsMatchMet) {
       return
     }
     setSelectedPersona('admin')
@@ -141,7 +160,7 @@ export default function LoginPage() {
       : step === 'mfa'
         ? "We've sent an email with your code to the address you have on file."
         : step === 'resetPassword'
-          ? 'Choose a strong password to secure your account.'
+          ? 'Password must contain at least 12 characters, including a number, symbol and a mix of upper/lowercase letters.'
           : "Please select which account you'd like to access."
 
   return (
@@ -456,7 +475,69 @@ export default function LoginPage() {
                             <span className="flex h-4 w-4 items-center justify-center rounded-sm border border-muted-foreground/40" />
                           )}
                         </span>
-                        At least 10 characters
+                        At least {MIN_PASSWORD_LENGTH} characters
+                      </li>
+                      <li
+                        className={cn(
+                          'flex flex-col gap-2 text-[13px] leading-5 transition-colors',
+                          passwordComplexityMet && 'text-emerald-700',
+                          !passwordComplexityMet && passwordSubmitAttempted && 'text-red-600',
+                          !passwordComplexityMet && !passwordSubmitAttempted && 'text-muted-foreground',
+                        )}
+                        role="listitem"
+                        aria-invalid={!passwordComplexityMet && passwordSubmitAttempted}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="mt-0.5 shrink-0" aria-hidden>
+                            {passwordComplexityMet ? (
+                              <Check className="h-4 w-4 text-emerald-600" strokeWidth={2.5} />
+                            ) : passwordSubmitAttempted ? (
+                              <X className="h-4 w-4 text-red-600" strokeWidth={2.5} />
+                            ) : (
+                              <span className="flex h-4 w-4 items-center justify-center rounded-sm border border-muted-foreground/40" />
+                            )}
+                          </span>
+                          <span>
+                            At least 3 of: uppercase (A–Z), lowercase (a–z), numbers (0–9), special characters
+                            <span className="mt-1 block text-[12px] opacity-90">
+                              {passwordComplexityCount(newPassword)}/4 types used
+                            </span>
+                          </span>
+                        </div>
+                        <ul className="ml-6 grid grid-cols-2 gap-x-2 gap-y-1.5 text-[12px] leading-snug" aria-label="Character types detected">
+                          <li className="flex items-center gap-1.5">
+                            {charTypes.upper ? (
+                              <Check className="h-3 w-3 shrink-0 text-emerald-600" strokeWidth={2.5} aria-hidden />
+                            ) : (
+                              <span className="h-3 w-3 shrink-0 rounded-sm border border-muted-foreground/40" aria-hidden />
+                            )}
+                            <span className={charTypes.upper ? 'text-emerald-700' : 'text-muted-foreground'}>Uppercase</span>
+                          </li>
+                          <li className="flex items-center gap-1.5">
+                            {charTypes.lower ? (
+                              <Check className="h-3 w-3 shrink-0 text-emerald-600" strokeWidth={2.5} aria-hidden />
+                            ) : (
+                              <span className="h-3 w-3 shrink-0 rounded-sm border border-muted-foreground/40" aria-hidden />
+                            )}
+                            <span className={charTypes.lower ? 'text-emerald-700' : 'text-muted-foreground'}>Lowercase</span>
+                          </li>
+                          <li className="flex items-center gap-1.5">
+                            {charTypes.number ? (
+                              <Check className="h-3 w-3 shrink-0 text-emerald-600" strokeWidth={2.5} aria-hidden />
+                            ) : (
+                              <span className="h-3 w-3 shrink-0 rounded-sm border border-muted-foreground/40" aria-hidden />
+                            )}
+                            <span className={charTypes.number ? 'text-emerald-700' : 'text-muted-foreground'}>Numbers</span>
+                          </li>
+                          <li className="flex items-center gap-1.5">
+                            {charTypes.special ? (
+                              <Check className="h-3 w-3 shrink-0 text-emerald-600" strokeWidth={2.5} aria-hidden />
+                            ) : (
+                              <span className="h-3 w-3 shrink-0 rounded-sm border border-muted-foreground/40" aria-hidden />
+                            )}
+                            <span className={charTypes.special ? 'text-emerald-700' : 'text-muted-foreground'}>Special</span>
+                          </li>
+                        </ul>
                       </li>
                       <li
                         className={cn(
