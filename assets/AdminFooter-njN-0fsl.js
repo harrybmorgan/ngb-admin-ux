@@ -1,1 +1,0 @@
-import{j as e}from"./index-Rq5zmCGa.js";function t(){return e.jsx("footer",{className:"mt-auto border-t border-border bg-card/50 py-6 text-center text-xs text-muted-foreground",children:e.jsx("p",{children:"WEX Health Inc. 2004-2026. All rights reserved. Powered by WEX Health."})})}export{t as A};
