@@ -62,10 +62,16 @@ export function emitSetupChanged() {
   window.dispatchEvent(new Event('ngb-admin-setup'))
 }
 
-/** Remove saved wizard draft so the next session starts with no tasks complete. Call on sign-out. */
-export function clearGuidedSetupWizardDraft() {
+/**
+ * Clears guided wizard draft and employer setup flags so the app reads as **Not Started**.
+ * Call on sign-in and sign-out so each session starts clean (prototype localStorage).
+ */
+export function resetGuidedSetupState() {
   if (typeof window === 'undefined') return
   localStorage.removeItem(GUIDED_SETUP_WIZARD_DRAFT_KEY)
+  localStorage.removeItem(SETUP_STORAGE_KEY)
+  snapshotKey = null
+  snapshotState = defaults
   emitSetupChanged()
 }
 

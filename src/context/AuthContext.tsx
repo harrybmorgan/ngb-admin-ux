@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
-import { clearGuidedSetupWizardDraft } from '@/hooks/useEmployerSetup'
+import { resetGuidedSetupState } from '@/hooks/useEmployerSetup'
 
 interface AuthContextType {
   isAuthenticated: boolean
@@ -17,9 +17,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-  const login = () => setIsAuthenticated(true)
+  const login = () => {
+    resetGuidedSetupState()
+    setIsAuthenticated(true)
+  }
+
   const logout = () => {
-    clearGuidedSetupWizardDraft()
+    resetGuidedSetupState()
     setIsAuthenticated(false)
   }
 
