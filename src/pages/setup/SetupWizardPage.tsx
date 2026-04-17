@@ -1822,6 +1822,11 @@ export default function SetupWizardPage() {
   const stepMeta = taskOrdinalInStepGroup(stepIndex)
   const taskOutcomes = draft.taskOutcomes
   const overallRequired = useMemo(() => globalRequiredProgress(draft), [draft])
+  const overallRequiredPercent = useMemo(() => {
+    const { complete, total } = overallRequired
+    if (total <= 0) return 0
+    return Math.min(100, Math.round((complete / total) * 100))
+  }, [overallRequired])
   const sandboxFailBlocksAdvance = useMemo(
     () =>
       collectSandboxLinkedIssues(draft).some(
@@ -5100,20 +5105,35 @@ export default function SetupWizardPage() {
                 <span className="text-muted-foreground"> · </span>
                 {TASK_LABELS[stepIndex]}
               </p>
-              <p className="mt-1.5 text-xs tabular-nums leading-snug text-muted-foreground">
-                <span className="font-medium text-foreground/80">
-                  {overallRequired.complete}/{overallRequired.total}
-                </span>{' '}
-                required tasks complete
+              <div className="mt-3 max-w-md space-y-1.5">
+                <div className="flex items-baseline justify-between gap-3 text-xs">
+                  <span className="font-medium text-foreground/90">Overall progress</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    <span className="font-medium text-foreground/80">{overallRequired.complete}</span>
+                    {' of '}
+                    <span className="font-medium text-foreground/80">{overallRequired.total}</span>
+                    {' required tasks complete'}
+                  </span>
+                </div>
+                <div
+                  className="h-1.5 overflow-hidden rounded-full bg-muted"
+                  role="progressbar"
+                  aria-valuenow={overallRequiredPercent}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`Overall setup progress: ${overallRequiredPercent}% of required tasks`}
+                >
+                  <div
+                    className="h-full rounded-full bg-emerald-600 transition-[width] duration-300 ease-out dark:bg-emerald-500"
+                    style={{ width: `${overallRequiredPercent}%` }}
+                  />
+                </div>
                 {overallOptional.total > 0 ? (
-                  <>
-                    <span className="text-border"> · </span>
-                    <span title="Optional tasks do not fill the required bar">
-                      {overallOptional.complete}/{overallOptional.total} optional done
-                    </span>
-                  </>
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    Optional: {overallOptional.complete}/{overallOptional.total} done
+                  </p>
                 ) : null}
-              </p>
+              </div>
             </div>
             <Badge
               intent="default"
