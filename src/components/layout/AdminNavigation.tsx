@@ -67,7 +67,7 @@ export function AdminNavigation({ hideNav = false }: AdminNavigationProps) {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+    <header className="sticky top-0 z-50 border-b border-border/80 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-4 px-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex shrink-0 items-center" aria-label="WEX Employer admin home">
           <img src={wexLogoUrl} alt="WEX" className="h-8 w-auto" />
