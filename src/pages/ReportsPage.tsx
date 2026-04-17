@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Button,
   Card,
@@ -29,7 +30,7 @@ import {
   TabsTrigger,
 } from '@wexinc-healthbenefits/ben-ui-kit'
 import { toast } from 'sonner'
-import { ArrowUpRight, BarChart3, ChevronRight, Download, Sparkles } from 'lucide-react'
+import { ArrowUpRight, BarChart3, Bell, ChevronRight, Download, Sparkles } from 'lucide-react'
 import { AdminAiChatInput } from '@/components/dashboard/AdminAiChatInput'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
@@ -71,10 +72,47 @@ const outlineSpark =
   'rounded-xl border-[#3958c3] font-medium text-[#3958c3] hover:bg-[#3958c3]/5'
 
 const keyInsights = [
-  'Life-event volume is up 18% vs last month — most are dependent adds tied to your new medical tier.',
-  'Payroll sync last ran successfully; 3 employees still need a valid address before OE comms go out.',
-  'COBRA notices and premium subsidy reports are the most opened items by your team this week.',
-  'HSA and FSA enrollment is trending up in Accounts Payments; consider highlighting contribution limits in your next employer update.',
+  {
+    reportId: 'r6',
+    text: 'Life-event volume is up 18% vs last month — most are dependent adds tied to your new medical tier.',
+  },
+  {
+    reportId: 'r1',
+    text: 'Payroll sync last ran successfully; 3 employees still need a valid address before OE comms go out.',
+  },
+  {
+    reportId: 'r2',
+    text: 'COBRA notices and premium subsidy reports are the most opened items by your team this week.',
+  },
+  {
+    reportId: 'r3',
+    text: 'HSA and FSA enrollment is trending up in Accounts Payments; consider highlighting contribution limits in your next employer update.',
+  },
+] as const
+
+/** Prototype: recent notifications tied to reports in the library. */
+const reportAlerts = [
+  {
+    id: 'alert-1',
+    reportId: 'r1',
+    title: 'Variances need review',
+    detail: 'Payroll deduction reconciliation — 2 pay periods flagged after refresh.',
+    when: 'Today · 9:14 AM',
+  },
+  {
+    id: 'alert-2',
+    reportId: 'r2',
+    title: 'Batch send completed',
+    detail: 'COBRA notice delivery log — 14 queued notices went out successfully.',
+    when: 'Yesterday · 4:02 PM',
+  },
+  {
+    id: 'alert-3',
+    reportId: 'r6',
+    title: 'Export ready',
+    detail: 'Full Plan Enrollments — your scheduled CSV is available to download.',
+    when: 'Apr 12 · 8:05 AM',
+  },
 ] as const
 
 const kpis: { service: string; metrics: ServiceMetric[] }[] = [
@@ -87,7 +125,7 @@ const kpis: { service: string; metrics: ServiceMetric[] }[] = [
     ],
   },
   {
-    service: 'Benefit Admin',
+    service: 'Member & Benefits',
     metrics: [
       { label: 'Active Enrollments', value: '248', trendPercent: '3.1%' },
       { label: 'Pending Approvals', value: '12' },
@@ -95,7 +133,7 @@ const kpis: { service: string; metrics: ServiceMetric[] }[] = [
     ],
   },
   {
-    service: 'COBRA/Direct Bill',
+    service: 'Contributions & Funding',
     metrics: [
       { label: 'Active COBRA Plans', value: '26', trendPercent: '2.4%' },
       { label: 'Pending Payments', value: '3' },
@@ -103,7 +141,7 @@ const kpis: { service: string; metrics: ServiceMetric[] }[] = [
     ],
   },
   {
-    service: 'Accounts/Payments',
+    service: 'Claims & Spending',
     metrics: [
       { label: 'Active Accounts', value: '189', trendPercent: '5.6%' },
       { label: 'Total Balance', value: '$1.2M' },
@@ -113,16 +151,20 @@ const kpis: { service: string; metrics: ServiceMetric[] }[] = [
 ]
 
 export default function ReportsPage() {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
   const [nl, setNl] = useState('')
   const [reportSearch, setReportSearch] = useState('')
   const [authorFilter, setAuthorFilter] = useState('all')
   const [serviceFocusFilter, setServiceFocusFilter] = useState('all')
+  const [categoryFilter, setCategoryFilter] = useState('all')
 
   const [pinnedReportIds, setPinnedReportIds] = useState<string[]>(loadPinnedReportIds)
   const [managePinnedOpen, setManagePinnedOpen] = useState(false)
-  const [reportDetailOpen, setReportDetailOpen] = useState(false)
-  const [selectedReport, setSelectedReport] = useState<ReportRow | null>(null)
+
+  const openReport = (id: string) => {
+    navigate(`/reports/${id}`)
+  }
 
   useEffect(() => {
     localStorage.setItem(PINNED_REPORTS_STORAGE_KEY, JSON.stringify(pinnedReportIds))
@@ -150,22 +192,29 @@ export default function ReportsPage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b))
   }, [])
 
+  const reportCategories = useMemo(() => {
+    const set = new Set(REPORT_LIBRARY.map((r) => r.category))
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [])
+
   const filteredReportLibrary = useMemo(() => {
     const q = reportSearch.trim().toLowerCase()
     return REPORT_LIBRARY.filter((r) => {
       const matchesSearch =
         !q ||
         r.name.toLowerCase().includes(q) ||
+        r.description.toLowerCase().includes(q) ||
         r.author.toLowerCase().includes(q) ||
         r.service.toLowerCase().includes(q) ||
         r.category.toLowerCase().includes(q)
       const matchesAuthor = authorFilter === 'all' || r.author === authorFilter
       const matchesService = serviceFocusFilter === 'all' || r.service === serviceFocusFilter
-      return matchesSearch && matchesAuthor && matchesService
+      const matchesCategory = categoryFilter === 'all' || r.category === categoryFilter
+      return matchesSearch && matchesAuthor && matchesService && matchesCategory
     })
-  }, [reportSearch, authorFilter, serviceFocusFilter])
+  }, [reportSearch, authorFilter, serviceFocusFilter, categoryFilter])
 
-  /** Most recently updated reports first (prototype: derived from library metadata). */
+  /** Most recently updated reports first (top four for the overview card). */
   const overviewRecentReports = useMemo(() => {
     return [...REPORT_LIBRARY]
       .sort((a, b) => {
@@ -173,7 +222,7 @@ export default function ReportsPage() {
         if (byDate !== 0) return byDate
         return b.updatedTime.localeCompare(a.updatedTime)
       })
-      .slice(0, 3)
+      .slice(0, 4)
   }, [])
 
   return (
@@ -237,7 +286,63 @@ export default function ReportsPage() {
           </div>
 
           <section>
-            <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
+            <div className="grid gap-6 lg:grid-cols-3 lg:items-stretch">
+              <Card className={cn(cardSurface, 'group/card flex h-full min-h-0 flex-col hover:shadow-md')}>
+                <CardHeader className="flex flex-row items-start gap-2.5 space-y-0 px-5 pb-1.5 pt-4">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-700 transition-transform group-hover/card:scale-110 dark:bg-amber-950/40 dark:text-amber-400">
+                    <Bell className="h-4 w-4" aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <CardTitle className="text-sm font-bold leading-tight text-[#14182c] sm:text-base sm:leading-snug">
+                      Recent alerts
+                    </CardTitle>
+                    <CardDescription className="text-xs leading-snug text-[#5f6a94] sm:text-sm sm:leading-5">
+                      Updates and actions related to your reports
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col space-y-3 px-5 pb-4">
+                  <ul className="flex flex-col gap-1.5">
+                    {reportAlerts.map((a) => {
+                      const rowClass =
+                        'flex w-full items-center justify-between gap-2 rounded-lg border border-[#e8ecf4] bg-[#f8f9fc] px-3 py-2 text-left transition-colors hover:border-amber-500/30 hover:bg-amber-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/35 focus-visible:ring-offset-2 dark:hover:bg-amber-950/20'
+                      return (
+                        <li key={a.id}>
+                          <button
+                            type="button"
+                            className={cn(rowClass, 'group/alert')}
+                            onClick={() => openReport(a.reportId)}
+                          >
+                            <span className="min-w-0">
+                              <span className="block text-sm font-semibold text-[#14182c] group-hover/alert:text-amber-900 dark:group-hover/alert:text-amber-200">
+                                {a.title}
+                              </span>
+                              <span className="mt-0.5 block text-xs leading-snug text-[#5f6a94]">{a.detail}</span>
+                              <span className="mt-1 block text-[11px] font-medium uppercase tracking-wide text-[#9aa3bd]">
+                                {a.when}
+                              </span>
+                            </span>
+                            <ChevronRight
+                              className="h-4 w-4 shrink-0 self-start text-[#9aa3bd] transition-transform group-hover/alert:translate-x-0.5 group-hover/alert:text-amber-700 dark:group-hover/alert:text-amber-400"
+                              aria-hidden
+                            />
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={cn('mt-auto w-full rounded-xl sm:w-auto', outlineSpark)}
+                    onClick={() => setActiveTab('report-library')}
+                  >
+                    View more alerts
+                  </Button>
+                </CardContent>
+              </Card>
+
               <Card className={cn(cardSurface, 'group/card flex h-full min-h-0 flex-col hover:shadow-md')}>
                 <CardHeader className="flex flex-row items-start gap-2.5 space-y-0 px-5 pb-1.5 pt-4">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3] transition-transform group-hover/card:scale-110">
@@ -253,13 +358,29 @@ export default function ReportsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-1">
-                  <ul className="space-y-2.5 text-[13px] leading-snug text-[#374056] sm:text-[14px] sm:leading-[1.5]">
-                    {keyInsights.map((line) => (
-                      <li key={line} className="flex gap-2.5">
-                        <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#3958c3] sm:h-4 sm:w-4" aria-hidden />
-                        <span className="min-w-0">{line}</span>
-                      </li>
-                    ))}
+                  <ul className="space-y-5 text-[13px] leading-snug text-[#374056] sm:space-y-6 sm:text-[14px] sm:leading-[1.5]">
+                    {keyInsights.map((insight, idx) => {
+                      const sourceReport = REPORT_LIBRARY.find((r) => r.id === insight.reportId)
+                      const label = sourceReport
+                        ? `Open report: ${sourceReport.name}`
+                        : 'Open source report'
+                      return (
+                        <li key={`${insight.reportId}-${idx}`}>
+                          <button
+                            type="button"
+                            className="group/insight flex w-full gap-2.5 rounded-lg border border-transparent p-1.5 text-left transition-colors hover:border-[#3958c3]/25 hover:bg-[#f0f3ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-2"
+                            onClick={() => openReport(insight.reportId)}
+                            aria-label={label}
+                          >
+                            <Sparkles
+                              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#3958c3] transition-transform group-hover/insight:scale-110 sm:h-4 sm:w-4"
+                              aria-hidden
+                            />
+                            <span className="min-w-0">{insight.text}</span>
+                          </button>
+                        </li>
+                      )
+                    })}
                   </ul>
                 </CardContent>
               </Card>
@@ -278,20 +399,17 @@ export default function ReportsPage() {
                     </CardDescription>
                   </div>
                 </CardHeader>
-                <CardContent className="flex flex-1 flex-col space-y-3 px-5 pb-4">
-                  <ul className="flex flex-col gap-1.5">
+                <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-5 pb-4">
+                  <ul className="flex min-h-0 flex-1 flex-col justify-between gap-2">
                     {overviewRecentReports.map((r) => {
                       const rowClass =
-                        'flex w-full items-center justify-between gap-2 rounded-lg border border-[#e8ecf4] bg-[#f8f9fc] px-3 py-2 text-left transition-colors hover:border-[#3958c3]/35 hover:bg-[#f0f3ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-2'
+                        'flex w-full items-center justify-between gap-2 rounded-lg border border-[#e8ecf4] bg-[#f8f9fc] px-3 py-2.5 text-left transition-colors hover:border-[#3958c3]/35 hover:bg-[#f0f3ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-2'
                       return (
                         <li key={r.id}>
                           <button
                             type="button"
                             className={cn(rowClass, 'group/row')}
-                            onClick={() => {
-                              setSelectedReport(r)
-                              setReportDetailOpen(true)
-                            }}
+                            onClick={() => openReport(r.id)}
                           >
                             <span className="min-w-0">
                               <span className="block text-sm font-semibold text-[#14182c] group-hover/row:text-[#3958c3]">
@@ -408,10 +526,7 @@ export default function ReportsPage() {
                   <button
                     type="button"
                     className="w-full text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    onClick={() => {
-                      setSelectedReport(r)
-                      setReportDetailOpen(true)
-                    }}
+                    onClick={() => openReport(r.id)}
                   >
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base leading-snug">{r.name}</CardTitle>
@@ -435,7 +550,10 @@ export default function ReportsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Report library</CardTitle>
-            <CardDescription>Explore available reports. Use the search and filters to narrow before downloading..</CardDescription>
+            <CardDescription>
+              Explore available reports. Use search, category, author, and service focus filters to narrow results before
+              downloading.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
@@ -446,6 +564,22 @@ export default function ReportsPage() {
                 onChange={(e) => setReportSearch(e.target.value)}
               />
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                <div className="w-full min-w-[160px] sm:w-52">
+                  <span className="mb-1 block text-xs font-medium text-muted-foreground">Category</span>
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All categories</SelectItem>
+                      {reportCategories.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="w-full min-w-[160px] sm:w-52">
                   <span className="mb-1 block text-xs font-medium text-muted-foreground">Author</span>
                   <Select value={authorFilter} onValueChange={setAuthorFilter}>
@@ -494,8 +628,17 @@ export default function ReportsPage() {
               </TableHeader>
               <TableBody>
                 {filteredReportLibrary.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
+                  <TableRow
+                    key={r.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openReport(r.id)}
+                  >
+                    <TableCell className="max-w-[min(100%,28rem)] align-top">
+                      <span className="block font-medium leading-snug text-foreground">{r.name}</span>
+                      <span className="mt-1 block text-sm font-normal leading-snug text-muted-foreground">
+                        {r.description}
+                      </span>
+                    </TableCell>
                     <TableCell>{r.author}</TableCell>
                     <TableCell>{r.service}</TableCell>
                     <TableCell>{r.category}</TableCell>
@@ -506,6 +649,10 @@ export default function ReportsPage() {
                         variant="ghost"
                         size="icon"
                         aria-label={`Download ${r.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toast.message(`Download for “${r.name}” is not enabled in this prototype.`)
+                        }}
                       >
                         <Download className="h-4 w-4" />
                       </Button>
@@ -564,48 +711,6 @@ export default function ReportsPage() {
           </SheetContent>
         </Sheet>
 
-        <Sheet
-          open={reportDetailOpen}
-          onOpenChange={(open) => {
-            setReportDetailOpen(open)
-            if (!open) setSelectedReport(null)
-          }}
-        >
-          <SheetContent className="flex w-full flex-col gap-4 overflow-y-auto sm:max-w-lg">
-            {selectedReport && (
-              <>
-                <SheetHeader>
-                  <SheetTitle>{selectedReport.name}</SheetTitle>
-                </SheetHeader>
-                <div className="space-y-4 text-sm">
-                  <div className="grid gap-1">
-                    <span className="text-xs font-medium text-muted-foreground">Author</span>
-                    <span>{selectedReport.author}</span>
-                  </div>
-                  <div className="grid gap-1">
-                    <span className="text-xs font-medium text-muted-foreground">Service focus</span>
-                    <span>{selectedReport.service}</span>
-                  </div>
-                  <div className="grid gap-1">
-                    <span className="text-xs font-medium text-muted-foreground">Last updated</span>
-                    <span>{relativeUpdatedFromIsoDate(selectedReport.updated)}</span>
-                  </div>
-                  <p className="rounded-md border border-border bg-muted/30 p-3 text-muted-foreground">
-                    Summary, filters, and export options for this report would appear here. This is a prototype view.
-                  </p>
-                </div>
-                <div className="mt-auto flex flex-wrap gap-2 pt-4 sm:mt-0">
-                  <Button type="button" variant="outline">
-                    Download PDF
-                  </Button>
-                  <Button type="button" variant="outline">
-                    Download CSV
-                  </Button>
-                </div>
-              </>
-            )}
-          </SheetContent>
-        </Sheet>
       </main>
       <AdminFooter />
     </div>

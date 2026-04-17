@@ -11,6 +11,8 @@ const SetupWizardPage = React.lazy(() => import('@/pages/setup/SetupWizardPage')
 const EnrollmentPage = React.lazy(() => import('@/pages/EnrollmentPage'))
 const BillingPage = React.lazy(() => import('@/pages/BillingPage'))
 const ReportsPage = React.lazy(() => import('@/pages/ReportsPage'))
+const ReportDetailPage = React.lazy(() => import('@/pages/ReportDetailPage'))
+const ReportCustomizePage = React.lazy(() => import('@/pages/ReportCustomizePage'))
 const ContentPage = React.lazy(() => import('@/pages/ContentPage'))
 const CommunicationsPage = React.lazy(() => import('@/pages/CommunicationsPage'))
 const ThemingPage = React.lazy(() => import('@/pages/ThemingPage'))
@@ -44,6 +46,8 @@ export function AppRoutes() {
         <Route path="setup" element={withProtected(<SetupWizardPage />)} />
         <Route path="enrollment" element={withProtected(<EnrollmentPage />)} />
         <Route path="billing" element={withProtected(<BillingPage />)} />
+        <Route path="reports/:reportId/customize" element={withProtected(<ReportCustomizePage />)} />
+        <Route path="reports/:reportId" element={withProtected(<ReportDetailPage />)} />
         <Route path="reports" element={withProtected(<ReportsPage />)} />
         <Route path="content" element={withProtected(<ContentPage />)} />
         <Route path="communications" element={withProtected(<CommunicationsPage />)} />
