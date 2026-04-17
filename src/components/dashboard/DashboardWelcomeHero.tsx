@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Badge } from '@wexinc-healthbenefits/ben-ui-kit'
-import { Bell, Check, FileText, RefreshCw, Ticket, Upload } from 'lucide-react'
+import { Badge, Button } from '@wexinc-healthbenefits/ben-ui-kit'
+import { Bell, Check, ChevronRight, CircleHelp, FileText, RefreshCw, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { EMPLOYER } from '@/data/adminMockData'
 import { useGuidedSetupHomeState } from '@/hooks/useGuidedSetupHomeState'
 import { formatStepsLeftPhrase, getWizardHeroMeta } from '@/lib/guidedSetupHome'
 import { cn } from '@/lib/utils'
 import { AdminAiChatInput } from '@/components/dashboard/AdminAiChatInput'
+import { GetHelpDialog } from '@/components/dashboard/GetHelpDialog'
 import { ShineBorder } from '@/components/ui/ShineBorder'
 import { WexAiSparkleMark } from '@/components/ui/WexAiSparkleMark'
 
@@ -154,18 +155,38 @@ function greetingLabel() {
   return 'Good evening'
 }
 
+const postLaunchPriorities = [
+  {
+    title: 'Review 12 life events',
+    description: 'Confirm dependent adds, address updates, and COBRA qualifiers.',
+    to: '/enrollment',
+  },
+  {
+    title: 'Reconcile April invoice',
+    description: 'Bundled marketplace payment due Apr 18.',
+    to: '/billing',
+  },
+  {
+    title: 'Schedule OE announcement',
+    description: 'Draft comms for fall open enrollment.',
+    to: '/communications',
+  },
+] as const
+
 type DashboardWelcomeHeroProps = {
   onboardingComplete: boolean
   planReady: boolean
+  launchComplete: boolean
 }
 
 const HERO_VISITED_KEY = 'ngb-admin-dashboard-hero-visited'
 
-export function DashboardWelcomeHero({ onboardingComplete, planReady }: DashboardWelcomeHeroProps) {
+export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComplete }: DashboardWelcomeHeroProps) {
   const navigate = useNavigate()
   const prefersReducedMotion = useReducedMotion()
   const guidedSnapshot = useGuidedSetupHomeState()
   const [askValue, setAskValue] = useState('')
+  const [getHelpOpen, setGetHelpOpen] = useState(false)
   const firstName = EMPLOYER.hrAdminName.split(' ')[0]
 
   const [isFirstVisit] = useState(() => {
@@ -191,8 +212,9 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady }: Dashboar
       return {
         state: 'complete' as const,
         title: 'Setup complete',
-        description:
-          'Your core setup is ready. Review setup anytime or make updates as needed.',
+        description: launchComplete
+          ? 'Your core setup is ready. Review setup anytime or make updates as needed.'
+          : 'Your core setup is ready. Launch the employer portal from Guided setup (Test & Launch) when you are ready for live data on your home page.',
         ctaLabel: 'Review setup',
         headerBadge: { label: 'All set', intent: 'default' as const },
         pill: { label: 'Complete', className: 'bg-emerald-100 text-emerald-950' },
@@ -225,7 +247,7 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady }: Dashboar
       pill: { label: 'Recommended', className: 'bg-amber-100 text-amber-950' },
       metaLine: null as string | null,
     }
-  }, [guidedSnapshot, onboardingComplete])
+  }, [guidedSnapshot, onboardingComplete, launchComplete])
 
   return (
     <div
@@ -266,7 +288,7 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady }: Dashboar
         </div>
 
         <motion.div
-          className="spark-hero-content relative z-[1] flex flex-col overflow-visible lg:flex-row lg:items-stretch"
+          className="spark-hero-content relative z-[50] flex flex-col overflow-visible lg:flex-row lg:items-stretch"
           layout
           transition={{ layout: layoutSpring }}
         >
@@ -330,31 +352,31 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady }: Dashboar
                 <motion.button
                   variants={pillVariants}
                   type="button"
-                  onClick={() => toast.message('DBI upload is not wired in this prototype.')}
+                  onClick={() => toast.message('File upload is not wired in this prototype.')}
                   whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
                   transition={{ duration: 0.2, ease: softEaseOut }}
                   className={pillClass}
                 >
                   <Upload className="h-4 w-4 text-[#5f6a94]" aria-hidden />
-                  Upload DBI
+                  Upload file
                 </motion.button>
                 <motion.button
                   variants={pillVariants}
                   type="button"
-                  onClick={() => toast.message('Support ticketing is not enabled in this prototype.')}
+                  onClick={() => setGetHelpOpen(true)}
                   whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
                   transition={{ duration: 0.2, ease: softEaseOut }}
                   className={pillClass}
                 >
-                  <Ticket className="h-4 w-4 text-[#5f6a94]" aria-hidden />
-                  Submit support ticket
+                  <CircleHelp className="h-4 w-4 text-[#5f6a94]" aria-hidden />
+                  Get help
                 </motion.button>
               </motion.div>
             </motion.div>
 
-            {!planReady && (
+            {launchComplete && !planReady && (
               <p className="text-sm leading-5 text-[#5f6a94]">
-                Complete plan design in setup to unlock data, reports, and frequent tasks below.
+                Your portal is live. Finish any remaining plan configuration in setup if your team still has open tasks.
               </p>
             )}
           </motion.div>
@@ -382,84 +404,135 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady }: Dashboar
                 <Bell className="h-4 w-4 text-[#5f6a94]" aria-hidden />
                 <span className={sectionEyebrow}>Your next steps</span>
               </div>
-              <Badge
-                intent={setupCard.headerBadge.intent}
-                className={cn(
-                  'rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
-                  setupCard.headerBadge.intent === 'info' && 'border-0 bg-[#eef2ff] text-[#3958c3]',
-                )}
-              >
-                {setupCard.headerBadge.label}
-              </Badge>
-            </motion.div>
-
-            <motion.div
-              variants={ctaCardVariants}
-              initial={shouldAnimate ? 'hidden' : 'instant'}
-              animate={animateState}
-              className={cn(
-                'flex min-h-0 flex-1 flex-col rounded-2xl border border-[#e8ecf4] bg-white/95 p-4 shadow-[0_2px_12px_rgba(43,49,78,0.06)] backdrop-blur-sm sm:p-5',
-                'transition-shadow duration-300 hover:shadow-md',
-              )}
-            >
-              <span
-                className={cn(
-                  'mb-3 inline-flex w-fit rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide',
-                  setupCard.pill.className,
-                )}
-              >
-                {setupCard.pill.label}
-              </span>
-              <h2 className="text-base font-bold leading-6 text-[#14182c]">{setupCard.title}</h2>
-              <p className="mt-2 text-sm leading-5 text-[#5f6a94]">{setupCard.description}</p>
-              {setupCard.metaLine ? (
-                <p className="mt-2 text-xs font-medium leading-snug text-[#374056]">{setupCard.metaLine}</p>
-              ) : null}
-
-              <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#e8ecf4] bg-[#f7f8fc] px-3 py-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-[#3958c3] shadow-sm">
-                  <FileText className="h-5 w-5" aria-hidden />
-                </div>
-                <div className="min-w-0 flex-1 text-[13px] leading-snug">
-                  <p className="font-semibold text-[#14182c]">{EMPLOYER.name}</p>
-                  <p className="text-[#5f6a94]">Ben Admin · CDH · COBRA</p>
-                </div>
-              </div>
-
-              <MotionLink
-                to="/setup"
-                whileTap={prefersReducedMotion ? undefined : { scale: 0.99 }}
-                transition={{ duration: 0.2, ease: softEaseOut }}
-                className={cn(
-                  'dashboard-welcome-cta mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-[15px] font-semibold text-white no-underline shadow-md',
-                  'wex-ai-gradient-send',
-                  'transition-[box-shadow,transform,filter] duration-200 hover:brightness-[1.05]',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5b21b6]/50 focus-visible:ring-offset-2',
-                )}
-              >
-                {setupCard.ctaLabel}
-              </MotionLink>
-
-              {setupCard.state !== 'complete' ? (
-                <motion.button
-                  type="button"
-                  onClick={() => toast.message('Reminder set (prototype only — not saved).')}
-                  whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
-                  transition={{ duration: 0.2, ease: softEaseOut }}
-                  className="mt-3 w-full text-center text-[13px] font-semibold text-[#5f6a94] underline-offset-2 transition-colors hover:text-[#3958c3] hover:underline"
+              {launchComplete ? (
+                <Badge intent="info" className="rounded-full border-0 bg-[#eef2ff] px-2.5 py-0.5 text-[11px] font-semibold text-[#3958c3]">
+                  3 tasks
+                </Badge>
+              ) : (
+                <Badge
+                  intent={setupCard.headerBadge.intent}
+                  className={cn(
+                    'rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+                    setupCard.headerBadge.intent === 'info' && 'border-0 bg-[#eef2ff] text-[#3958c3]',
+                  )}
                 >
-                  Remind me tomorrow
-                </motion.button>
-              ) : null}
+                  {setupCard.headerBadge.label}
+                </Badge>
+              )}
             </motion.div>
 
-            <p className="mt-4 flex items-center justify-center gap-2 text-center text-[13px] text-[#5f6a94]">
-              <Check className="h-4 w-4 shrink-0 text-emerald-600" strokeWidth={2.5} aria-hidden />
-              You&apos;re all caught up on other tasks
-            </p>
+            {!launchComplete ? (
+              <motion.div
+                variants={ctaCardVariants}
+                initial={shouldAnimate ? 'hidden' : 'instant'}
+                animate={animateState}
+                className={cn(
+                  'flex min-h-0 flex-1 flex-col rounded-2xl border border-[#e8ecf4] bg-white/95 p-4 shadow-[0_2px_12px_rgba(43,49,78,0.06)] backdrop-blur-sm sm:p-5',
+                  'transition-shadow duration-300 hover:shadow-md',
+                )}
+              >
+                <span
+                  className={cn(
+                    'mb-3 inline-flex w-fit rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide',
+                    setupCard.pill.className,
+                  )}
+                >
+                  {setupCard.pill.label}
+                </span>
+                <h2 className="text-base font-bold leading-6 text-[#14182c]">{setupCard.title}</h2>
+                <p className="mt-2 text-sm leading-5 text-[#5f6a94]">{setupCard.description}</p>
+                {setupCard.metaLine ? (
+                  <p className="mt-2 text-xs font-medium leading-snug text-[#374056]">{setupCard.metaLine}</p>
+                ) : null}
+
+                <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#e8ecf4] bg-[#f7f8fc] px-3 py-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-[#3958c3] shadow-sm">
+                    <FileText className="h-5 w-5" aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1 text-[13px] leading-snug">
+                    <p className="font-semibold text-[#14182c]">{EMPLOYER.name}</p>
+                    <p className="text-[#5f6a94]">Ben Admin · CDH · COBRA</p>
+                  </div>
+                </div>
+
+                <MotionLink
+                  to="/setup"
+                  whileTap={prefersReducedMotion ? undefined : { scale: 0.99 }}
+                  transition={{ duration: 0.2, ease: softEaseOut }}
+                  className={cn(
+                    'dashboard-welcome-cta mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-[15px] font-semibold text-white no-underline shadow-md',
+                    'wex-ai-gradient-send',
+                    'transition-[box-shadow,transform,filter] duration-200 hover:brightness-[1.05]',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5b21b6]/50 focus-visible:ring-offset-2',
+                  )}
+                >
+                  {setupCard.ctaLabel}
+                </MotionLink>
+
+                {setupCard.state !== 'complete' ? (
+                  <motion.button
+                    type="button"
+                    onClick={() => toast.message('Reminder set (prototype only — not saved).')}
+                    whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
+                    transition={{ duration: 0.2, ease: softEaseOut }}
+                    className="mt-3 w-full text-center text-[13px] font-semibold text-[#5f6a94] underline-offset-2 transition-colors hover:text-[#3958c3] hover:underline"
+                  >
+                    Remind me tomorrow
+                  </motion.button>
+                ) : null}
+              </motion.div>
+            ) : (
+              <motion.div
+                variants={ctaCardVariants}
+                initial={shouldAnimate ? 'hidden' : 'instant'}
+                animate={animateState}
+                className={cn(
+                  'flex min-h-0 flex-1 flex-col rounded-2xl border border-[#e8ecf4] bg-white/95 p-4 shadow-[0_2px_12px_rgba(43,49,78,0.06)] backdrop-blur-sm sm:p-5',
+                  'transition-shadow duration-300 hover:shadow-md',
+                )}
+              >
+                <ul className="flex flex-col gap-2">
+                  {postLaunchPriorities.map((item) => (
+                    <li key={item.to}>
+                      <MotionLink
+                        to={item.to}
+                        whileTap={prefersReducedMotion ? undefined : { scale: 0.99 }}
+                        transition={{ duration: 0.2, ease: softEaseOut }}
+                        className={cn(
+                          'flex items-start justify-between gap-2 rounded-xl border border-[#e8ecf4] bg-[#f7f8fc] px-3 py-3 text-left no-underline transition-colors',
+                          'hover:border-[#3958c3]/35 hover:bg-[#f0f3ff]',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-2',
+                        )}
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold text-[#14182c]">{item.title}</span>
+                          <span className="mt-0.5 block text-xs leading-snug text-[#5f6a94]">{item.description}</span>
+                        </span>
+                        <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-[#9aa3bd]" aria-hidden />
+                      </MotionLink>
+                    </li>
+                  ))}
+                </ul>
+                <Button asChild variant="outline" className="mt-4 w-full rounded-xl border-[#3958c3] font-medium text-[#3958c3] sm:w-auto">
+                  <Link to="/setup">View more</Link>
+                </Button>
+              </motion.div>
+            )}
+
+            {!launchComplete && (
+              <p className="mt-4 flex items-center justify-center gap-2 text-center text-[13px] text-[#5f6a94]">
+                <Check className="h-4 w-4 shrink-0 text-emerald-600" strokeWidth={2.5} aria-hidden />
+                You&apos;re all caught up on other tasks
+              </p>
+            )}
           </motion.div>
         </motion.div>
       </motion.div>
+      <GetHelpDialog
+        open={getHelpOpen}
+        onOpenChange={setGetHelpOpen}
+        onPrefillAssistantQuestion={(text) => setAskValue(text)}
+      />
     </div>
   )
 }

@@ -54,8 +54,20 @@ const secondaryTasks = [
   },
 ] as const
 
+const placeholderInsightLines = [
+  'Program signals and trends will appear here once the employer portal is live.',
+  'Payroll and enrollment activity summaries will populate from connected systems.',
+  'No insights to show yet — launch unlocks this experience.',
+] as const
+
+const placeholderReportRows = [
+  { title: 'Enrollment snapshot', hint: 'Not available until launch' },
+  { title: 'Payroll reconciliation', hint: 'Not available until launch' },
+] as const
+
 export default function DashboardPage() {
-  const { onboardingComplete, planReady } = useEmployerSetup()
+  const { onboardingComplete, planReady, launchComplete } = useEmployerSetup()
+  const portalLive = launchComplete
 
   return (
     <div className="admin-app-bg flex min-h-screen flex-col font-sans">
@@ -63,7 +75,11 @@ export default function DashboardPage() {
 
       <main className="mx-auto w-full max-w-[1200px] flex-1 space-y-10 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
         <section>
-          <DashboardWelcomeHero onboardingComplete={onboardingComplete} planReady={planReady} />
+          <DashboardWelcomeHero
+            onboardingComplete={onboardingComplete}
+            planReady={planReady}
+            launchComplete={launchComplete}
+          />
         </section>
 
         <DashboardManageSetupSection />
@@ -74,7 +90,7 @@ export default function DashboardPage() {
             <Card
               className={cn(
                 cardSurface,
-                !planReady ? 'opacity-60' : 'group/card hover:shadow-md',
+                !portalLive ? 'pointer-events-none opacity-60' : 'group/card hover:shadow-md',
               )}
             >
               <CardHeader className="flex flex-row items-start gap-3 space-y-0 px-6 pb-2 pt-6">
@@ -89,25 +105,44 @@ export default function DashboardPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 px-6 pb-6 pt-2">
-                <ul className="space-y-5 text-[15px] leading-[1.65] text-[#374056]">
-                  {keyInsights.map((line) => (
-                    <li key={line} className="flex gap-3.5">
-                      <Sparkles className="mt-1 h-4 w-4 shrink-0 text-[#3958c3]" aria-hidden />
-                      <span className="min-w-0">{line}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="border-t border-[#e8ecf4] pt-5 text-xs leading-relaxed text-[#5f6a94]">
-                  Insights are illustrative for this prototype. Live signals will replace them when analytics feeds are
-                  connected.
-                </p>
+                {portalLive ? (
+                  <>
+                    <ul className="space-y-5 text-[15px] leading-[1.65] text-[#374056]">
+                      {keyInsights.map((line) => (
+                        <li key={line} className="flex gap-3.5">
+                          <Sparkles className="mt-1 h-4 w-4 shrink-0 text-[#3958c3]" aria-hidden />
+                          <span className="min-w-0">{line}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="border-t border-[#e8ecf4] pt-5 text-xs leading-relaxed text-[#5f6a94]">
+                      Insights are illustrative for this prototype. Live signals will replace them when analytics feeds are
+                      connected.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <ul className="space-y-5 text-[15px] leading-[1.65] text-[#9aa3bd]" aria-label="Insights placeholders">
+                      {placeholderInsightLines.map((line) => (
+                        <li key={line} className="flex gap-3.5">
+                          <Sparkles className="mt-1 h-4 w-4 shrink-0 text-[#c8d0ef]" aria-hidden />
+                          <span className="min-w-0">{line}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="border-t border-[#e8ecf4] pt-5 text-xs leading-relaxed text-[#5f6a94]">
+                      Launch the employer portal from Guided setup (Test &amp; Launch) to populate insights and the rest of
+                      your dashboard.
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
 
             <Card
               className={cn(
                 cardSurface,
-                !planReady ? 'opacity-60' : 'group/card hover:shadow-md',
+                !portalLive ? 'pointer-events-none opacity-60' : 'group/card hover:shadow-md',
               )}
             >
               <CardHeader className="flex flex-row items-start gap-3 space-y-0 px-6 pb-2 pt-6">
@@ -117,72 +152,68 @@ export default function DashboardPage() {
                 <div className="min-w-0 flex-1 space-y-1">
                   <CardTitle className="text-base font-bold leading-6 text-[#14182c]">Your top reports</CardTitle>
                   <CardDescription className="text-sm leading-5 text-[#5f6a94]">
-                    Most used by your team — open in Reporting & Analytics.
+                    Most used by your team — open in Reports.
                   </CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4 px-6 pb-6">
                 <ul className="flex flex-col gap-2">
-                  {topReports.map((r) => {
-                    const rowClass =
-                      'flex items-center justify-between gap-3 rounded-xl border border-[#e8ecf4] bg-[#f8f9fc] px-4 py-3 text-left'
-                    const inner = (
-                      <>
-                        <span className="min-w-0">
-                          <span className="block text-sm font-semibold text-[#14182c]">{r.name}</span>
-                          <span className="mt-0.5 block text-xs text-[#5f6a94]">
-                            {r.service} · Updated {relativeUpdatedFromIsoDate(r.updated)}
-                          </span>
-                        </span>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-[#9aa3bd]" aria-hidden />
-                      </>
-                    )
-                    return (
-                      <li key={r.id}>
-                        {planReady ? (
-                          <Link
-                            to="/reports"
-                            className={cn(
-                              rowClass,
-                              'group/row transition-colors hover:border-[#3958c3]/35 hover:bg-[#f0f3ff]',
-                            )}
-                          >
+                  {portalLive
+                    ? topReports.map((r) => {
+                        const rowClass =
+                          'flex items-center justify-between gap-3 rounded-xl border border-[#e8ecf4] bg-[#f8f9fc] px-4 py-3 text-left'
+                        return (
+                          <li key={r.id}>
+                            <Link
+                              to="/reports"
+                              className={cn(
+                                rowClass,
+                                'group/row transition-colors hover:border-[#3958c3]/35 hover:bg-[#f0f3ff]',
+                              )}
+                            >
+                              <span className="min-w-0">
+                                <span className="block text-sm font-semibold text-[#14182c] group-hover/row:text-[#3958c3]">
+                                  {r.name}
+                                </span>
+                                <span className="mt-0.5 block text-xs text-[#5f6a94]">
+                                  {r.service} · Updated {relativeUpdatedFromIsoDate(r.updated)}
+                                </span>
+                              </span>
+                              <ChevronRight
+                                className="h-4 w-4 shrink-0 text-[#9aa3bd] transition-transform group-hover/row:translate-x-0.5 group-hover/row:text-[#3958c3]"
+                                aria-hidden
+                              />
+                            </Link>
+                          </li>
+                        )
+                      })
+                    : placeholderReportRows.map((row) => (
+                        <li key={row.title}>
+                          <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[#e8ecf4] bg-[#f8f9fc]/80 px-4 py-3 text-left opacity-90">
                             <span className="min-w-0">
-                              <span className="block text-sm font-semibold text-[#14182c] group-hover/row:text-[#3958c3]">
-                                {r.name}
-                              </span>
-                              <span className="mt-0.5 block text-xs text-[#5f6a94]">
-                                {r.service} · Updated {relativeUpdatedFromIsoDate(r.updated)}
-                              </span>
+                              <span className="block text-sm font-semibold text-[#9aa3bd]">{row.title}</span>
+                              <span className="mt-0.5 block text-xs text-[#b4bcd4]">{row.hint}</span>
                             </span>
-                            <ChevronRight
-                              className="h-4 w-4 shrink-0 text-[#9aa3bd] transition-transform group-hover/row:translate-x-0.5 group-hover/row:text-[#3958c3]"
-                              aria-hidden
-                            />
-                          </Link>
-                        ) : (
-                          <div className={cn(rowClass, 'opacity-70')}>{inner}</div>
-                        )}
-                      </li>
-                    )
-                  })}
+                            <ChevronRight className="h-4 w-4 shrink-0 text-[#d8deef]" aria-hidden />
+                          </div>
+                        </li>
+                      ))}
                 </ul>
-                {planReady ? (
+                {portalLive ? (
                   <Button asChild variant="outline" size="sm" className={cn('w-full rounded-xl sm:w-auto', outlineSpark)}>
                     <Link to="/reports">View all reports</Link>
                   </Button>
                 ) : (
                   <Button type="button" variant="outline" size="sm" disabled className="w-full rounded-xl sm:w-auto">
-                    Complete plan setup first
+                    Available after portal launch
                   </Button>
                 )}
               </CardContent>
             </Card>
           </div>
-          {!planReady && (
+          {!portalLive && (
             <p className="text-xs leading-4 text-[#5f6a94]">
-              Data and report shortcuts unlock when your plan framework is ready in the setup wizard, same as frequent
-              tasks below.
+              Data and report shortcuts unlock after you launch the employer portal from Guided setup → Test &amp; Launch.
             </p>
           )}
         </section>
@@ -191,13 +222,13 @@ export default function DashboardPage() {
           <h2 className={sectionEyebrow}>Frequent tasks</h2>
           <div className="grid gap-6 sm:grid-cols-2">
             {secondaryTasks.map(({ title, description, icon: Icon, to }) => {
-              const locked = !planReady && to !== '/theming'
+              const locked = !portalLive
               return (
                 <Card
                   key={title}
                   className={cn(
                     cardSurface,
-                    locked ? 'opacity-60' : 'group/card hover:shadow-md',
+                    locked ? 'pointer-events-none opacity-60' : 'group/card hover:shadow-md',
                   )}
                 >
                   <CardHeader className="flex flex-row items-start gap-3 space-y-0 px-6 pb-2 pt-6">
@@ -212,7 +243,7 @@ export default function DashboardPage() {
                   <CardContent className="px-6 pb-6">
                     {locked ? (
                       <Button type="button" variant="outline" size="sm" disabled className="w-full rounded-xl sm:w-auto">
-                        Complete plan setup first
+                        Launch employer portal to unlock
                       </Button>
                     ) : (
                       <Button asChild variant="outline" size="sm" className={cn('w-full sm:w-auto', outlineSpark)}>
@@ -224,10 +255,10 @@ export default function DashboardPage() {
               )
             })}
           </div>
-          {!planReady && (
+          {!portalLive && (
             <p className="text-xs leading-4 text-[#5f6a94]">
-              Tasks stay disabled until your plan framework is marked ready in the setup wizard. Branding stays available
-              so you can preview the employee portal anytime.
+              Tasks open after launch. Finish configuration in Guided setup, then use Test &amp; Launch when you are ready to go
+              live.
             </p>
           )}
         </section>

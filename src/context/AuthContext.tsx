@@ -21,7 +21,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resetGuidedSetupState()
     setIsAuthenticated(true)
   }
-
   const logout = () => {
     resetGuidedSetupState()
     setIsAuthenticated(false)

@@ -38,8 +38,8 @@ type MainNavItem = { to: string; label: string; icon: LucideIcon }
 const mainNav: MainNavItem[] = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/enrollment', label: 'People', icon: Users },
-  { to: '/reports', label: 'Reporting & Analytics', icon: BarChart3 },
-  { to: '/billing', label: 'Billing & Invoicing', icon: CreditCard },
+  { to: '/reports', label: 'Reports', icon: BarChart3 },
+  { to: '/billing', label: 'Payroll', icon: CreditCard },
   { to: '/content', label: 'Content', icon: FolderOpen },
   { to: '/communications', label: 'Communications', icon: Mail },
 ]

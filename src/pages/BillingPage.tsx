@@ -26,7 +26,7 @@ export default function BillingPage() {
       <AdminNavigation />
       <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Billing & invoicing</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Payroll</h1>
           <p className="text-sm text-muted-foreground">
             Marketplace financials, remittance tools, payment methods, COBRA counts, and accounting actions — prototype
             layout.
