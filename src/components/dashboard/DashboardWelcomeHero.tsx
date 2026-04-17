@@ -221,6 +221,9 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
       return {
         state: 'complete' as const,
         title: 'Setup ready',
+        helperLine: launchComplete
+          ? 'Review or adjust configuration anytime'
+          : 'Core setup is complete',
         ctaLabel: 'Review setup',
         headerBadge: { label: 'All set', intent: 'default' as const },
         pill: { label: 'Complete', className: 'bg-emerald-100 text-emerald-950' },
@@ -253,7 +256,7 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
       pill: { label: 'Recommended', className: 'bg-amber-100 text-amber-950' },
       metaLine: null as string | null,
     }
-  }, [guidedSnapshot, onboardingComplete])
+  }, [guidedSnapshot, onboardingComplete, launchComplete])
 
   return (
     <div
@@ -531,37 +534,30 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
                   initial={shouldAnimate ? 'hidden' : 'instant'}
                   animate={animateState}
                   className={cn(
-                    'flex flex-col gap-1.5 rounded-xl border border-[#e8ecf4] bg-white px-2.5 py-2 shadow-[0_1px_3px_rgba(43,49,78,0.06)] sm:px-3',
-                    'transition-[box-shadow,transform] duration-200 hover:border-[#dfe4ef] hover:shadow-[0_2px_8px_rgba(43,49,78,0.07)]',
+                    'flex flex-col gap-2 rounded-xl border border-[#e8ecf4] bg-white px-2.5 py-1.5 shadow-[0_1px_2px_rgba(43,49,78,0.05)] sm:px-3 sm:py-2',
+                    'transition-[box-shadow,transform] duration-200 hover:border-[#dfe4ef] hover:shadow-[0_2px_6px_rgba(43,49,78,0.06)]',
                   )}
                 >
-                  <div className="flex items-start gap-2">
+                  <div className="flex items-start gap-1.5">
                     <div
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-[0_1px_4px_rgba(5,122,85,0.25)]"
+                      className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-[0_1px_3px_rgba(5,122,85,0.22)]"
                       aria-hidden
                     >
-                      <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                      <Check className="h-3 w-3" strokeWidth={2.5} />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                        <h2 className="text-sm font-semibold leading-snug tracking-tight text-[#14182c]">{setupCard.title}</h2>
                         <span
-                          className={cn(
-                            'inline-flex rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide',
-                            setupCard.pill.className,
-                          )}
+                          className="inline-flex shrink-0 rounded border border-emerald-200/90 bg-emerald-50/90 px-1 py-px text-[8px] font-semibold uppercase tracking-[0.08em] text-emerald-800/80"
+                          title="Setup status"
                         >
                           {setupCard.pill.label}
                         </span>
-                        <h2 className="text-[13px] font-bold leading-tight tracking-tight text-[#14182c]">{setupCard.title}</h2>
                       </div>
-                      <p className="mt-1 flex min-w-0 items-center gap-1 text-[11px] leading-tight text-[#5f6a94]">
-                        <FileText className="h-3 w-3 shrink-0 text-[#9aa3bd]" aria-hidden />
-                        <span className="min-w-0 truncate">
-                          <span className="font-semibold text-[#374056]">{EMPLOYER.name}</span>
-                          <span className="text-[#c8cfdf]"> · </span>
-                          <span>Ben Admin · CDH · COBRA</span>
-                        </span>
-                      </p>
+                      {'helperLine' in setupCard && setupCard.helperLine ? (
+                        <p className="text-[11px] leading-snug text-[#5f6a94]">{setupCard.helperLine}</p>
+                      ) : null}
                     </div>
                   </div>
 
@@ -570,7 +566,7 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
                     whileTap={prefersReducedMotion ? undefined : { scale: 0.99 }}
                     transition={{ duration: 0.2, ease: softEaseOut }}
                     className={cn(
-                      'dashboard-welcome-cta mt-1 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-[13px] font-semibold text-white no-underline shadow-sm',
+                      'dashboard-welcome-cta mt-0.5 flex w-full items-center justify-center gap-1.5 rounded-md border border-transparent py-1.5 text-xs font-semibold text-white no-underline shadow-sm',
                       'wex-ai-gradient-send',
                       'transition-[box-shadow,transform,filter] duration-200 hover:brightness-[1.04]',
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5b21b6]/50 focus-visible:ring-offset-2',
