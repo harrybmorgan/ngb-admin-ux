@@ -10,6 +10,10 @@ import { cn } from '@/lib/utils'
 
 type Step = 'credentials' | 'mfa' | 'selectAccount' | 'resetPassword'
 
+/** Prototype-only gate; reset-password in the flow does not replace these for the next visit or refresh. */
+const PROTOTYPE_USERNAME = 'Shelly'
+const PROTOTYPE_TEMP_PASSWORD = 'NGB123'
+
 function maskLoginIdentifier(value: string): string {
   const v = value.trim()
   if (!v) return '••••••••'
@@ -66,6 +70,12 @@ export default function LoginPage() {
     setError(null)
     if (!username.trim() || !tempPassword) {
       setError('Enter your username and temporary password from your welcome email.')
+      return
+    }
+    const userOk = username.trim() === PROTOTYPE_USERNAME
+    const passOk = tempPassword === PROTOTYPE_TEMP_PASSWORD
+    if (!userOk || !passOk) {
+      setError('Incorrect username or password. Check the prototype credentials and try again.')
       return
     }
     issueMfaCode()

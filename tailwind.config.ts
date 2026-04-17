@@ -679,10 +679,17 @@ const config: Config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        /** Spark homepage hero — moving gradient border (ShineBorder) */
+        "shine-pulse": {
+          "0%": { "background-position": "0% 0%" },
+          "50%": { "background-position": "100% 100%" },
+          "100%": { "background-position": "0% 0%" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "shine-pulse": "shine-pulse 14s infinite linear",
       },
     },
   },

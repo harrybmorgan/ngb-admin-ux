@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
 import { clearGuidedSetupWizardDraft } from '@/hooks/useEmployerSetup'
 
@@ -10,25 +10,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const SESSION_STORAGE_KEY = 'ngb_admin_authenticated'
-
+/**
+ * Auth is in-memory only so a full page refresh requires signing in again
+ * (prototype gate with fixed first-screen credentials).
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem(SESSION_STORAGE_KEY) === 'true'
-    }
-    return false
-  })
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (isAuthenticated) {
-        sessionStorage.setItem(SESSION_STORAGE_KEY, 'true')
-      } else {
-        sessionStorage.removeItem(SESSION_STORAGE_KEY)
-      }
-    }
-  }, [isAuthenticated])
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   const login = () => setIsAuthenticated(true)
   const logout = () => {
