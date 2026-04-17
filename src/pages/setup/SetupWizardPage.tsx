@@ -183,6 +183,9 @@ const PREVIEW_EMPLOYEE_TASK_INDEX = 11
 /** Single Connect systems task — waiting-on-others for vendor / feed work. */
 const CONNECT_SYSTEMS_TASK_INDEX = 9
 
+/** Configure plans (includes eligibility rules + plan costs). */
+const CONFIGURE_PLANS_TASK_INDEX = 7
+
 type WizardStepDef = {
   title: string
   /** Fuller step context in the main task card (not the step list). */
@@ -254,11 +257,12 @@ function taskOrdinalInStepGroup(taskIndex: number): { step: WizardStepDef; index
 function firstNonCompleteTaskIndexInStep(
   step: WizardStepDef,
   outcomes: readonly StoredTaskOutcome[],
+  draft: Draft,
 ): number {
   const first = step.taskIndices[0]
   if (first === undefined) return 0
   for (const i of step.taskIndices) {
-    if (outcomes[i] !== 'complete') return i
+    if (!isEffectiveTaskComplete(i, outcomes, draft)) return i
   }
   return first
 }
@@ -316,13 +320,35 @@ type TaskNavStatus =
   | 'blocked'
   | 'waiting_on_others'
   | 'needs_review'
+  /** Sandbox / environment validation failed for work done in this task. */
+  | 'validation_fail'
+  /** Sandbox suggests review; counts like needs_review for navigation. */
+  | 'validation_warning'
 
 function resolveTaskNavStatus(
   taskIndex: number,
   stepIndex: number,
   outcomes: readonly StoredTaskOutcome[],
+  draft: Draft,
 ): TaskNavStatus {
   if (isTaskBlocked(taskIndex, outcomes)) return 'blocked'
+
+  if (taskIndex === CONNECT_SYSTEMS_TASK_INDEX) {
+    const o = outcomes[taskIndex]
+    if (o === 'complete') return 'complete'
+    if (o === 'skipped') return 'skipped'
+    if (o === 'waiting_on_others') return 'waiting_on_others'
+    if (o === 'needs_review') return 'needs_review'
+    if (taskIndex === stepIndex) return 'in_progress'
+    return 'not_started'
+  }
+
+  const sandboxOnTask = collectSandboxLinkedIssues(draft).filter((x) => x.targetTaskIndex === taskIndex)
+  if (sandboxOnTask.length > 0) {
+    if (sandboxOnTask.some((x) => x.severity === 'fail')) return 'validation_fail'
+    return 'validation_warning'
+  }
+
   const o = outcomes[taskIndex]
   if (o === 'complete') return 'complete'
   if (o === 'skipped') return 'skipped'
@@ -340,20 +366,22 @@ function stepRequiredIndices(step: WizardStepDef): number[] {
 function stepRequiredProgress(
   step: WizardStepDef,
   outcomes: readonly StoredTaskOutcome[],
+  draft: Draft,
 ): { complete: number; total: number } {
   const req = stepRequiredIndices(step)
-  const complete = req.filter((i) => outcomes[i] === 'complete').length
+  const complete = req.filter((i) => isEffectiveTaskComplete(i, outcomes, draft)).length
   return { complete, total: req.length }
 }
 
 /** All required tasks in the wizard (optional indices excluded). */
-function globalRequiredProgress(outcomes: readonly StoredTaskOutcome[]): { complete: number; total: number } {
+function globalRequiredProgress(draft: Draft): { complete: number; total: number } {
+  const outcomes = draft.taskOutcomes
   let complete = 0
   let total = 0
   for (let i = 0; i < TASK_COUNT; i++) {
     if (!isTaskRequired(i)) continue
     total++
-    if (outcomes[i] === 'complete') complete++
+    if (isEffectiveTaskComplete(i, outcomes, draft)) complete++
   }
   return { complete, total }
 }
@@ -1062,6 +1090,115 @@ function sandboxEnvironmentProbes(d: Draft): SandboxEnvProbe[] {
   return probes
 }
 
+type SandboxLinkedIssueSource = 'eligibility_rules' | 'contribution_math'
+
+type SandboxLinkedIssue = {
+  source: SandboxLinkedIssueSource
+  severity: 'fail' | 'warning'
+  targetTaskIndex: number
+  /** Short summary for the stepper (full evidence stays on Test & Launch). */
+  summary: string
+}
+
+function truncateSandboxSummary(text: string, max = 100): string {
+  const t = text.replace(/\s+/g, ' ').trim()
+  if (t.length <= max) return t
+  return `${t.slice(0, max - 1)}…`
+}
+
+/** Maps sandbox check results to originating setup tasks (Configure plans only; Connect Systems stays optional). */
+function collectSandboxLinkedIssues(d: Draft): SandboxLinkedIssue[] {
+  const out: SandboxLinkedIssue[] = []
+  const { eligibilityRules: er, contributionMath: cm } = d.sandboxVerifyRuns
+
+  if (er.lastRunMs != null && er.result != null && er.result !== 'pass') {
+    out.push({
+      source: 'eligibility_rules',
+      severity: er.result === 'fail' ? 'fail' : 'warning',
+      targetTaskIndex: CONFIGURE_PLANS_TASK_INDEX,
+      summary:
+        er.evidence.trim() !== ''
+          ? truncateSandboxSummary(er.evidence)
+          : er.result === 'fail'
+            ? 'Eligibility rules check failed'
+            : 'Eligibility rules need review',
+    })
+  }
+
+  if (cm.lastRunMs != null && cm.result != null && cm.result !== 'pass') {
+    out.push({
+      source: 'contribution_math',
+      severity: cm.result === 'fail' ? 'fail' : 'warning',
+      targetTaskIndex: CONFIGURE_PLANS_TASK_INDEX,
+      summary:
+        cm.evidence.trim() !== ''
+          ? truncateSandboxSummary(cm.evidence)
+          : cm.result === 'fail'
+            ? 'Contribution math check failed'
+            : 'Contribution math needs review',
+    })
+  }
+
+  return out
+}
+
+function taskSandboxBlocksEffectiveComplete(d: Draft, taskIndex: number): boolean {
+  if (taskIndex === CONNECT_SYSTEMS_TASK_INDEX) return false
+  return collectSandboxLinkedIssues(d).some(
+    (x) => x.targetTaskIndex === taskIndex && (x.severity === 'fail' || x.severity === 'warning'),
+  )
+}
+
+function isEffectiveTaskComplete(
+  taskIndex: number,
+  outcomes: readonly StoredTaskOutcome[],
+  draft: Draft,
+): boolean {
+  if (outcomes[taskIndex] !== 'complete') return false
+  if (taskSandboxBlocksEffectiveComplete(draft, taskIndex)) return false
+  return true
+}
+
+/** Step header icon: sandbox severity on tasks in this step, plus failed checks on Test & Launch. */
+function stepSandboxFailIndicator(step: WizardStepDef, d: Draft): 'fail' | 'warn' | null {
+  const linked = collectSandboxLinkedIssues(d)
+  const inStep = linked.filter((x) => step.taskIndices.includes(x.targetTaskIndex))
+  if (inStep.some((x) => x.severity === 'fail')) return 'fail'
+  if (inStep.some((x) => x.severity === 'warning')) return 'warn'
+  if (step.taskIndices.includes(VERIFY_RULES_TASK_INDEX) && sandboxVerifyHasFailure(d.sandboxVerifyRuns)) {
+    return 'fail'
+  }
+  const runs = d.sandboxVerifyRuns
+  if (step.taskIndices.includes(VERIFY_RULES_TASK_INDEX)) {
+    const warnOnly =
+      (runs.eligibilityRules.lastRunMs != null && runs.eligibilityRules.result === 'warning') ||
+      (runs.contributionMath.lastRunMs != null && runs.contributionMath.result === 'warning')
+    if (warnOnly) return 'warn'
+  }
+  return null
+}
+
+function sidebarVerifyTaskHint(d: Draft): string | null {
+  if (sandboxVerifyHasFailure(d.sandboxVerifyRuns)) return sandboxVerifyFailureHintLine(d.sandboxVerifyRuns)
+  const r = d.sandboxVerifyRuns
+  const parts: string[] = []
+  if (r.eligibilityRules.lastRunMs != null && r.eligibilityRules.result === 'warning') {
+    parts.push('Eligibility: review recommended')
+  }
+  if (r.contributionMath.lastRunMs != null && r.contributionMath.result === 'warning') {
+    parts.push('Contributions: review recommended')
+  }
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
+function taskSandboxHintLines(d: Draft, taskIndex: number, maxLines = 2): string | null {
+  const lines = collectSandboxLinkedIssues(d)
+    .filter((x) => x.targetTaskIndex === taskIndex)
+    .map((x) => x.summary)
+  if (lines.length === 0) return null
+  return lines.slice(0, maxLines).join(' · ')
+}
+
 function normalizeDefaultBenefitDates(raw: unknown): DefaultBenefitDatesState {
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_BENEFIT_DATES }
   const o = raw as Record<string, unknown>
@@ -1380,7 +1517,7 @@ function applyUrlIntentToDraft(base: Draft): Draft {
     const n = Number.parseInt(wizardStepRaw, 10)
     if (!Number.isNaN(n) && n >= 0 && n < WIZARD_STEPS.length) {
       const step = WIZARD_STEPS[n]
-      if (step) nextIndex = firstNonCompleteTaskIndexInStep(step, base.taskOutcomes)
+      if (step) nextIndex = firstNonCompleteTaskIndexInStep(step, base.taskOutcomes, base)
     }
   }
 
@@ -1410,11 +1547,25 @@ const TASK_STATUS_LABEL: Record<TaskNavStatus, string> = {
   blocked: 'Needs earlier step',
   waiting_on_others: 'Waiting on others',
   needs_review: 'Needs review',
+  validation_fail: 'Test failed',
+  validation_warning: 'Needs review',
 }
 
 function TaskStatusGlyph({ status, taskNumber }: { status: TaskNavStatus; taskNumber: number }) {
   const shell = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[9px] font-semibold tabular-nums'
   switch (status) {
+    case 'validation_fail':
+      return (
+        <span className={cn(shell, 'border-red-600/45 bg-red-600/15 text-red-700 dark:text-red-300')} aria-hidden>
+          <AlertCircle className="h-2.5 w-2.5" strokeWidth={2.5} />
+        </span>
+      )
+    case 'validation_warning':
+      return (
+        <span className={cn(shell, 'border-amber-600/45 bg-amber-500/10 text-amber-800 dark:text-amber-200')} aria-hidden>
+          <AlertCircle className="h-2.5 w-2.5" strokeWidth={2.5} />
+        </span>
+      )
     case 'complete':
       return (
         <span className={cn(shell, 'border-emerald-600/30 bg-emerald-600/90 text-white')} aria-hidden>
@@ -1505,6 +1656,14 @@ function SetupProgressHelpDisclosure({ id, className }: { id: string; className?
                   'Needs review — resolve before it can complete.',
                 )}
                 {legendRow(
+                  <TaskStatusGlyph status="validation_fail" taskNumber={1} />,
+                  'Test failed — a sandbox check failed for work in this task; fix and re-run checks.',
+                )}
+                {legendRow(
+                  <TaskStatusGlyph status="validation_warning" taskNumber={1} />,
+                  'Sandbox review — Test & Launch flagged this area for review.',
+                )}
+                {legendRow(
                   <TaskStatusGlyph status="waiting_on_others" taskNumber={1} />,
                   'Waiting on others — paused until external work clears.',
                 )}
@@ -1538,6 +1697,7 @@ function wizardStepRequiredIndicators(
   step: WizardStepDef,
   outcomes: readonly StoredTaskOutcome[],
   currentTaskIndex: number,
+  draft: Draft,
 ): {
   /** Emerald check: every required task is `complete`, none skipped / waiting / needs review. */
   showRequiredSuccess: boolean
@@ -1553,10 +1713,11 @@ function wizardStepRequiredIndicators(
   const requiredIdx = step.taskIndices.filter(isTaskRequired)
   const hasRequired = requiredIdx.length > 0
   const reqTotal = requiredIdx.length
-  const reqComplete = requiredIdx.filter((i) => outcomes[i] === 'complete').length
+  const reqComplete = requiredIdx.filter((i) => isEffectiveTaskComplete(i, outcomes, draft)).length
   const reqSkipped = requiredIdx.some((i) => outcomes[i] === 'skipped')
   const reqWaiting = requiredIdx.some((i) => outcomes[i] === 'waiting_on_others')
   const reqReview = requiredIdx.some((i) => outcomes[i] === 'needs_review')
+  const reqSandboxAttention = requiredIdx.some((i) => taskSandboxBlocksEffectiveComplete(draft, i))
 
   const requiredSuccess =
     hasRequired &&
@@ -1565,7 +1726,8 @@ function wizardStepRequiredIndicators(
     !reqWaiting &&
     !reqReview
 
-  const requiredAttention = hasRequired && (reqSkipped || reqWaiting || reqReview)
+  const requiredAttention =
+    hasRequired && (reqSkipped || reqWaiting || reqReview || reqSandboxAttention)
 
   const requiredInProgress =
     hasRequired &&
@@ -1659,7 +1821,14 @@ export default function SetupWizardPage() {
   const totalTasks = TASK_LABELS.length
   const stepMeta = taskOrdinalInStepGroup(stepIndex)
   const taskOutcomes = draft.taskOutcomes
-  const overallRequired = useMemo(() => globalRequiredProgress(taskOutcomes), [taskOutcomes])
+  const overallRequired = useMemo(() => globalRequiredProgress(draft), [draft])
+  const sandboxFailBlocksAdvance = useMemo(
+    () =>
+      collectSandboxLinkedIssues(draft).some(
+        (x) => x.targetTaskIndex === draft.stepIndex && x.severity === 'fail',
+      ),
+    [draft],
+  )
   const overallOptional = useMemo(() => globalOptionalProgress(taskOutcomes), [taskOutcomes])
   useEffect(() => {
     setSelectedStepIndex(stepGroupIndexForTask(stepIndex))
@@ -1703,7 +1872,7 @@ export default function SetupWizardPage() {
     setDraft((d) => {
       const step = WIZARD_STEPS[stepIdx]
       if (!step) return d
-      const target = firstNonCompleteTaskIndexInStep(step, d.taskOutcomes)
+      const target = firstNonCompleteTaskIndexInStep(step, d.taskOutcomes, d)
       return { ...d, stepIndex: target }
     })
   }, [])
@@ -2972,12 +3141,39 @@ export default function SetupWizardPage() {
           isConfigurePlanNameFilled(draft.configurePlanNames, p.productId),
         ).length
         const configurePlansNeedName = configurePlansTotal - configurePlansWithName
+        const configurePlansSandboxIssues = collectSandboxLinkedIssues(draft).filter(
+          (x) => x.targetTaskIndex === CONFIGURE_PLANS_TASK_INDEX,
+        )
         return (
           <div className="space-y-6">
             <p className="text-sm text-muted-foreground">
               Configure one plan at a time. Dates follow your employer defaults unless you turn off “Use default benefit
               dates” for an exception (for example, calendar-year FSA vs plan-year medical).
             </p>
+
+            {configurePlansSandboxIssues.length > 0 ? (
+              <Alert
+                intent={configurePlansSandboxIssues.some((x) => x.severity === 'fail') ? 'destructive' : 'warning'}
+                role="status"
+                className="text-sm"
+              >
+                <p className="font-medium text-foreground">Test & Launch flagged this task</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Fix the items below, then return to <strong className="font-medium text-foreground">Verify rules and calculations</strong>{' '}
+                  and re-run the relevant check. Full evidence stays on the verify screen.
+                </p>
+                <ul className="mt-2 list-inside list-disc text-xs leading-relaxed text-muted-foreground">
+                  {configurePlansSandboxIssues.map((x) => (
+                    <li key={x.source}>{x.summary}</li>
+                  ))}
+                </ul>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => goToTask(VERIFY_RULES_TASK_INDEX)}>
+                    View sandbox checks
+                  </Button>
+                </div>
+              </Alert>
+            ) : null}
 
             <Card className="border-border bg-card shadow-sm ring-1 ring-border/60">
               <CardHeader className="space-y-1.5 pb-3">
@@ -4440,6 +4636,7 @@ export default function SetupWizardPage() {
               in the order below. Status updates on this screen—expand <strong className="font-medium">Diagnose</strong> for
               quick checks or open the mapping flow to record a connection.
             </p>
+
             <div className="space-y-4">
               {lineCard(
                 'edi',
@@ -4675,9 +4872,9 @@ export default function SetupWizardPage() {
                               variant="ghost"
                               size="sm"
                               className="h-8 text-xs"
-                              onClick={() => goToTask(7)}
+                              onClick={() => goToTask(CONFIGURE_PLANS_TASK_INDEX)}
                             >
-                              Configure
+                              Go to eligibility rules
                             </Button>
                           </div>
                         </TableCell>
@@ -4714,9 +4911,9 @@ export default function SetupWizardPage() {
                               variant="ghost"
                               size="sm"
                               className="h-8 text-xs"
-                              onClick={() => goToTask(7)}
+                              onClick={() => goToTask(CONFIGURE_PLANS_TASK_INDEX)}
                             >
-                              Plan costs
+                              Go to plan costs
                             </Button>
                           </div>
                         </TableCell>
@@ -4922,7 +5119,7 @@ export default function SetupWizardPage() {
               intent="default"
               className="shrink-0 rounded-md border border-border/80 bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-foreground"
             >
-              {TASK_STATUS_LABEL[resolveTaskNavStatus(stepIndex, stepIndex, taskOutcomes)]}
+              {TASK_STATUS_LABEL[resolveTaskNavStatus(stepIndex, stepIndex, taskOutcomes, draft)]}
             </Badge>
           </div>
           <Separator className="bg-border/60" />
@@ -4946,9 +5143,9 @@ export default function SetupWizardPage() {
               <ScrollArea className="mt-2 h-[min(52vh,30rem)] w-full lg:h-auto lg:max-h-none">
                 <ol className="flex flex-col gap-1 pb-1 pr-3 lg:pb-0 lg:pr-0">
                 {WIZARD_STEPS.map((wizardStep, stepIdx) => {
-                  const stepInd = wizardStepRequiredIndicators(wizardStep, draft.taskOutcomes, stepIndex)
+                  const stepInd = wizardStepRequiredIndicators(wizardStep, draft.taskOutcomes, stepIndex, draft)
                   const stepRowSelected = selectedStepIndex === stepIdx
-                  const reqProgress = stepRequiredProgress(wizardStep, draft.taskOutcomes)
+                  const reqProgress = stepRequiredProgress(wizardStep, draft.taskOutcomes, draft)
                   const optionalIndices = wizardStep.taskIndices.filter((i) => !isTaskRequired(i))
                   const optionalComplete = optionalIndices.filter((i) => draft.taskOutcomes[i] === 'complete').length
                   const optionalTotal = optionalIndices.length
@@ -4964,9 +5161,18 @@ export default function SetupWizardPage() {
                         : 'All optional'
                   const StepNavIcon = WIZARD_STEP_NAV_ICONS[stepIdx] ?? Building2
                   const sandboxVerifyFailHint = sandboxVerifyFailureHintLine(draft.sandboxVerifyRuns)
-                  const showVerifyFailOnStep =
-                    wizardStep.taskIndices.includes(VERIFY_RULES_TASK_INDEX) &&
-                    sandboxVerifyHasFailure(draft.sandboxVerifyRuns)
+                  const sandboxInd = stepSandboxFailIndicator(wizardStep, draft)
+                  const showSandboxFailDot = sandboxInd === 'fail'
+                  const showSandboxWarnDot = sandboxInd === 'warn'
+                  const linkedInStep = collectSandboxLinkedIssues(draft).filter((x) =>
+                    wizardStep.taskIndices.includes(x.targetTaskIndex),
+                  )
+                  const linkedAria =
+                    linkedInStep.length > 0 ? `${linkedInStep.map((x) => x.summary).join('. ')}. ` : ''
+                  const verifyFailAria =
+                    wizardStep.taskIndices.includes(VERIFY_RULES_TASK_INDEX) && sandboxVerifyHasFailure(draft.sandboxVerifyRuns)
+                      ? `${sandboxVerifyFailHint ?? 'Sandbox check failed'}. `
+                      : ''
 
                   return (
                     <li key={wizardStep.title} className="rounded-lg">
@@ -4979,7 +5185,7 @@ export default function SetupWizardPage() {
                         )}
                         aria-pressed={stepRowSelected}
                         aria-controls={stepRowSelected ? `setup-step-panel-${stepIdx}` : undefined}
-                        aria-label={`${wizardStep.title}, ${showVerifyFailOnStep && sandboxVerifyFailHint ? `${sandboxVerifyFailHint}. ` : ''}${reqProgress.total > 0 ? `${reqProgress.complete} of ${reqProgress.total} required complete` : isConnectSystemsStep ? 'optional step, no required tasks' : 'all tasks optional in this step'}`}
+                        aria-label={`${wizardStep.title}, ${verifyFailAria}${linkedAria}${reqProgress.total > 0 ? `${reqProgress.complete} of ${reqProgress.total} required complete` : isConnectSystemsStep ? 'optional step, no required tasks' : 'all tasks optional in this step'}`}
                         id={`setup-step-trigger-${stepIdx}`}
                       >
                         <span
@@ -4992,10 +5198,17 @@ export default function SetupWizardPage() {
                           aria-hidden
                         >
                           <StepNavIcon className="h-[18px] w-[18px]" strokeWidth={1.75} />
-                          {showVerifyFailOnStep ? (
+                          {showSandboxFailDot ? (
                             <span
                               className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-600 text-white shadow-sm ring-2 ring-background dark:bg-red-500"
-                              title={sandboxVerifyFailHint ?? 'Sandbox check failed'}
+                              title={sandboxVerifyFailHint ?? 'Sandbox or validation issue'}
+                            >
+                              <AlertCircle className="h-2 w-2" strokeWidth={3} aria-hidden />
+                            </span>
+                          ) : showSandboxWarnDot ? (
+                            <span
+                              className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-500 text-white shadow-sm ring-2 ring-background"
+                              title="Review recommended from Test & Launch"
                             >
                               <AlertCircle className="h-2 w-2" strokeWidth={3} aria-hidden />
                             </span>
@@ -5057,15 +5270,19 @@ export default function SetupWizardPage() {
                         >
                           <ol className="space-y-0.5 pl-7">
                             {wizardStep.taskIndices.map((taskIdx, taskOrd) => {
-                              const navStatus = resolveTaskNavStatus(taskIdx, stepIndex, draft.taskOutcomes)
+                              const navStatus = resolveTaskNavStatus(taskIdx, stepIndex, draft.taskOutcomes, draft)
                               const current = taskIdx === stepIndex
                               const label = TASK_LABELS[taskIdx]
                               const blocked = navStatus === 'blocked'
                               const showOptionalTaskBadge =
                                 OPTIONAL_TASK_IDS.has(taskIdx) && !CONNECT_SYSTEMS_TASK_IDS.has(taskIdx)
-                              const verifyFailOnTask =
-                                taskIdx === VERIFY_RULES_TASK_INDEX ? sandboxVerifyFailHint : null
-                              const verifyFailAria = verifyFailOnTask ? ` Sandbox verification: ${verifyFailOnTask}.` : ''
+                              const taskSandboxHint =
+                                taskIdx === VERIFY_RULES_TASK_INDEX
+                                  ? sidebarVerifyTaskHint(draft)
+                                  : taskIdx === CONNECT_SYSTEMS_TASK_INDEX
+                                    ? null
+                                    : taskSandboxHintLines(draft, taskIdx)
+                              const verifyFailAria = taskSandboxHint ? ` Sandbox: ${taskSandboxHint}.` : ''
                               return (
                                 <li key={label}>
                                   <button
@@ -5095,13 +5312,22 @@ export default function SetupWizardPage() {
                                           navStatus === 'skipped' && 'text-amber-900 line-through decoration-amber-700/50 dark:text-amber-200',
                                           navStatus === 'waiting_on_others' && 'text-sky-900 dark:text-sky-100',
                                           navStatus === 'needs_review' && 'text-amber-800 dark:text-amber-200',
+                                      navStatus === 'validation_fail' && 'text-red-800 dark:text-red-200',
+                                      navStatus === 'validation_warning' && 'text-amber-900 dark:text-amber-200',
                                         )}
                                       >
                                         {label}
                                       </span>
-                                      {verifyFailOnTask ? (
-                                        <span className="text-[10px] font-semibold leading-tight text-red-600 dark:text-red-400">
-                                          {verifyFailOnTask}
+                                      {taskSandboxHint ? (
+                                        <span
+                                          className={cn(
+                                            'text-[10px] font-semibold leading-tight',
+                                            navStatus === 'validation_fail'
+                                              ? 'text-red-600 dark:text-red-400'
+                                              : 'text-amber-800 dark:text-amber-200',
+                                          )}
+                                        >
+                                          {taskSandboxHint}
                                         </span>
                                       ) : null}
                                     </span>
@@ -5238,7 +5464,14 @@ export default function SetupWizardPage() {
                 ) : null}
               </div>
               {stepIndex < totalTasks - 1 ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-col items-end gap-2">
+                  {sandboxFailBlocksAdvance ? (
+                    <p className="max-w-md text-right text-xs leading-snug text-red-700 dark:text-red-300">
+                      A sandbox check failed for this task. Fix it in the area flagged in the step list, re-run checks
+                      under Test & Launch, then continue.
+                    </p>
+                  ) : null}
+                  <div className="flex flex-wrap justify-end gap-2">
                   {!currentBlocked ? (
                     <>
                       <Button
@@ -5250,7 +5483,18 @@ export default function SetupWizardPage() {
                         <SkipForward className="h-4 w-4" />
                         Skip for now
                       </Button>
-                      <Button type="button" variant="outline" className="gap-1" onClick={completeCurrentAndAdvance}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="gap-1"
+                        disabled={sandboxFailBlocksAdvance}
+                        title={
+                          sandboxFailBlocksAdvance
+                            ? 'Resolve failing sandbox checks for this task before marking it complete.'
+                            : undefined
+                        }
+                        onClick={completeCurrentAndAdvance}
+                      >
                         Next
                         <ChevronRight className="h-4 w-4" />
                       </Button>
@@ -5261,6 +5505,7 @@ export default function SetupWizardPage() {
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   ) : null}
+                  </div>
                 </div>
               ) : null}
             </div>
