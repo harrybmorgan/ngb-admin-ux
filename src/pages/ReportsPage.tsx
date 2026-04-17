@@ -35,12 +35,13 @@ import { AdminAiChatInput } from '@/components/dashboard/AdminAiChatInput'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import { WexAiSparkleMark } from '@/components/ui/WexAiSparkleMark'
-import { REPORT_LIBRARY } from '@/data/adminMockData'
+import { REPORT_LIBRARY, type ReportLibraryItemStatus } from '@/data/adminMockData'
 import { relativeUpdatedFromIsoDate } from '@/lib/relativeUpdatedDate'
 import { cn } from '@/lib/utils'
 
 const PINNED_REPORTS_STORAGE_KEY = 'ngb-admin-ux-pinned-report-ids'
-const DEFAULT_PINNED_IDS = ['r1', 'r2', 'r3', 'r4'] as const
+/** Includes Combined Overview Dashboard (`r7`) for quick access to the cross-service view. */
+const DEFAULT_PINNED_IDS = ['r7', 'r1', 'r2', 'r3', 'r4'] as const
 
 function loadPinnedReportIds(): string[] {
   try {
@@ -57,6 +58,13 @@ function loadPinnedReportIds(): string[] {
 
 type ReportRow = (typeof REPORT_LIBRARY)[number]
 
+/** Most recently run first (ISO date on `updated`, then `updatedTime`). */
+function compareReportsByLastRun(a: ReportRow, b: ReportRow): number {
+  const byDate = b.updated.localeCompare(a.updated)
+  if (byDate !== 0) return byDate
+  return b.updatedTime.localeCompare(a.updatedTime)
+}
+
 type ServiceMetric = {
   label: string
   value: string
@@ -71,6 +79,14 @@ const cardSurface =
 const outlineSpark =
   'rounded-xl border-[#3958c3] font-medium text-[#3958c3] hover:bg-[#3958c3]/5'
 
+const reportLibraryStatusClass: Record<ReportLibraryItemStatus, string> = {
+  Success:
+    'bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-600/15 dark:bg-emerald-950/35 dark:text-emerald-200 dark:ring-emerald-500/25',
+  Warning:
+    'bg-amber-50 text-amber-950 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-500/25',
+  Error: 'bg-red-50 text-red-800 ring-1 ring-inset ring-red-600/15 dark:bg-red-950/40 dark:text-red-200 dark:ring-red-500/25',
+}
+
 const keyInsights = [
   {
     reportId: 'r6',
@@ -78,7 +94,7 @@ const keyInsights = [
   },
   {
     reportId: 'r1',
-    text: 'Payroll sync last ran successfully; 3 employees still need a valid address before OE comms go out.',
+    text: 'Claims filed via web portal are up this month; compare against import and mobile in Claims by Source.',
   },
   {
     reportId: 'r2',
@@ -95,8 +111,8 @@ const reportAlerts = [
   {
     id: 'alert-1',
     reportId: 'r1',
-    title: 'Variances need review',
-    detail: 'Payroll deduction reconciliation — 2 pay periods flagged after refresh.',
+    title: 'Filing mix shifted',
+    detail: 'Claims by Source — unusual volume from email submission vs last week.',
     when: 'Today · 9:14 AM',
   },
   {
@@ -197,33 +213,32 @@ export default function ReportsPage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b))
   }, [])
 
+  /** Full library ordered by most recent run (same ordering as the Report Library table). */
+  const reportLibraryByLastRun = useMemo(
+    () => [...REPORT_LIBRARY].sort(compareReportsByLastRun),
+    [],
+  )
+
   const filteredReportLibrary = useMemo(() => {
     const q = reportSearch.trim().toLowerCase()
-    return REPORT_LIBRARY.filter((r) => {
+    return reportLibraryByLastRun.filter((r) => {
       const matchesSearch =
         !q ||
         r.name.toLowerCase().includes(q) ||
         r.description.toLowerCase().includes(q) ||
         r.author.toLowerCase().includes(q) ||
         r.service.toLowerCase().includes(q) ||
-        r.category.toLowerCase().includes(q)
+        r.category.toLowerCase().includes(q) ||
+        r.status.toLowerCase().includes(q)
       const matchesAuthor = authorFilter === 'all' || r.author === authorFilter
       const matchesService = serviceFocusFilter === 'all' || r.service === serviceFocusFilter
       const matchesCategory = categoryFilter === 'all' || r.category === categoryFilter
       return matchesSearch && matchesAuthor && matchesService && matchesCategory
     })
-  }, [reportSearch, authorFilter, serviceFocusFilter, categoryFilter])
+  }, [reportSearch, authorFilter, serviceFocusFilter, categoryFilter, reportLibraryByLastRun])
 
-  /** Most recently updated reports first (top four for the overview card). */
-  const overviewRecentReports = useMemo(() => {
-    return [...REPORT_LIBRARY]
-      .sort((a, b) => {
-        const byDate = b.updated.localeCompare(a.updated)
-        if (byDate !== 0) return byDate
-        return b.updatedTime.localeCompare(a.updatedTime)
-      })
-      .slice(0, 4)
-  }, [])
+  /** Top four most recently run (overview card). */
+  const overviewRecentReports = useMemo(() => reportLibraryByLastRun.slice(0, 4), [reportLibraryByLastRun])
 
   return (
     <div className="admin-app-bg flex min-h-screen flex-col font-sans">
@@ -622,6 +637,7 @@ export default function ReportsPage() {
                   <TableHead>Author</TableHead>
                   <TableHead>Service focus</TableHead>
                   <TableHead>Category</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Updated</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
@@ -642,6 +658,16 @@ export default function ReportsPage() {
                     <TableCell>{r.author}</TableCell>
                     <TableCell>{r.service}</TableCell>
                     <TableCell>{r.category}</TableCell>
+                    <TableCell>
+                      <span
+                        className={cn(
+                          'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
+                          reportLibraryStatusClass[r.status],
+                        )}
+                      >
+                        {r.status}
+                      </span>
+                    </TableCell>
                     <TableCell>{relativeUpdatedFromIsoDate(r.updated)}</TableCell>
                     <TableCell className="text-right">
                       <Button
@@ -687,7 +713,7 @@ export default function ReportsPage() {
               pin as many as you need.
             </p>
             <ul className="flex flex-col gap-2 border-t border-border pt-4">
-              {REPORT_LIBRARY.map((r) => (
+              {reportLibraryByLastRun.map((r) => (
                 <li key={r.id}>
                   <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 hover:bg-muted/40">
                     <Checkbox

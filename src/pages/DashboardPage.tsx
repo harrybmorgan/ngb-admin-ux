@@ -22,7 +22,7 @@ const outlineSpark =
 
 const keyInsights = [
   'Life-event volume is up 18% vs last month — most are dependent adds tied to your new medical tier.',
-  'Payroll sync last ran successfully; 3 employees still need a valid address before OE comms go out.',
+  'Claims filed via web portal are up this month; compare filing channels in Claims by Source.',
   'COBRA notices and premium subsidy reports are the most opened items by your team this week.',
 ] as const
 

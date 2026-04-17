@@ -1,4 +1,3 @@
-import type { MouseEvent } from 'react'
 import {
   Table,
   TableBody,
@@ -22,14 +21,12 @@ type ReportClaimTableProps = {
   rows: ReportDetailClaimRow[]
   columns: readonly ReportTableColumn[]
   onRowClick: (row: ReportDetailClaimRow) => void
-  onClaimNumberClick: (row: ReportDetailClaimRow, event: MouseEvent) => void
 }
 
 export function ReportClaimTable({
   rows,
   columns,
   onRowClick,
-  onClaimNumberClick,
 }: ReportClaimTableProps) {
   if (columns.length === 0) {
     return (
@@ -78,13 +75,7 @@ export function ReportClaimTable({
                   {col.id === 'employerName' && row.employerName}
                   {col.id === 'submitDate' && <span className="tabular-nums">{row.submitDate}</span>}
                   {col.id === 'claimNumber' && (
-                    <button
-                      type="button"
-                      className="font-medium text-[#3958c3] underline-offset-2 hover:underline"
-                      onClick={(e) => onClaimNumberClick(row, e)}
-                    >
-                      {row.claimNumber}
-                    </button>
+                    <span className="font-medium tabular-nums">{row.claimNumber}</span>
                   )}
                   {col.id === 'planType' && planTypeLabel(row.planType)}
                   {col.id === 'planDisplayName' && row.planDisplayName}
