@@ -14,19 +14,25 @@ import {
 } from '@/lib/reportCustomization'
 import { planTypeLabel } from '@/lib/reportClaimModel'
 import { ClaimStatusText } from '@/components/reports/reportClaimCells'
+import { cn } from '@/lib/utils'
 
 export type ReportTableColumn = ResolvedReportTableColumn
+
+const PLACEHOLDER_CELL = <span className="text-[#c5cad8] select-none">—</span>
 
 type ReportClaimTableProps = {
   rows: ReportDetailClaimRow[]
   columns: readonly ReportTableColumn[]
   onRowClick: (row: ReportDetailClaimRow) => void
+  /** When true, built-in columns show neutral dashes instead of row values (customize preview). */
+  placeholderRows?: boolean
 }
 
 export function ReportClaimTable({
   rows,
   columns,
   onRowClick,
+  placeholderRows = false,
 }: ReportClaimTableProps) {
   if (columns.length === 0) {
     return (
@@ -61,8 +67,11 @@ export function ReportClaimTable({
           {rows.map((row) => (
             <TableRow
               key={row.id}
-              className="cursor-pointer border-b border-[#eef1f7] last:border-0 hover:bg-[#f8f9fc]"
-              onClick={() => onRowClick(row)}
+              className={cn(
+                'border-b border-[#eef1f7] last:border-0',
+                placeholderRows ? 'cursor-default' : 'cursor-pointer hover:bg-[#f8f9fc]',
+              )}
+              onClick={placeholderRows ? undefined : () => onRowClick(row)}
             >
               {columns.map((col, idx) => (
                 <TableCell key={`${row.id}-${col.id}-${idx}`} className="align-middle text-[#374056]">
@@ -71,16 +80,20 @@ export function ReportClaimTable({
                       {getCustomColumnCellPlaceholder(col.customColumnType)}
                     </span>
                   )}
-                  {col.id === 'methodFiled' && row.methodFiled}
-                  {col.id === 'employerName' && row.employerName}
-                  {col.id === 'submitDate' && <span className="tabular-nums">{row.submitDate}</span>}
-                  {col.id === 'claimNumber' && (
-                    <span className="font-medium tabular-nums">{row.claimNumber}</span>
-                  )}
-                  {col.id === 'planType' && planTypeLabel(row.planType)}
-                  {col.id === 'planDisplayName' && row.planDisplayName}
-                  {col.id === 'claimStatus' && <ClaimStatusText status={row.claimStatus} />}
-                  {col.id === 'claimProcessingStatus' && row.claimProcessingStatus}
+                  {col.id === 'methodFiled' && (placeholderRows ? PLACEHOLDER_CELL : row.methodFiled)}
+                  {col.id === 'employerName' && (placeholderRows ? PLACEHOLDER_CELL : row.employerName)}
+                  {col.id === 'submitDate' &&
+                    (placeholderRows ? PLACEHOLDER_CELL : <span className="tabular-nums">{row.submitDate}</span>)}
+                  {col.id === 'claimNumber' &&
+                    (placeholderRows ? PLACEHOLDER_CELL : (
+                      <span className="font-medium tabular-nums">{row.claimNumber}</span>
+                    ))}
+                  {col.id === 'planType' && (placeholderRows ? PLACEHOLDER_CELL : planTypeLabel(row.planType))}
+                  {col.id === 'planDisplayName' && (placeholderRows ? PLACEHOLDER_CELL : row.planDisplayName)}
+                  {col.id === 'claimStatus' &&
+                    (placeholderRows ? PLACEHOLDER_CELL : <ClaimStatusText status={row.claimStatus} />)}
+                  {col.id === 'claimProcessingStatus' &&
+                    (placeholderRows ? PLACEHOLDER_CELL : row.claimProcessingStatus)}
                 </TableCell>
               ))}
             </TableRow>

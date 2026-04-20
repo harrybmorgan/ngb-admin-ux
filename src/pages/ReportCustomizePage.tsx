@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Breadcrumb,
@@ -8,7 +8,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
   Button,
-  ButtonGroup,
   Card,
   CardContent,
   CardDescription,
@@ -18,7 +17,6 @@ import {
   Label,
   Textarea,
 } from '@wexinc-healthbenefits/ben-ui-kit'
-import { Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { ReportClaimChart } from '@/components/reports/ReportClaimChart'
 import { ReportClaimFilterBar } from '@/components/reports/ReportClaimFilterBar'
@@ -50,7 +48,25 @@ import {
 
 const PAGE_SIZE = 12
 
+/** Max length for the report description on the customize preview (stored with customization). */
+const REPORT_DESCRIPTION_MAX_CHARS = 60
+
 const ALL_REPORT_FILTERS = ['dateRange', 'claimStatus', 'plan'] as const
+
+/** Skeleton rows for the table preview — cell values are not shown (`placeholderRows` on `ReportClaimTable`). */
+function makeCustomizePreviewRows(count: number): ReportDetailClaimRow[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `customize-preview-${i}`,
+    methodFiled: '',
+    employerName: '',
+    submitDate: '',
+    claimNumber: '',
+    planType: 'medical_flex',
+    planDisplayName: '',
+    claimStatus: 'paid',
+    claimProcessingStatus: '',
+  }))
+}
 
 export default function ReportCustomizePage() {
   const { reportId } = useParams<{ reportId: string }>()
@@ -68,9 +84,7 @@ export default function ReportCustomizePage() {
   const [dateRange, setDateRange] = useState<(typeof DATE_RANGE_OPTIONS)[number]>(DATE_RANGE_OPTIONS[0]!)
   const [claimStatusFilter, setClaimStatusFilter] = useState<ClaimStatusFilterValue>('all')
   const [planFilter, setPlanFilter] = useState<string>(PLAN_FILTER_OPTIONS[0]!)
-  const [page, setPage] = useState(1)
-  const [descriptionEditing, setDescriptionEditing] = useState(false)
-  const descriptionBackupRef = useRef<string>('')
+  const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (!reportId || !report) return
@@ -79,9 +93,8 @@ export default function ReportCustomizePage() {
     setDraft({
       ...loaded,
       displayName: title,
-      displayDescription: description,
+      displayDescription: description.slice(0, REPORT_DESCRIPTION_MAX_CHARS),
     })
-    setDescriptionEditing(false)
   }, [reportId, report])
 
   useEffect(() => {
@@ -102,13 +115,7 @@ export default function ReportCustomizePage() {
     })
   }, [planFilter, claimStatusFilter, dateRange, reportAsOf])
 
-  const total = filteredRows.length
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const safePage = Math.min(page, pageCount)
-  const pageRows = useMemo(() => {
-    const start = (safePage - 1) * PAGE_SIZE
-    return filteredRows.slice(start, start + PAGE_SIZE)
-  }, [filteredRows, safePage])
+  const customizePreviewRows = useMemo(() => makeCustomizePreviewRows(PAGE_SIZE), [])
 
   const tableColumns = useMemo(() => resolveColumnHeaders(draft.columns), [draft.columns])
 
@@ -116,7 +123,6 @@ export default function ReportCustomizePage() {
     setDateRange(DATE_RANGE_OPTIONS[0]!)
     setClaimStatusFilter('all')
     setPlanFilter(PLAN_FILTER_OPTIONS[0]!)
-    setPage(1)
     toast.message('Preview filters reset.')
   }
 
@@ -134,7 +140,7 @@ export default function ReportCustomizePage() {
     saveReportCustomization(reportId, {
       ...draft,
       displayName: name,
-      displayDescription: draft.displayDescription?.trim() ?? '',
+      displayDescription: (draft.displayDescription?.trim() ?? '').slice(0, REPORT_DESCRIPTION_MAX_CHARS),
       enabledFilters: [...ALL_REPORT_FILTERS],
     })
     toast.success('Report customization saved.')
@@ -145,31 +151,23 @@ export default function ReportCustomizePage() {
     toast.message(`Claim ${row.claimNumber} — detail view is not available in this prototype.`)
   }
 
-  const resolvedDescription =
-    report && draft.displayDescription !== undefined ? draft.displayDescription : report?.description ?? ''
-
-  const startDescriptionEdit = () => {
-    if (!report) return
-    const current =
-      draft.displayDescription !== undefined ? draft.displayDescription : report.description
-    descriptionBackupRef.current = current
-    setDraft((d) => ({ ...d, displayDescription: current }))
-    setDescriptionEditing(true)
-  }
-
-  const saveDescriptionEdit = () => {
-    setDescriptionEditing(false)
-  }
-
-  const cancelDescriptionEdit = () => {
-    setDraft((d) => ({ ...d, displayDescription: descriptionBackupRef.current }))
-    setDescriptionEditing(false)
-  }
-
   const previewLabels = useMemo(() => {
     if (!report) return { title: '', description: '' }
     return resolveReportPresentation(report, draft)
   }, [report, draft])
+
+  const descriptionValue = useMemo(() => {
+    const raw =
+      draft.displayDescription !== undefined ? draft.displayDescription : (report?.description ?? '')
+    return raw.slice(0, REPORT_DESCRIPTION_MAX_CHARS)
+  }, [draft.displayDescription, report?.description])
+
+  useLayoutEffect(() => {
+    const el = descriptionTextareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [descriptionValue])
 
   if (!reportId || !report) {
     return (
@@ -269,58 +267,30 @@ export default function ReportCustomizePage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-baseline justify-between gap-2">
                   <Label htmlFor="report-preview-desc" className="text-xs font-medium text-[#5f6a94]">
                     Description
                   </Label>
-                  {!descriptionEditing && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 shrink-0 gap-1.5 rounded-lg px-2 text-[#3958c3]"
-                      onClick={startDescriptionEdit}
-                    >
-                      <Pencil className="h-3.5 w-3.5" aria-hidden />
-                      Edit
-                    </Button>
-                  )}
+                  <span className="text-xs tabular-nums text-[#9aa3bd]" aria-live="polite">
+                    {descriptionValue.length}/{REPORT_DESCRIPTION_MAX_CHARS}
+                  </span>
                 </div>
-                {descriptionEditing ? (
-                  <div className="space-y-2">
-                    <Textarea
-                      id="report-preview-desc"
-                      value={draft.displayDescription ?? ''}
-                      onChange={(e) => setDraft((d) => ({ ...d, displayDescription: e.target.value }))}
-                      placeholder="Short description for this report"
-                      rows={4}
-                      className="min-h-[5rem] resize-y rounded-xl border-[#d0d7e6] text-sm leading-relaxed text-[#374056]"
-                      aria-label="Report description"
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        intent="primary"
-                        className="rounded-xl"
-                        onClick={saveDescriptionEdit}
-                      >
-                        Save
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="rounded-xl"
-                        onClick={cancelDescriptionEdit}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm leading-relaxed text-[#374056]">{resolvedDescription.trim() || '—'}</p>
-                )}
+                <Textarea
+                  ref={descriptionTextareaRef}
+                  id="report-preview-desc"
+                  value={descriptionValue}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      displayDescription: e.target.value.slice(0, REPORT_DESCRIPTION_MAX_CHARS),
+                    }))
+                  }
+                  placeholder="Short description for this report"
+                  rows={1}
+                  maxLength={REPORT_DESCRIPTION_MAX_CHARS}
+                  className="min-h-0 w-full resize-none overflow-hidden border-0 border-b border-[#e8ecf4] bg-transparent px-0 py-1 text-sm leading-relaxed text-[#374056] shadow-none placeholder:text-[#9aa3bd] focus-visible:border-[#3958c3] focus-visible:ring-0"
+                  aria-label="Report description"
+                />
               </div>
             </div>
 
@@ -329,64 +299,33 @@ export default function ReportCustomizePage() {
               dateRange={dateRange}
               onDateRangeChange={(v) => {
                 setDateRange(v)
-                setPage(1)
               }}
               claimStatusFilter={claimStatusFilter}
               onClaimStatusFilterChange={(v) => {
                 setClaimStatusFilter(v)
-                setPage(1)
               }}
               planFilter={planFilter}
               onPlanFilterChange={(v) => {
                 setPlanFilter(v)
-                setPage(1)
               }}
               onReset={resetPreviewFilters}
             />
 
             {draft.defaultView === 'table' ? (
-              <ReportClaimTable rows={pageRows} columns={tableColumns} onRowClick={openClaim} />
+              <ReportClaimTable
+                rows={customizePreviewRows}
+                columns={tableColumns}
+                onRowClick={openClaim}
+                placeholderRows
+              />
             ) : (
               <ReportClaimChart rows={filteredRows} />
             )}
 
             {draft.defaultView === 'table' && (
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-[#5f6a94]">
-                  Showing {pageRows.length} of {total} claims
-                </p>
-                <ButtonGroup className="rounded-xl border border-[#d0d7e6] p-0.5">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-lg px-3"
-                    disabled={safePage <= 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="solid"
-                    intent="primary"
-                    size="sm"
-                    className="pointer-events-none rounded-lg px-3"
-                  >
-                    {safePage}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-lg px-3"
-                    disabled={safePage >= pageCount}
-                    onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                  >
-                    Next
-                  </Button>
-                </ButtonGroup>
-              </div>
+              <p className="text-sm text-[#5f6a94]">
+                Preview shows column layout only. Save the report to view live data on the report detail page.
+              </p>
             )}
           </div>
         </div>

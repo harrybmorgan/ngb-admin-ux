@@ -9,9 +9,27 @@ import {
   BreadcrumbSeparator,
   Button,
   ButtonGroup,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@wexinc-healthbenefits/ben-ui-kit'
 import { toast } from 'sonner'
-import { AlertTriangle, Calendar, CircleAlert, Download, FileText, SlidersHorizontal } from 'lucide-react'
+import {
+  AlertTriangle,
+  Calendar,
+  CircleAlert,
+  Download,
+  FileText,
+  History,
+  SlidersHorizontal,
+} from 'lucide-react'
 import { CombinedOverviewDashboard } from '@/components/reports/CombinedOverviewDashboard'
 import { ReportClaimFilterBar } from '@/components/reports/ReportClaimFilterBar'
 import { ReportClaimTable } from '@/components/reports/ReportClaimTable'
@@ -21,7 +39,9 @@ import {
   COMBINED_OVERVIEW_REPORT_ID,
   REPORT_DETAIL_CLAIM_ROWS,
   REPORT_LIBRARY,
+  getReportRunLog,
   type ReportDetailClaimRow,
+  type ReportRunLogStatus,
 } from '@/data/adminMockData'
 import {
   loadReportCustomization,
@@ -40,6 +60,15 @@ import { cn } from '@/lib/utils'
 const PAGE_SIZE = 12
 
 const ALL_REPORT_FILTERS = ['dateRange', 'claimStatus', 'plan'] as const
+
+const runLogStatusClass: Record<ReportRunLogStatus, string> = {
+  Success:
+    'bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-600/15 dark:bg-emerald-950/35 dark:text-emerald-200 dark:ring-emerald-500/25',
+  Warning:
+    'bg-amber-50 text-amber-950 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-500/25',
+  Error:
+    'bg-red-50 text-red-800 ring-1 ring-inset ring-red-600/15 dark:bg-red-950/40 dark:text-red-200 dark:ring-red-500/25',
+}
 
 function formatReportLastRun(isoDate: string, timeLabel: string): string {
   const parts = isoDate.split('-').map(Number)
@@ -65,6 +94,9 @@ export default function ReportDetailPage() {
   const [claimStatusFilter, setClaimStatusFilter] = useState<ClaimStatusFilterValue>('all')
   const [planFilter, setPlanFilter] = useState<string>(PLAN_FILTER_OPTIONS[0]!)
   const [page, setPage] = useState(1)
+  const [runLogOpen, setRunLogOpen] = useState(false)
+
+  const runLogRows = useMemo(() => (reportId ? getReportRunLog(reportId) : []), [reportId])
 
   const customization = useMemo(
     () => (reportId ? loadReportCustomization(reportId) : loadReportCustomization('')),
@@ -176,6 +208,17 @@ export default function ReportDetailPage() {
                 </Link>
               </Button>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl gap-2"
+              aria-expanded={runLogOpen}
+              aria-controls="report-run-log-panel"
+              onClick={() => setRunLogOpen(true)}
+            >
+              <History className="h-4 w-4 shrink-0" aria-hidden />
+              Run log
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -304,6 +347,59 @@ export default function ReportDetailPage() {
           </>
         )}
       </main>
+
+      <Sheet open={runLogOpen} onOpenChange={setRunLogOpen}>
+        <SheetContent
+          id="report-run-log-panel"
+          side="right"
+          className="flex w-full flex-col gap-4 overflow-y-auto sm:max-w-xl"
+        >
+          <SheetHeader className="text-left">
+            <SheetTitle>Run log</SheetTitle>
+            <p className="text-sm text-muted-foreground">
+              Recent runs for this report (newest first). Prototype data only.
+            </p>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-x-auto rounded-xl border border-[#e8ecf4]">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="whitespace-nowrap">Started</TableHead>
+                  <TableHead className="whitespace-nowrap">Status</TableHead>
+                  <TableHead className="whitespace-nowrap">Duration</TableHead>
+                  <TableHead className="min-w-[140px]">Trigger</TableHead>
+                  <TableHead className="min-w-[220px]">Summary</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {runLogRows.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="align-top text-xs tabular-nums text-[#5f6a94]">
+                      {row.startedLabel}
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <span
+                        className={cn(
+                          'inline-flex rounded-md px-2 py-0.5 text-xs font-medium',
+                          runLogStatusClass[row.status],
+                        )}
+                      >
+                        {row.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="align-top text-xs tabular-nums text-[#5f6a94]">
+                      {row.durationLabel}
+                    </TableCell>
+                    <TableCell className="align-top text-sm">{row.trigger}</TableCell>
+                    <TableCell className="align-top text-sm text-[#14182c]">{row.summary}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       <AdminFooter />
     </div>
   )

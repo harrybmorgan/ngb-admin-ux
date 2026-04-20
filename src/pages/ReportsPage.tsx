@@ -125,15 +125,16 @@ const reportAlerts = [
   {
     id: 'alert-3',
     reportId: 'r6',
-    title: 'Export ready',
+    title: 'Download ready',
     detail: 'Full Plan Enrollments — your scheduled CSV is available to download.',
     when: 'Apr 12 · 8:05 AM',
   },
 ] as const
 
-const kpis: { service: string; metrics: ServiceMetric[] }[] = [
+const kpis: { service: string; /** Report library category filter; `'all'` clears the filter. */ reportLibraryCategory: 'all' | string; metrics: ServiceMetric[] }[] = [
   {
     service: 'Overall Summary',
+    reportLibraryCategory: 'all',
     metrics: [
       { label: 'Total Active Enrollments', value: '325', trendPercent: '4.2%' },
       { label: 'Active Total Montly Premium', value: '$487,350', trendPercent: '1.8%' },
@@ -142,6 +143,7 @@ const kpis: { service: string; metrics: ServiceMetric[] }[] = [
   },
   {
     service: 'Member & Benefits',
+    reportLibraryCategory: 'Member & Benefits',
     metrics: [
       { label: 'Active Enrollments', value: '248', trendPercent: '3.1%' },
       { label: 'Pending Approvals', value: '12' },
@@ -150,6 +152,7 @@ const kpis: { service: string; metrics: ServiceMetric[] }[] = [
   },
   {
     service: 'Contributions & Funding',
+    reportLibraryCategory: 'Contributions & Funding',
     metrics: [
       { label: 'Active COBRA Plans', value: '26', trendPercent: '2.4%' },
       { label: 'Pending Payments', value: '3' },
@@ -158,6 +161,7 @@ const kpis: { service: string; metrics: ServiceMetric[] }[] = [
   },
   {
     service: 'Claims & Spending',
+    reportLibraryCategory: 'Claims & Spending',
     metrics: [
       { label: 'Active Accounts', value: '189', trendPercent: '5.6%' },
       { label: 'Total Balance', value: '$1.2M' },
@@ -299,172 +303,172 @@ export default function ReportsPage() {
               </div>
             </div>
           </div>
-
-          <section>
-            <div className="grid gap-6 lg:grid-cols-3 lg:items-stretch">
-              <Card className={cn(cardSurface, 'group/card flex h-full min-h-0 flex-col hover:shadow-md')}>
-                <CardHeader className="flex flex-row items-start gap-2.5 space-y-0 px-5 pb-1.5 pt-4">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-700 transition-transform group-hover/card:scale-110 dark:bg-amber-950/40 dark:text-amber-400">
-                    <Bell className="h-4 w-4" aria-hidden />
-                  </div>
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <CardTitle className="text-sm font-bold leading-tight text-[#14182c] sm:text-base sm:leading-snug">
-                      Recent alerts
-                    </CardTitle>
-                    <CardDescription className="text-xs leading-snug text-[#5f6a94] sm:text-sm sm:leading-5">
-                      Updates and actions related to your reports
-                    </CardDescription>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex flex-1 flex-col space-y-3 px-5 pb-4">
-                  <ul className="flex flex-col gap-1.5">
-                    {reportAlerts.map((a) => {
-                      const rowClass =
-                        'flex w-full items-center justify-between gap-2 rounded-lg border border-[#e8ecf4] bg-[#f8f9fc] px-3 py-2 text-left transition-colors hover:border-amber-500/30 hover:bg-amber-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/35 focus-visible:ring-offset-2 dark:hover:bg-amber-950/20'
-                      return (
-                        <li key={a.id}>
-                          <button
-                            type="button"
-                            className={cn(rowClass, 'group/alert')}
-                            onClick={() => openReport(a.reportId)}
-                          >
-                            <span className="min-w-0">
-                              <span className="block text-sm font-semibold text-[#14182c] group-hover/alert:text-amber-900 dark:group-hover/alert:text-amber-200">
-                                {a.title}
-                              </span>
-                              <span className="mt-0.5 block text-xs leading-snug text-[#5f6a94]">{a.detail}</span>
-                              <span className="mt-1 block text-[11px] font-medium uppercase tracking-wide text-[#9aa3bd]">
-                                {a.when}
-                              </span>
-                            </span>
-                            <ChevronRight
-                              className="h-4 w-4 shrink-0 self-start text-[#9aa3bd] transition-transform group-hover/alert:translate-x-0.5 group-hover/alert:text-amber-700 dark:group-hover/alert:text-amber-400"
-                              aria-hidden
-                            />
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={cn('mt-auto w-full rounded-xl sm:w-auto', outlineSpark)}
-                    onClick={() => setActiveTab('report-library')}
-                  >
-                    View more alerts
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className={cn(cardSurface, 'group/card flex h-full min-h-0 flex-col hover:shadow-md')}>
-                <CardHeader className="flex flex-row items-start gap-2.5 space-y-0 px-5 pb-1.5 pt-4">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3] transition-transform group-hover/card:scale-110">
-                    <Sparkles className="h-4 w-4" aria-hidden />
-                  </div>
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <CardTitle className="text-sm font-bold leading-tight text-[#14182c] sm:text-base sm:leading-snug">
-                      WEX Insights
-                    </CardTitle>
-                    <CardDescription className="text-xs leading-snug text-[#5f6a94] sm:text-sm sm:leading-5">
-                      Tailored for your benefits program
-                    </CardDescription>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-1">
-                  <ul className="space-y-5 text-[13px] leading-snug text-[#374056] sm:space-y-6 sm:text-[14px] sm:leading-[1.5]">
-                    {keyInsights.map((insight, idx) => {
-                      const sourceReport = REPORT_LIBRARY.find((r) => r.id === insight.reportId)
-                      const label = sourceReport
-                        ? `Open report: ${sourceReport.name}`
-                        : 'Open source report'
-                      return (
-                        <li key={`${insight.reportId}-${idx}`}>
-                          <button
-                            type="button"
-                            className="group/insight flex w-full gap-2.5 rounded-lg border border-transparent p-1.5 text-left transition-colors hover:border-[#3958c3]/25 hover:bg-[#f0f3ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-2"
-                            onClick={() => openReport(insight.reportId)}
-                            aria-label={label}
-                          >
-                            <Sparkles
-                              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#3958c3] transition-transform group-hover/insight:scale-110 sm:h-4 sm:w-4"
-                              aria-hidden
-                            />
-                            <span className="min-w-0">{insight.text}</span>
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card className={cn(cardSurface, 'group/card flex h-full min-h-0 flex-col hover:shadow-md')}>
-                <CardHeader className="flex flex-row items-start gap-2.5 space-y-0 px-5 pb-1.5 pt-4">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3] transition-transform group-hover/card:scale-110">
-                    <BarChart3 className="h-4 w-4" aria-hidden />
-                  </div>
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <CardTitle className="text-sm font-bold leading-tight text-[#14182c] sm:text-base sm:leading-snug">
-                      Your most recent reports
-                    </CardTitle>
-                    <CardDescription className="text-xs leading-snug text-[#5f6a94] sm:text-sm sm:leading-5">
-                      Ordered by last update in your library — open for details.
-                    </CardDescription>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-5 pb-4">
-                  <ul className="flex min-h-0 flex-1 flex-col justify-between gap-2">
-                    {overviewRecentReports.map((r) => {
-                      const rowClass =
-                        'flex w-full items-center justify-between gap-2 rounded-lg border border-[#e8ecf4] bg-[#f8f9fc] px-3 py-2.5 text-left transition-colors hover:border-[#3958c3]/35 hover:bg-[#f0f3ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-2'
-                      return (
-                        <li key={r.id}>
-                          <button
-                            type="button"
-                            className={cn(rowClass, 'group/row')}
-                            onClick={() => openReport(r.id)}
-                          >
-                            <span className="min-w-0">
-                              <span className="block text-sm font-semibold text-[#14182c] group-hover/row:text-[#3958c3]">
-                                {r.name}
-                              </span>
-                              <span className="mt-0.5 block text-xs text-[#5f6a94]">
-                                {r.service} · Updated {relativeUpdatedFromIsoDate(r.updated)}
-                              </span>
-                            </span>
-                            <ChevronRight
-                              className="h-4 w-4 shrink-0 text-[#9aa3bd] transition-transform group-hover/row:translate-x-0.5 group-hover/row:text-[#3958c3]"
-                              aria-hidden
-                            />
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={cn('mt-auto w-full rounded-xl sm:w-auto', outlineSpark)}
-                    onClick={() => setActiveTab('report-library')}
-                  >
-                    View all reports
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </section>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="flex h-auto w-full flex-wrap gap-1 sm:w-auto">
-            <TabsTrigger value="overview">Services Overview</TabsTrigger>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="report-library">Report Library</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-6 space-y-8">
+            <section>
+              <div className="grid gap-6 lg:grid-cols-3 lg:items-stretch">
+                <Card className={cn(cardSurface, 'group/card flex h-full min-h-0 flex-col hover:shadow-md')}>
+                  <CardHeader className="flex flex-row items-start gap-2.5 space-y-0 px-5 pb-1.5 pt-4">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-700 transition-transform group-hover/card:scale-110 dark:bg-amber-950/40 dark:text-amber-400">
+                      <Bell className="h-4 w-4" aria-hidden />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <CardTitle className="text-sm font-bold leading-tight text-[#14182c] sm:text-base sm:leading-snug">
+                        Recent alerts
+                      </CardTitle>
+                      <CardDescription className="text-xs leading-snug text-[#5f6a94] sm:text-sm sm:leading-5">
+                        Updates and actions related to your reports
+                      </CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex flex-1 flex-col space-y-3 px-5 pb-4">
+                    <ul className="flex flex-col gap-1.5">
+                      {reportAlerts.map((a) => {
+                        const rowClass =
+                          'flex w-full items-center justify-between gap-2 rounded-lg border border-[#e8ecf4] bg-[#f8f9fc] px-3 py-2 text-left transition-colors hover:border-amber-500/30 hover:bg-amber-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/35 focus-visible:ring-offset-2 dark:hover:bg-amber-950/20'
+                        return (
+                          <li key={a.id}>
+                            <button
+                              type="button"
+                              className={cn(rowClass, 'group/alert')}
+                              onClick={() => openReport(a.reportId)}
+                            >
+                              <span className="min-w-0">
+                                <span className="block text-sm font-semibold text-[#14182c] group-hover/alert:text-amber-900 dark:group-hover/alert:text-amber-200">
+                                  {a.title}
+                                </span>
+                                <span className="mt-0.5 block text-xs leading-snug text-[#5f6a94]">{a.detail}</span>
+                                <span className="mt-1 block text-[11px] font-medium uppercase tracking-wide text-[#9aa3bd]">
+                                  {a.when}
+                                </span>
+                              </span>
+                              <ChevronRight
+                                className="h-4 w-4 shrink-0 self-start text-[#9aa3bd] transition-transform group-hover/alert:translate-x-0.5 group-hover/alert:text-amber-700 dark:group-hover/alert:text-amber-400"
+                                aria-hidden
+                              />
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={cn('mt-auto w-full rounded-xl sm:w-auto', outlineSpark)}
+                      onClick={() => setActiveTab('report-library')}
+                    >
+                      View more alerts
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className={cn(cardSurface, 'group/card flex h-full min-h-0 flex-col hover:shadow-md')}>
+                  <CardHeader className="flex flex-row items-start gap-2.5 space-y-0 px-5 pb-1.5 pt-4">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3] transition-transform group-hover/card:scale-110">
+                      <Sparkles className="h-4 w-4" aria-hidden />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <CardTitle className="text-sm font-bold leading-tight text-[#14182c] sm:text-base sm:leading-snug">
+                        WEX Insights
+                      </CardTitle>
+                      <CardDescription className="text-xs leading-snug text-[#5f6a94] sm:text-sm sm:leading-5">
+                        Tailored for your benefits program
+                      </CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-1">
+                    <ul className="space-y-5 text-[13px] leading-snug text-[#374056] sm:space-y-6 sm:text-[14px] sm:leading-[1.5]">
+                      {keyInsights.map((insight, idx) => {
+                        const sourceReport = REPORT_LIBRARY.find((r) => r.id === insight.reportId)
+                        const label = sourceReport
+                          ? `Open report: ${sourceReport.name}`
+                          : 'Open source report'
+                        return (
+                          <li key={`${insight.reportId}-${idx}`}>
+                            <button
+                              type="button"
+                              className="group/insight flex w-full gap-2.5 rounded-lg border border-transparent p-1.5 text-left transition-colors hover:border-[#3958c3]/25 hover:bg-[#f0f3ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-2"
+                              onClick={() => openReport(insight.reportId)}
+                              aria-label={label}
+                            >
+                              <Sparkles
+                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#3958c3] transition-transform group-hover/insight:scale-110 sm:h-4 sm:w-4"
+                                aria-hidden
+                              />
+                              <span className="min-w-0">{insight.text}</span>
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </CardContent>
+                </Card>
+
+                <Card className={cn(cardSurface, 'group/card flex h-full min-h-0 flex-col hover:shadow-md')}>
+                  <CardHeader className="flex flex-row items-start gap-2.5 space-y-0 px-5 pb-1.5 pt-4">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3] transition-transform group-hover/card:scale-110">
+                      <BarChart3 className="h-4 w-4" aria-hidden />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <CardTitle className="text-sm font-bold leading-tight text-[#14182c] sm:text-base sm:leading-snug">
+                        Your most recent reports
+                      </CardTitle>
+                      <CardDescription className="text-xs leading-snug text-[#5f6a94] sm:text-sm sm:leading-5">
+                        Ordered by last update in your library — open for details.
+                      </CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-5 pb-4">
+                    <ul className="flex min-h-0 flex-1 flex-col justify-between gap-2">
+                      {overviewRecentReports.map((r) => {
+                        const rowClass =
+                          'flex w-full items-center justify-between gap-2 rounded-lg border border-[#e8ecf4] bg-[#f8f9fc] px-3 py-2.5 text-left transition-colors hover:border-[#3958c3]/35 hover:bg-[#f0f3ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-2'
+                        return (
+                          <li key={r.id}>
+                            <button
+                              type="button"
+                              className={cn(rowClass, 'group/row')}
+                              onClick={() => openReport(r.id)}
+                            >
+                              <span className="min-w-0">
+                                <span className="block text-sm font-semibold text-[#14182c] group-hover/row:text-[#3958c3]">
+                                  {r.name}
+                                </span>
+                                <span className="mt-0.5 block text-xs text-[#5f6a94]">
+                                  {r.service} · Updated {relativeUpdatedFromIsoDate(r.updated)}
+                                </span>
+                              </span>
+                              <ChevronRight
+                                className="h-4 w-4 shrink-0 text-[#9aa3bd] transition-transform group-hover/row:translate-x-0.5 group-hover/row:text-[#3958c3]"
+                                aria-hidden
+                              />
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={cn('mt-auto w-full rounded-xl sm:w-auto', outlineSpark)}
+                      onClick={() => setActiveTab('report-library')}
+                    >
+                      View all reports
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
+
             <section>
               <h2 className="mb-4 text-lg font-semibold">Services dashboard</h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -492,7 +496,16 @@ export default function ReportsPage() {
                         type="button"
                         variant="outline"
                         className="mt-2 w-full"
-                        onClick={() => setActiveTab('report-library')}
+                        onClick={() => {
+                          setCategoryFilter(k.reportLibraryCategory)
+                          setActiveTab('report-library')
+                          window.setTimeout(() => {
+                            document.getElementById('report-library')?.scrollIntoView({
+                              behavior: 'smooth',
+                              block: 'start',
+                            })
+                          }, 50)
+                        }}
                       >
                         View Report Libraries
                       </Button>

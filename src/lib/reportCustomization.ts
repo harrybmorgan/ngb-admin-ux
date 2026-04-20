@@ -210,6 +210,41 @@ function normalizeCustomization(raw: unknown): ReportCustomization {
   return base
 }
 
+/**
+ * Saved displayName / displayDescription in localStorage override the catalog. When a report is
+ * renamed in REPORT_LIBRARY, clear persisted values that match the old strings so the new defaults show.
+ */
+const LEGACY_REPORT_PRESENTATION: Record<
+  string,
+  { displayNames?: readonly string[]; displayDescriptions?: readonly string[] }
+> = {
+  r1: {
+    displayNames: ['Payroll deduction reconciliation'],
+    displayDescriptions: ['Compare payroll deductions to funding and variances.'],
+  },
+}
+
+function migrateLegacyReportPresentation(reportId: string, c: ReportCustomization): ReportCustomization {
+  const leg = LEGACY_REPORT_PRESENTATION[reportId]
+  if (!leg) return c
+
+  let displayName = c.displayName
+  let displayDescription = c.displayDescription
+  const dn = displayName?.trim() ?? ''
+  if (leg.displayNames?.includes(dn)) {
+    displayName = undefined
+  }
+  const dd = displayDescription?.trim() ?? ''
+  if (leg.displayDescriptions?.includes(dd)) {
+    displayDescription = undefined
+  }
+
+  if (displayName === c.displayName && displayDescription === c.displayDescription) {
+    return c
+  }
+  return { ...c, displayName, displayDescription }
+}
+
 /** Built-in title overrides are not edited in the UI; custom columns keep their label and type. */
 export function stripColumnCustomLabels(customization: ReportCustomization): ReportCustomization {
   return {
@@ -238,12 +273,24 @@ export function loadReportCustomization(reportId: string): ReportCustomization {
     const v2 = localStorage.getItem(`${STORAGE_PREFIX}${reportId}`)
     if (v2) {
       const n = normalizeCustomization(JSON.parse(v2) as unknown)
-      return stripColumnCustomLabels({ ...n, columns: expandToFullColumnList(n.columns) })
+      let result = stripColumnCustomLabels({ ...n, columns: expandToFullColumnList(n.columns) })
+      const migrated = migrateLegacyReportPresentation(reportId, result)
+      if (migrated !== result) {
+        result = migrated
+        saveReportCustomization(reportId, result)
+      }
+      return result
     }
     const legacy = localStorage.getItem(`${STORAGE_PREFIX_LEGACY}${reportId}`)
     if (legacy) {
       const n = normalizeCustomization(JSON.parse(legacy) as unknown)
-      return stripColumnCustomLabels({ ...n, columns: expandToFullColumnList(n.columns) })
+      let result = stripColumnCustomLabels({ ...n, columns: expandToFullColumnList(n.columns) })
+      const migrated = migrateLegacyReportPresentation(reportId, result)
+      if (migrated !== result) {
+        result = migrated
+        saveReportCustomization(reportId, result)
+      }
+      return result
     }
     return fallback()
   } catch {
