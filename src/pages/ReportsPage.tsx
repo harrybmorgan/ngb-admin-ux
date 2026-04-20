@@ -32,7 +32,9 @@ import {
 import { toast } from 'sonner'
 import { ArrowUpRight, BarChart3, Bell, ChevronRight, Download, Sparkles } from 'lucide-react'
 import { AdminAiChatInput } from '@/components/dashboard/AdminAiChatInput'
+import { useAdminAssist } from '@/context/AdminAssistContext'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
+import { AdminDockablePageShell } from '@/components/layout/AdminDockablePageShell'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import { WexAiSparkleMark } from '@/components/ui/WexAiSparkleMark'
 import { REPORT_LIBRARY, type ReportLibraryItemStatus } from '@/data/adminMockData'
@@ -168,6 +170,7 @@ const kpis: { service: string; metrics: ServiceMetric[] }[] = [
 
 export default function ReportsPage() {
   const navigate = useNavigate()
+  const { openAssistant } = useAdminAssist()
   const [activeTab, setActiveTab] = useState('overview')
   const [nl, setNl] = useState('')
   const [reportSearch, setReportSearch] = useState('')
@@ -243,6 +246,7 @@ export default function ReportsPage() {
   return (
     <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
+      <AdminDockablePageShell>
       <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-8 px-4 py-8 sm:px-6 lg:px-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
@@ -287,12 +291,9 @@ export default function ReportsPage() {
                     value={nl}
                     onChange={setNl}
                     onMicClick={() => toast.message('Voice input is not enabled in this prototype.')}
-                    onSendClick={() => {
-                      toast.message(
-                        nl.trim()
-                          ? 'Search and assistant features are not enabled in this prototype.'
-                          : 'Type a question to get started (prototype).',
-                      )
+                    onSubmit={(text) => {
+                      openAssistant({ seedText: text })
+                      setNl('')
                     }}
                   />
                 </div>
@@ -739,6 +740,7 @@ export default function ReportsPage() {
 
       </main>
       <AdminFooter />
+      </AdminDockablePageShell>
     </div>
   )
 }

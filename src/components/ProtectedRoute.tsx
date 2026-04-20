@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { AdminAssistProvider } from '@/context/AdminAssistContext'
 import type { ReactNode } from 'react'
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -17,5 +18,5 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     return null
   }
 
-  return <>{children}</>
+  return <AdminAssistProvider>{children}</AdminAssistProvider>
 }

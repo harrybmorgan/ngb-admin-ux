@@ -99,10 +99,10 @@ export function EmployerPortalLaunchDialog({ open, onOpenChange, onGoHome }: Emp
 
           <DialogFooter className="relative z-10 mt-2 flex flex-col gap-2 sm:flex-col">
             <Button type="button" className="w-full" onClick={onGoHome}>
-              Go to admin home
+              Go home
             </Button>
             <Button type="button" variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
-              Make further changes
+              Keep editing
             </Button>
           </DialogFooter>
         </div>

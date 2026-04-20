@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
+import { AdminDockablePageShell } from '@/components/layout/AdminDockablePageShell'
 import { EmbeddedThemingStudio } from '@/pages/theming-engine/EmbeddedThemingStudio'
 
 /**
@@ -9,7 +10,9 @@ export default function ThemingPage() {
   return (
     <div className={cn('admin-app-bg flex min-h-screen flex-col font-sans')}>
       <AdminNavigation hideNav />
-      <EmbeddedThemingStudio variant="standalone" />
+      <AdminDockablePageShell>
+        <EmbeddedThemingStudio variant="standalone" />
+      </AdminDockablePageShell>
     </div>
   )
 }

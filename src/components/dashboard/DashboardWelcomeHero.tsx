@@ -8,10 +8,12 @@ import { EMPLOYER } from '@/data/adminMockData'
 import { useGuidedSetupHomeState } from '@/hooks/useGuidedSetupHomeState'
 import { formatStepsLeftPhrase, getWizardHeroMeta } from '@/lib/guidedSetupHome'
 import { cn } from '@/lib/utils'
+import { WEXLY_GRADIENT, WEXLY_GRADIENT_SHADOW } from '@/lib/wexlyBrand'
+import { useAdminAssist } from '@/context/AdminAssistContext'
 import { AdminAiChatInput } from '@/components/dashboard/AdminAiChatInput'
 import { GetHelpDialog } from '@/components/dashboard/GetHelpDialog'
 import { ShineBorder } from '@/components/ui/ShineBorder'
-import { WexAiSparkleMark } from '@/components/ui/WexAiSparkleMark'
+import { WexlySparkleIcon } from '@/components/wexly/WexlySparkleIcon'
 
 const MotionLink = motion(Link)
 
@@ -193,6 +195,7 @@ const HERO_VISITED_KEY = 'ngb-admin-dashboard-hero-visited'
 export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComplete }: DashboardWelcomeHeroProps) {
   const navigate = useNavigate()
   const prefersReducedMotion = useReducedMotion()
+  const { openAssistant } = useAdminAssist()
   const guidedSnapshot = useGuidedSetupHomeState()
   const [askValue, setAskValue] = useState('')
   const [getHelpOpen, setGetHelpOpen] = useState(false)
@@ -280,7 +283,7 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
           borderWidth={1.5}
           duration={18}
           color={['#25146f', '#c8102e', '#25146f']}
-          className="pointer-events-none absolute inset-0 z-[45] rounded-[inherit] border-none bg-transparent p-0 shadow-none dark:bg-transparent"
+          className="pointer-events-none absolute inset-0 z-[5] rounded-[inherit] border-none bg-transparent p-0 shadow-none dark:bg-transparent"
         >
           {null}
         </ShineBorder>
@@ -304,20 +307,17 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
           <motion.div
             layout
             transition={{ layout: layoutSpring }}
-            className="flex min-w-0 flex-1 flex-col gap-6 px-6 py-6 sm:px-8 sm:py-8 lg:max-w-none lg:basis-[58%]"
+            className="relative z-20 flex min-w-0 flex-1 flex-col gap-6 px-6 py-6 sm:px-8 sm:py-8 lg:max-w-none lg:basis-[58%]"
           >
             <motion.div variants={greetingVariants} className="flex flex-col gap-4">
               <motion.div
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-[0_1.057px_3.17px_rgba(2,13,36,0.2),0_0_0.528px_rgba(2,13,36,0.3)]"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(133.514deg, rgb(37, 20, 111) 2.4625%, rgb(200, 16, 46) 100%)',
-                }}
+                style={{ background: WEXLY_GRADIENT, boxShadow: WEXLY_GRADIENT_SHADOW }}
                 aria-hidden
                 whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
                 transition={restrainedSpring}
               >
-                <WexAiSparkleMark size="16.9px" />
+                <WexlySparkleIcon size={17} className="text-white" />
               </motion.div>
               <div className="flex min-w-0 flex-col gap-2">
                 <h2 className="text-[40px] font-semibold leading-[56px] tracking-[-0.88px] text-[#14182c]">
@@ -334,12 +334,9 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
                 value={askValue}
                 onChange={setAskValue}
                 onMicClick={() => toast.message('Voice input is not enabled in this prototype.')}
-                onSendClick={() => {
-                  toast.message(
-                    askValue.trim()
-                      ? 'Search and assistant features are not enabled in this prototype.'
-                      : 'Type a question to get started (prototype).',
-                  )
+                onSubmit={(text) => {
+                  openAssistant({ seedText: text })
+                  setAskValue('')
                 }}
               />
             </motion.div>
@@ -433,7 +430,7 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
           <motion.div
             layout
             transition={{ layout: layoutSpring }}
-            className="flex min-w-0 flex-col px-6 py-6 sm:px-8 sm:py-8 lg:basis-[42%]"
+            className="relative z-0 flex min-w-0 flex-col px-6 py-6 sm:px-8 sm:py-8 lg:basis-[42%]"
           >
             <motion.div
               variants={ctaHeaderVariants}

@@ -16,6 +16,7 @@ import { CombinedOverviewDashboard } from '@/components/reports/CombinedOverview
 import { ReportClaimFilterBar } from '@/components/reports/ReportClaimFilterBar'
 import { ReportClaimTable } from '@/components/reports/ReportClaimTable'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
+import { AdminDockablePageShell } from '@/components/layout/AdminDockablePageShell'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import {
   COMBINED_OVERVIEW_REPORT_ID,
@@ -130,13 +131,15 @@ export default function ReportDetailPage() {
     return (
       <div className="admin-app-bg flex min-h-screen flex-col font-sans">
         <AdminNavigation />
-        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-8 sm:px-6 lg:px-8">
-          <p className="text-muted-foreground">This report could not be found.</p>
-          <Button type="button" className="mt-4" onClick={() => navigate('/reports')}>
-            Back to Reporting &amp; Analytics
-          </Button>
-        </main>
-        <AdminFooter />
+        <AdminDockablePageShell>
+          <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-8 sm:px-6 lg:px-8">
+            <p className="text-muted-foreground">This report could not be found.</p>
+            <Button type="button" className="mt-4" onClick={() => navigate('/reports')}>
+              Back to Reporting &amp; Analytics
+            </Button>
+          </main>
+          <AdminFooter />
+        </AdminDockablePageShell>
       </div>
     )
   }
@@ -144,6 +147,7 @@ export default function ReportDetailPage() {
   return (
     <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
+      <AdminDockablePageShell>
       <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         <Breadcrumb>
           <BreadcrumbList>
@@ -305,6 +309,7 @@ export default function ReportDetailPage() {
         )}
       </main>
       <AdminFooter />
+      </AdminDockablePageShell>
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { BarChart3, ChevronRight, CreditCard, FileSpreadsheet, Lock, Palette, Sp
 import { DashboardWelcomeHero } from '@/components/dashboard/DashboardWelcomeHero'
 import { DashboardManageSetupSection } from '@/components/dashboard/DashboardManageSetupSection'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
+import { AdminDockablePageShell } from '@/components/layout/AdminDockablePageShell'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import { useEmployerSetup } from '@/hooks/useEmployerSetup'
 import { REPORT_LIBRARY } from '@/data/adminMockData'
@@ -82,7 +83,8 @@ export default function DashboardPage() {
     <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
 
-      <main className="mx-auto w-full max-w-[1200px] flex-1 space-y-10 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      <AdminDockablePageShell>
+        <main className="mx-auto w-full max-w-[1200px] flex-1 space-y-10 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
         <section>
           <DashboardWelcomeHero
             onboardingComplete={onboardingComplete}
@@ -250,9 +252,10 @@ export default function DashboardPage() {
             })}
           </div>
         </section>
-      </main>
+          </main>
 
-      <AdminFooter />
+        <AdminFooter />
+      </AdminDockablePageShell>
     </div>
   )
 }

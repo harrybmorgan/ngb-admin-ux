@@ -70,8 +70,14 @@ export function ContentLibraryGrid({
             <p className="text-xs text-muted-foreground">{item.format}</p>
           </CardContent>
           <CardFooter className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
-            <Button type="button" size="sm" onClick={() => onPreview(item)}>
-              Open / Preview
+            <Button
+              type="button"
+              size="md"
+              onClick={() => onPreview(item)}
+              className="shrink-0"
+              aria-label={`Preview ${item.title}`}
+            >
+              Preview
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

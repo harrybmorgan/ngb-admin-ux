@@ -13,6 +13,7 @@ import {
 } from '@wexinc-healthbenefits/ben-ui-kit'
 import { Plus } from 'lucide-react'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
+import { AdminDockablePageShell } from '@/components/layout/AdminDockablePageShell'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import { EmployerRequestWizard } from '@/components/dashboard/EmployerRequestWizard'
 
@@ -28,6 +29,7 @@ export default function TicketsPage() {
   return (
     <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
+      <AdminDockablePageShell>
       <main className="mx-auto w-full max-w-[1000px] flex-1 space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -64,6 +66,7 @@ export default function TicketsPage() {
           />
         </DialogContent>
       </Dialog>
+      </AdminDockablePageShell>
     </div>
   )
 }

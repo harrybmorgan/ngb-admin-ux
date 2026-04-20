@@ -66,6 +66,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
+import { AdminDockablePageShell } from '@/components/layout/AdminDockablePageShell'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import { EmployerPortalLaunchDialog } from '@/components/setup/EmployerPortalLaunchDialog'
 import {
@@ -5090,6 +5091,7 @@ export default function SetupWizardPage() {
   return (
     <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
+      <AdminDockablePageShell>
       <main
         className={cn(
           'mx-auto flex w-full max-w-none flex-1 flex-col px-4 py-6 sm:px-6 sm:py-8 lg:px-8',
@@ -5538,6 +5540,7 @@ export default function SetupWizardPage() {
         onGoHome={handleLaunchGoHome}
       />
       <AdminFooter />
+      </AdminDockablePageShell>
     </div>
   )
 }
