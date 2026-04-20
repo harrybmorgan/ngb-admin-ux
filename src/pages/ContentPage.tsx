@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Button, toast } from '@wexinc-healthbenefits/ben-ui-kit'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
+import { AdminDockablePageShell } from '@/components/layout/AdminDockablePageShell'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 import { ContentDeleteDialog } from '@/components/content/ContentDeleteDialog'
 import { ContentLibraryGrid } from '@/components/content/ContentLibraryGrid'
@@ -147,9 +148,10 @@ export default function ContentPage() {
   return (
     <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
+      <AdminDockablePageShell>
       <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Content management</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Library</h1>
           <p className="text-sm text-muted-foreground">
             Documents, videos, and tutorials you can publish to the employee portal.
           </p>
@@ -198,6 +200,7 @@ export default function ContentPage() {
       />
 
       <AdminFooter />
+      </AdminDockablePageShell>
     </div>
   )
 }

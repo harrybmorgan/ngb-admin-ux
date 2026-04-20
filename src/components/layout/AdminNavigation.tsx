@@ -40,7 +40,7 @@ const mainNav: MainNavItem[] = [
   { to: '/enrollment', label: 'People', icon: Users },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/billing', label: 'Payroll', icon: CreditCard },
-  { to: '/content', label: 'Content', icon: FolderOpen },
+  { to: '/content', label: 'Library', icon: FolderOpen },
   { to: '/communications', label: 'Communications', icon: Mail },
 ]
 

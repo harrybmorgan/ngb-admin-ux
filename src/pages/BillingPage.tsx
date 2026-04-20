@@ -18,12 +18,14 @@ import {
   TabsTrigger,
 } from '@wexinc-healthbenefits/ben-ui-kit'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
+import { AdminDockablePageShell } from '@/components/layout/AdminDockablePageShell'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 
 export default function BillingPage() {
   return (
     <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
+      <AdminDockablePageShell>
       <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Payroll</h1>
@@ -169,6 +171,7 @@ export default function BillingPage() {
         </Tabs>
       </main>
       <AdminFooter />
+      </AdminDockablePageShell>
     </div>
   )
 }
