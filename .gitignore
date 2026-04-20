@@ -27,6 +27,9 @@ packages/design-tokens/.style-dictionary-tokens.json
 # Private registry credentials (copy from your environment; see README)
 .npmrc
 
+# Cursor: user rules and skills
+.cursor/
+
 # Playwright / A11y Testing
 test-results
 playwright-report
