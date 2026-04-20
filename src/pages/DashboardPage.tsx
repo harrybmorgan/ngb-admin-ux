@@ -21,10 +21,26 @@ const sectionEyebrow = 'text-[12px] font-black uppercase tracking-[3px] text-[#5
 const outlineSpark =
   'rounded-xl border-[#3958c3] font-medium text-[#3958c3] hover:bg-[#3958c3]/5'
 
-const keyInsights = [
-  'Life-event volume is up 18% vs last month — most are dependent adds tied to your new medical tier.',
-  'Claims filed via web portal are up this month; compare filing channels in Claims by Source.',
-  'COBRA notices and premium subsidy reports are the most opened items by your team this week.',
+/** Shared list row for WEX Insights and Your top reports (same min-height and chrome). */
+const dataReportsListRowClass =
+  'flex w-full min-h-[5rem] items-center justify-between gap-3 rounded-xl border border-[#e8ecf4] bg-[#f8f9fc] px-4 py-3 text-left transition-colors hover:border-[#3958c3]/35 hover:bg-[#f0f3ff]'
+
+const focusRingRow = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/30 focus-visible:ring-offset-2'
+
+/** Shown in WEX Insights when the employer portal is live (prototype: rows look actionable but do not navigate). */
+const postLaunchWexInsights = [
+  {
+    headline: 'Your OE announcement email is scheduled for tomorrow.',
+    detail: 'Would you like to preview or edit?',
+  },
+  {
+    headline: "45 employees haven't started their elections.",
+    detail: "Click to send a 'Last Call' SMS.",
+  },
+  {
+    headline: '12 EOI forms are pending approval.',
+    detail: 'Click here to bulk approve or notify employees.',
+  },
 ] as const
 
 const topReports = REPORT_LIBRARY.slice(0, 3)
@@ -120,11 +136,32 @@ export default function DashboardPage() {
               <CardContent className="space-y-6 px-6 pb-6 pt-2">
                 {portalLive ? (
                   <>
-                    <ul className="space-y-5 text-[15px] leading-[1.65] text-[#374056]">
-                      {keyInsights.map((line) => (
-                        <li key={line} className="flex gap-3.5">
-                          <Sparkles className="mt-1 h-4 w-4 shrink-0 text-[#3958c3]" aria-hidden />
-                          <span className="min-w-0">{line}</span>
+                    <ul className="flex flex-col gap-2">
+                      {postLaunchWexInsights.map(({ headline, detail }) => (
+                        <li key={headline}>
+                          <button
+                            type="button"
+                            className={cn(dataReportsListRowClass, focusRingRow, 'group/insight cursor-pointer')}
+                          >
+                            <span className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                              <Sparkles
+                                className="h-4 w-4 shrink-0 text-[#3958c3] group-hover/insight:text-[#3958c3]"
+                                aria-hidden
+                              />
+                              <span className="min-w-0">
+                                <span className="block text-sm font-bold text-[#14182c] group-hover/insight:text-[#3958c3]">
+                                  {headline}
+                                </span>
+                                <span className="mt-0.5 block text-xs font-normal leading-snug text-[#5f6a94]">
+                                  {detail}
+                                </span>
+                              </span>
+                            </span>
+                            <ChevronRight
+                              className="h-4 w-4 shrink-0 text-[#9aa3bd] transition-transform group-hover/insight:translate-x-0.5 group-hover/insight:text-[#3958c3]"
+                              aria-hidden
+                            />
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -162,38 +199,31 @@ export default function DashboardPage() {
                   ) : null}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4 px-6 pb-6">
+              <CardContent className="space-y-6 px-6 pb-6 pt-2">
                 {portalLive ? (
                   <>
                     <ul className="flex flex-col gap-2">
-                      {topReports.map((r) => {
-                        const rowClass =
-                          'flex items-center justify-between gap-3 rounded-xl border border-[#e8ecf4] bg-[#f8f9fc] px-4 py-3 text-left'
-                        return (
-                          <li key={r.id}>
-                            <Link
-                              to="/reports"
-                              className={cn(
-                                rowClass,
-                                'group/row transition-colors hover:border-[#3958c3]/35 hover:bg-[#f0f3ff]',
-                              )}
-                            >
-                              <span className="min-w-0">
-                                <span className="block text-sm font-semibold text-[#14182c] group-hover/row:text-[#3958c3]">
-                                  {r.name}
-                                </span>
-                                <span className="mt-0.5 block text-xs text-[#5f6a94]">
-                                  {r.service} · Updated {relativeUpdatedFromIsoDate(r.updated)}
-                                </span>
+                      {topReports.map((r) => (
+                        <li key={r.id}>
+                          <Link
+                            to="/reports"
+                            className={cn(dataReportsListRowClass, focusRingRow, 'group/row')}
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-bold text-[#14182c] group-hover/row:text-[#3958c3]">
+                                {r.name}
                               </span>
-                              <ChevronRight
-                                className="h-4 w-4 shrink-0 text-[#9aa3bd] transition-transform group-hover/row:translate-x-0.5 group-hover/row:text-[#3958c3]"
-                                aria-hidden
-                              />
-                            </Link>
-                          </li>
-                        )
-                      })}
+                              <span className="mt-0.5 block text-xs font-normal leading-snug text-[#5f6a94]">
+                                {r.service} · Updated {relativeUpdatedFromIsoDate(r.updated)}
+                              </span>
+                            </span>
+                            <ChevronRight
+                              className="h-4 w-4 shrink-0 text-[#9aa3bd] transition-transform group-hover/row:translate-x-0.5 group-hover/row:text-[#3958c3]"
+                              aria-hidden
+                            />
+                          </Link>
+                        </li>
+                      ))}
                     </ul>
                     <Button asChild variant="outline" size="sm" className={cn('w-full rounded-xl sm:w-auto', outlineSpark)}>
                       <Link to="/reports">View all reports</Link>
