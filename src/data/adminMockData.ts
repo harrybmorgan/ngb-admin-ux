@@ -672,6 +672,13 @@ export type ReportDetailClaimRow = {
   planDisplayName: string
   claimStatus: ReportDetailClaimStatus
   claimProcessingStatus: string
+  /** Optional — shown when the column is enabled in report customization. */
+  employeeName?: string
+  employeeId?: string
+  enrollmentDate?: string
+  numberOfDependents?: number
+  cobraDuration?: string
+  ytdContributions?: string
 }
 
 /** Submit dates fall within the rolling “Last 30 days” window when report “as of” is the max date below (04/15/2026). */

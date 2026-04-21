@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Mic, Send, Clock, Sparkles } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { useReducedMotion } from 'framer-motion'
@@ -7,15 +7,15 @@ import { WEXLY_GRADIENT, WEXLY_GRADIENT_SHADOW } from '@/lib/wexlyBrand'
 
 const PLACEHOLDER_PREFIX = 'Ask WEXly… '
 
-/** Text shown after the prefix in the rotating placeholder and suggestions. */
-const QUERIES = [
+/** Default text after the prefix in the rotating placeholder and suggestions (non–Reporting pages). */
+const DEFAULT_SAMPLE_QUERIES = [
   'how do I process a life event?',
   "how do I update an employee's address?",
   'what is our plan renewal checklist?',
   'why is my payroll contribution file wrong?',
   'how do I grant admin access?',
   'where is my admin fee invoice?',
-]
+] as const
 
 function fullSuggestion(suffix: string) {
   return `${PLACEHOLDER_PREFIX}${suffix}`
@@ -52,9 +52,21 @@ export type AdminAiChatInputProps = {
   onSubmit?: (trimmed: string) => void
   /** Legacy: used when `onSubmit` is omitted (prototype toast). */
   onSendClick?: () => void
+  /**
+   * Rotating placeholder + dropdown suggestions. Defaults to general benefits prompts.
+   * Pass from Reporting & Analytics when you want report-specific samples.
+   */
+  sampleQueries?: readonly string[]
 }
 
-export function AdminAiChatInput({ value, onChange, onMicClick, onSubmit, onSendClick }: AdminAiChatInputProps) {
+export function AdminAiChatInput({
+  value,
+  onChange,
+  onMicClick,
+  onSubmit,
+  onSendClick,
+  sampleQueries,
+}: AdminAiChatInputProps) {
   const prefersReducedMotion = useReducedMotion()
   const [isFocused, setIsFocused] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -63,7 +75,16 @@ export function AdminAiChatInput({ value, onChange, onMicClick, onSubmit, onSend
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const queries = useMemo(
+    () => (sampleQueries != null && sampleQueries.length > 0 ? sampleQueries : DEFAULT_SAMPLE_QUERIES),
+    [sampleQueries],
+  )
+
   const showPlaceholder = !isFocused && !value && !isDropdownOpen
+
+  useEffect(() => {
+    setQueryIndex(0)
+  }, [sampleQueries])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -79,19 +100,19 @@ export function AdminAiChatInput({ value, onChange, onMicClick, onSubmit, onSend
   useEffect(() => {
     if (!showPlaceholder || !hasAnimatedIn) return
     const timeout = setTimeout(() => {
-      setQueryIndex((prev) => (prev + 1) % QUERIES.length)
+      setQueryIndex((prev) => (prev + 1) % queries.length)
     }, 3000)
     return () => clearTimeout(timeout)
-  }, [showPlaceholder, queryIndex, hasAnimatedIn])
+  }, [showPlaceholder, queryIndex, hasAnimatedIn, queries.length])
 
   useEffect(() => {
     if (prefersReducedMotion && showPlaceholder) {
       const id = setInterval(() => {
-        setQueryIndex((prev) => (prev + 1) % QUERIES.length)
+        setQueryIndex((prev) => (prev + 1) % queries.length)
       }, 3000)
       return () => clearInterval(id)
     }
-  }, [prefersReducedMotion, showPlaceholder])
+  }, [prefersReducedMotion, showPlaceholder, queries.length])
 
   const handleSuggestionClick = (query: string) => {
     if (onSubmit) {
@@ -157,7 +178,7 @@ export function AdminAiChatInput({ value, onChange, onMicClick, onSubmit, onSend
                 }
               }}
               className="w-full border-0 bg-transparent text-[15px] text-[#14182c] outline-none placeholder:text-[#9aa3bd]"
-              placeholder={showPlaceholder ? `${PLACEHOLDER_PREFIX}${QUERIES[queryIndex]}` : undefined}
+              placeholder={showPlaceholder ? `${PLACEHOLDER_PREFIX}${queries[queryIndex]}` : undefined}
               aria-label="Message WEXly"
             />
           </div>
@@ -187,13 +208,13 @@ export function AdminAiChatInput({ value, onChange, onMicClick, onSubmit, onSend
             <button
               type="button"
               className="flex w-full items-start gap-3 px-6 py-3 text-left transition-colors hover:bg-[#f8f9fe]"
-              onClick={() => handleSuggestionClick(QUERIES[0])}
+              onClick={() => handleSuggestionClick(queries[0])}
             >
               <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#7a87b2]" />
-              <span className="text-[14px] leading-snug text-[#14182c]">{fullSuggestion(QUERIES[0])}</span>
+              <span className="text-[14px] leading-snug text-[#14182c]">{fullSuggestion(queries[0])}</span>
             </button>
             <div className="mx-4 my-1 h-px bg-[#e3e7f4]" />
-            {QUERIES.slice(1).map((query, i) => (
+            {queries.slice(1).map((query, i) => (
               <button
                 key={i}
                 type="button"
@@ -307,12 +328,12 @@ export function AdminAiChatInput({ value, onChange, onMicClick, onSubmit, onSend
                       }}
                     >
                       {queryIndex === 0 && !hasAnimatedIn
-                        ? QUERIES[0].split('').map((char, i) => (
+                        ? queries[0].split('').map((char, i) => (
                             <motion.span key={`q-${i}`} variants={letterVariants} style={{ display: 'inline-block' }}>
                               {char === ' ' ? '\u00A0' : char}
                             </motion.span>
                           ))
-                        : QUERIES[queryIndex]}
+                        : queries[queryIndex]}
                     </motion.span>
                   </AnimatePresence>
                 </div>
@@ -357,13 +378,13 @@ export function AdminAiChatInput({ value, onChange, onMicClick, onSubmit, onSend
             <button
               type="button"
               className="flex w-full items-start gap-3 px-6 py-3 text-left transition-colors hover:bg-[#f8f9fe]"
-              onClick={() => handleSuggestionClick(QUERIES[0])}
+              onClick={() => handleSuggestionClick(queries[0])}
             >
               <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#7a87b2]" />
-              <span className="text-[14px] leading-snug text-[#14182c]">{fullSuggestion(QUERIES[0])}</span>
+              <span className="text-[14px] leading-snug text-[#14182c]">{fullSuggestion(queries[0])}</span>
             </button>
             <div className="mx-4 my-1 h-px bg-[#e3e7f4]" />
-            {QUERIES.slice(1).map((query, i) => (
+            {queries.slice(1).map((query, i) => (
               <button
                 key={i}
                 type="button"
