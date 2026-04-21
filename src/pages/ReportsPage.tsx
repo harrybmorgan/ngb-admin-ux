@@ -32,14 +32,15 @@ import {
 import { toast } from 'sonner'
 import { ArrowUpRight, BarChart3, Bell, ChevronRight, Download, Sparkles } from 'lucide-react'
 import { AdminAiChatInput } from '@/components/dashboard/AdminAiChatInput'
+import { WexlySparkleIcon } from '@/components/wexly/WexlySparkleIcon'
 import { useAdminAssist } from '@/context/AdminAssistContext'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminDockablePageShell } from '@/components/layout/AdminDockablePageShell'
 import { AdminFooter } from '@/components/layout/AdminFooter'
-import { WexAiSparkleMark } from '@/components/ui/WexAiSparkleMark'
 import { REPORT_LIBRARY, type ReportLibraryItemStatus } from '@/data/adminMockData'
 import { relativeUpdatedFromIsoDate } from '@/lib/relativeUpdatedDate'
 import { cn } from '@/lib/utils'
+import { WEXLY_GRADIENT, WEXLY_GRADIENT_SHADOW } from '@/lib/wexlyBrand'
 
 const PINNED_REPORTS_STORAGE_KEY = 'ngb-admin-ux-pinned-report-ids'
 /** Includes Combined Overview Dashboard (`r7`) for quick access to the cross-service view. */
@@ -269,37 +270,25 @@ export default function ReportsPage() {
               <div className="spark-hero-bg-layer-b" aria-hidden />
 
               <div className="spark-hero-content flex flex-col gap-4 px-4 py-4 sm:px-5 sm:py-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3.5">
+                <div className="flex w-full min-h-0 items-center gap-3 sm:gap-3.5">
                   <div
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-[0_1.057px_3.17px_rgba(2,13,36,0.2),0_0_0.528px_rgba(2,13,36,0.3)]"
-                    style={{
-                      backgroundImage:
-                        'linear-gradient(133.514deg, rgb(37, 20, 111) 2.4625%, rgb(200, 16, 46) 100%)',
-                    }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-[0_1.057px_3.17px_rgba(2,13,36,0.2),0_0_0.528px_rgba(2,13,36,0.3)]"
+                    style={{ background: WEXLY_GRADIENT, boxShadow: WEXLY_GRADIENT_SHADOW }}
                     aria-hidden
                   >
-                    <WexAiSparkleMark size="14px" />
+                    <WexlySparkleIcon size={17} className="text-white" />
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <h2 className="text-lg font-semibold leading-snug tracking-tight text-[#14182c] sm:text-xl">
-                      Reporting assistant
-                    </h2>
-                    <p className="text-sm leading-relaxed text-[#5f6a94]">
-                    Explore reports, understand what's happening, and identify next steps.
-                    </p>
+                  <div className="min-h-0 min-w-0 flex-1">
+                    <AdminAiChatInput
+                      value={nl}
+                      onChange={setNl}
+                      onMicClick={() => toast.message('Voice input is not enabled in this prototype.')}
+                      onSubmit={(text) => {
+                        openAssistant({ seedText: text })
+                        setNl('')
+                      }}
+                    />
                   </div>
-                </div>
-
-                <div className="min-h-0 w-full pt-1">
-                  <AdminAiChatInput
-                    value={nl}
-                    onChange={setNl}
-                    onMicClick={() => toast.message('Voice input is not enabled in this prototype.')}
-                    onSubmit={(text) => {
-                      openAssistant({ seedText: text })
-                      setNl('')
-                    }}
-                  />
                 </div>
               </div>
             </div>
@@ -314,8 +303,8 @@ export default function ReportsPage() {
 
           <TabsContent value="overview" className="mt-6 space-y-8">
             <section>
-              <div className="grid gap-6 lg:grid-cols-3 lg:items-stretch">
-                <Card className={cn(cardSurface, 'group/card flex h-full min-h-0 flex-col hover:shadow-md')}>
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch">
+                <Card className={cn(cardSurface, 'group/card flex min-h-0 flex-1 flex-col hover:shadow-md lg:min-w-0')}>
                   <CardHeader className="flex flex-row items-start gap-2.5 space-y-0 px-5 pb-1.5 pt-4">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-700 transition-transform group-hover/card:scale-110 dark:bg-amber-950/40 dark:text-amber-400">
                       <Bell className="h-4 w-4" aria-hidden />
@@ -371,7 +360,7 @@ export default function ReportsPage() {
                   </CardContent>
                 </Card>
 
-                <Card className={cn(cardSurface, 'group/card flex h-full min-h-0 flex-col hover:shadow-md')}>
+                <Card className={cn(cardSurface, 'group/card flex min-h-0 flex-1 flex-col hover:shadow-md lg:min-w-0')}>
                   <CardHeader className="flex flex-row items-start gap-2.5 space-y-0 px-5 pb-1.5 pt-4">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3] transition-transform group-hover/card:scale-110">
                       <Sparkles className="h-4 w-4" aria-hidden />
@@ -386,14 +375,14 @@ export default function ReportsPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-1">
-                    <ul className="space-y-5 text-[13px] leading-snug text-[#374056] sm:space-y-6 sm:text-[14px] sm:leading-[1.5]">
+                    <ul className="flex min-h-0 flex-1 flex-col justify-between gap-0 text-[13px] leading-snug text-[#374056] sm:text-[14px] sm:leading-[1.5]">
                       {keyInsights.map((insight, idx) => {
                         const sourceReport = REPORT_LIBRARY.find((r) => r.id === insight.reportId)
                         const label = sourceReport
                           ? `Open report: ${sourceReport.name}`
                           : 'Open source report'
                         return (
-                          <li key={`${insight.reportId}-${idx}`}>
+                          <li key={`${insight.reportId}-${idx}`} className="shrink-0">
                             <button
                               type="button"
                               className="group/insight flex w-full gap-2.5 rounded-lg border border-transparent p-1.5 text-left transition-colors hover:border-[#3958c3]/25 hover:bg-[#f0f3ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-2"
@@ -413,7 +402,7 @@ export default function ReportsPage() {
                   </CardContent>
                 </Card>
 
-                <Card className={cn(cardSurface, 'group/card flex h-full min-h-0 flex-col hover:shadow-md')}>
+                <Card className={cn(cardSurface, 'group/card flex min-h-0 flex-1 flex-col hover:shadow-md lg:min-w-0')}>
                   <CardHeader className="flex flex-row items-start gap-2.5 space-y-0 px-5 pb-1.5 pt-4">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3] transition-transform group-hover/card:scale-110">
                       <BarChart3 className="h-4 w-4" aria-hidden />
@@ -587,7 +576,7 @@ export default function ReportsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-3">
               <FloatLabel
-                label="Search by report name, topic, or keyword"
+                label="Search by report name, category, or keyword"
                 containerClassName="w-full"
                 value={reportSearch}
                 onChange={(e) => setReportSearch(e.target.value)}

@@ -11,11 +11,29 @@ export const ALL_REPORT_COLUMN_IDS = [
   'planDisplayName',
   'claimStatus',
   'claimProcessingStatus',
+  'employeeName',
+  'employeeId',
+  'enrollmentDate',
+  'numberOfDependents',
+  'cobraDuration',
+  'ytdContributions',
 ] as const
 
 export type ReportColumnId = (typeof ALL_REPORT_COLUMN_IDS)[number]
 
 const COLUMN_ID_SET = new Set<string>(ALL_REPORT_COLUMN_IDS)
+
+/** Original claim-template columns default to on; newer fields start unchecked in the column picker. */
+const DEFAULT_ENABLED_REPORT_COLUMN_IDS = new Set<string>([
+  'methodFiled',
+  'employerName',
+  'submitDate',
+  'claimNumber',
+  'planType',
+  'planDisplayName',
+  'claimStatus',
+  'claimProcessingStatus',
+])
 
 /** User-added columns (prototype); persisted ids are `custom:<uuid>`. */
 export const CUSTOM_COLUMN_PREFIX = 'custom:' as const
@@ -73,7 +91,7 @@ const STORAGE_PREFIX = 'ngb-admin-ux-report-customization-v2-'
 const STORAGE_PREFIX_LEGACY = 'ngb-admin-ux-report-customization-v1-'
 
 export const DEFAULT_REPORT_CUSTOMIZATION: ReportCustomization = {
-  columns: ALL_REPORT_COLUMN_IDS.map((id) => ({ id, enabled: true })),
+  columns: ALL_REPORT_COLUMN_IDS.map((id) => ({ id, enabled: DEFAULT_ENABLED_REPORT_COLUMN_IDS.has(id) })),
   enabledFilters: ['dateRange', 'claimStatus', 'plan'],
   defaultView: 'table',
 }
@@ -395,6 +413,12 @@ export const REPORT_COLUMN_LABELS: Record<ReportColumnId, string> = {
   planDisplayName: 'Plan Display Name',
   claimStatus: 'Claim Status',
   claimProcessingStatus: 'Claim Processing Status',
+  employeeName: 'Employee Name',
+  employeeId: 'Employee ID',
+  enrollmentDate: 'Enrollment Date',
+  numberOfDependents: 'Number of Dependents',
+  cobraDuration: 'COBRA Duration',
+  ytdContributions: 'YTD Contributions',
 }
 
 export const REPORT_FILTER_LABELS: Record<ReportFilterId, string> = {

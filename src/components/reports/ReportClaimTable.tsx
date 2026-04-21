@@ -94,6 +94,26 @@ export function ReportClaimTable({
                     (placeholderRows ? PLACEHOLDER_CELL : <ClaimStatusText status={row.claimStatus} />)}
                   {col.id === 'claimProcessingStatus' &&
                     (placeholderRows ? PLACEHOLDER_CELL : row.claimProcessingStatus)}
+                  {col.id === 'employeeName' &&
+                    (placeholderRows ? PLACEHOLDER_CELL : (row.employeeName ?? '—'))}
+                  {col.id === 'employeeId' &&
+                    (placeholderRows ? PLACEHOLDER_CELL : (row.employeeId ?? '—'))}
+                  {col.id === 'enrollmentDate' &&
+                    (placeholderRows ? PLACEHOLDER_CELL : (
+                      <span className="tabular-nums">{row.enrollmentDate ?? '—'}</span>
+                    ))}
+                  {col.id === 'numberOfDependents' &&
+                    (placeholderRows ? PLACEHOLDER_CELL : (
+                      <span className="tabular-nums">
+                        {row.numberOfDependents != null ? row.numberOfDependents : '—'}
+                      </span>
+                    ))}
+                  {col.id === 'cobraDuration' &&
+                    (placeholderRows ? PLACEHOLDER_CELL : (row.cobraDuration ?? '—'))}
+                  {col.id === 'ytdContributions' &&
+                    (placeholderRows ? PLACEHOLDER_CELL : (
+                      <span className="tabular-nums">{row.ytdContributions ?? '—'}</span>
+                    ))}
                 </TableCell>
               ))}
             </TableRow>
