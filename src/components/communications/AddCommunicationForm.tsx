@@ -26,8 +26,8 @@ const formCardClass =
   'flex w-full max-w-[1124px] flex-col gap-6 rounded-lg border border-[#d1d6d8] bg-white p-4 sm:p-6'
 
 const DELIVERY_OPTIONS = ['Default Delivery Preference'] as const
-/** `Enrollment Window` = open enrollment / enrollment window flow in Figma. */
-const CONFIGURATION_TYPE_OPTIONS = ['User ID', 'Enrollment Window'] as const
+/** `Enrollment Window` = OE; `Benefit Class Change` = BCC (lightweight template + preview in this prototype). */
+const CONFIGURATION_TYPE_OPTIONS = ['User ID', 'Enrollment Window', 'Benefit Class Change'] as const
 
 const ENROLLMENT_TYPE_OPTIONS = ['Annual Open Enrollment', 'New hire', 'Special enrollment (life event)'] as const
 const ENROLLMENT_STATUS_OPTIONS = [
@@ -36,6 +36,14 @@ const ENROLLMENT_STATUS_OPTIONS = [
   'Complete',
 ] as const
 const BENEFIT_CLASS_OPTIONS = ['Part Time, Full Time', 'All benefit classes', 'Salaried only'] as const
+
+const BCC_FROM_CLASS_OPTIONS = ['Hourly / Non-exempt', 'Salaried / Exempt', 'Part-time', 'Seasonal'] as const
+const BCC_TO_CLASS_OPTIONS = [
+  'Salaried — Class A (Medical + dental)',
+  'Salaried — Class B (Core medical)',
+  'Full-time — Retail',
+  'Part-time — Limited benefits',
+] as const
 
 const TEMPLATE_CHOICES: { value: string; label: string }[] = [
   { value: 'benefit-class-change-1', label: 'Benefit Class Change 1' },
@@ -81,12 +89,14 @@ export function AddCommunicationForm() {
   const navigate = useNavigate()
   const id = useId()
 
-  const [configurationType, setConfigurationType] = useState<string>(CONFIGURATION_TYPE_OPTIONS[0]!)
+  const [configurationType, setConfigurationType] = useState<string>('')
   const [communicationName, setCommunicationName] = useState('')
   const [deliveryMethod, setDeliveryMethod] = useState<string>(DELIVERY_OPTIONS[0]!)
 
   const isUserId = configurationType === 'User ID'
   const isEnrollmentWindow = configurationType === 'Enrollment Window'
+  const isBenefitClassChange = configurationType === 'Benefit Class Change'
+  const hasConfigurationSelection = isUserId || isEnrollmentWindow || isBenefitClassChange
 
   const [userIdsRaw, setUserIdsRaw] = useState('')
   const [enrollmentType, setEnrollmentType] = useState<string>(ENROLLMENT_TYPE_OPTIONS[0]!)
@@ -95,7 +105,9 @@ export function AddCommunicationForm() {
   const [enrollmentStartDate, setEnrollmentStartDate] = useState('2025-01-01')
 
   const [emailSubject, setEmailSubject] = useState('')
-  const [templateId, setTemplateId] = useState<string>(TEMPLATE_CHOICES[0]!.value)
+  const [templateId, setTemplateId] = useState<string>('')
+  const [bccFromClass, setBccFromClass] = useState<string>('')
+  const [bccToClass, setBccToClass] = useState<string>('')
   const [fromAddress] = useState('DoNotReply@wexapps.com')
   const [showAsSender, setShowAsSender] = useState('WEX Benefits')
   const [sendTiming, setSendTiming] = useState<SendTiming>('schedule')
@@ -108,17 +120,28 @@ export function AddCommunicationForm() {
       setTemplateId('oe-content-zone-22')
       setCommunicationName((n) => n || '2025 Open Enrollment Email')
       setEmailSubject((s) => s || 'Open Enrollment 2025')
-    } else {
-      setTemplateId((t) => (t === 'oe-content-zone-22' ? 'benefit-class-change-1' : t))
+    } else if (v === 'User ID') {
+      setTemplateId((t) =>
+        t === 'oe-content-zone-22' || t === '' ? 'benefit-class-change-1' : t,
+      )
+    } else if (v === 'Benefit Class Change') {
+      setCommunicationName('')
+      setEmailSubject('')
+      setTemplateId('')
+      setBccFromClass('')
+      setBccToClass('')
     }
   }
 
-  const previewForBranch =
-    (isUserId && templateId === 'oe-content-zone-22' ? 'benefit-class-change-1' : templateId) as string
+  const effectiveTemplateId = (
+    isUserId && templateId === 'oe-content-zone-22' ? 'benefit-class-change-1' : templateId
+  ) as string
   const previewSource =
-    TEMPLATE_PREVIEW_HTML[previewForBranch] ?? TEMPLATE_PREVIEW_HTML['benefit-class-change-1']!
+    hasConfigurationSelection && effectiveTemplateId
+      ? TEMPLATE_PREVIEW_HTML[effectiveTemplateId] ?? TEMPLATE_PREVIEW_HTML['benefit-class-change-1']!
+      : ''
   const safePreviewHtml = useMemo(
-    () => sanitizeEmailBodyHtml(previewSource),
+    () => (previewSource ? sanitizeEmailBodyHtml(previewSource) : ''),
     [previewSource],
   )
 
@@ -127,9 +150,6 @@ export function AddCommunicationForm() {
   }
 
   const handleSchedule = () => {
-    if (isEnrollmentWindow && sendTiming === 'immediately') {
-      toast.message('Send immediately (prototype).')
-    }
     navigate('/communications', {
       state: {
         newCommunicationScheduled: true,
@@ -139,13 +159,21 @@ export function AddCommunicationForm() {
   }
 
   const templateSelectValue =
-    isUserId && templateId === 'oe-content-zone-22' ? 'benefit-class-change-1' : templateId
+    isUserId && templateId === 'oe-content-zone-22' ? 'benefit-class-change-1' : templateId || undefined
+
+  const contentTemplateOptions = isUserId
+    ? TEMPLATE_CHOICES.filter((t) => t.value !== 'oe-content-zone-22')
+    : isBenefitClassChange
+      ? TEMPLATE_CHOICES.filter((t) => t.value === 'benefit-class-change-1' || t.value === 'generic-oe')
+      : TEMPLATE_CHOICES
 
   return (
     <Card className={cn(formCardClass, 'shadow-sm')}>
       <div className="border-b border-[#E4E6E9] pb-4">
         <h1 className="text-2xl font-semibold leading-8 tracking-tight text-[#14182c]">Add New Communication</h1>
-        <p className="mt-1 text-sm text-[#5c5c5c]">Prototype · no field validation in UI. Configuration Type selects the form layout.</p>
+        <p className="mt-1 text-sm text-[#5c5c5c]">
+          Prototype · no field validation in UI. Choose Configuration Type to show the rest of the form.
+        </p>
       </div>
 
       <CardContent className="flex flex-col gap-0 space-y-8 p-0">
@@ -180,9 +208,12 @@ export function AddCommunicationForm() {
             </div>
             <div>
               <p className="mb-1.5 text-sm font-medium text-[#12181d]">Configuration Type *</p>
-              <Select value={configurationType} onValueChange={onConfigurationTypeChange}>
+              <Select
+                value={configurationType || undefined}
+                onValueChange={onConfigurationTypeChange}
+              >
                 <SelectTrigger id={`${id}-config`} className="h-12 w-full rounded-lg border-[#a5aeb4]">
-                  <SelectValue />
+                  <SelectValue placeholder="Select configuration type" />
                 </SelectTrigger>
                 <SelectContent>
                   {CONFIGURATION_TYPE_OPTIONS.map((c) => (
@@ -192,6 +223,9 @@ export function AddCommunicationForm() {
                   ))}
                 </SelectContent>
               </Select>
+              {!hasConfigurationSelection ? (
+                <p className="mt-1.5 text-sm text-[#5c5c5c]">Select a type to see configuration, content, and email fields.</p>
+              ) : null}
             </div>
           </div>
         </section>
@@ -213,6 +247,53 @@ export function AddCommunicationForm() {
               <p className="text-sm text-[#5c5c5c]">
                 {userIdCount === 1 ? '1 user' : `${userIdCount} users`}
               </p>
+            </div>
+          </section>
+        ) : null}
+
+        {isBenefitClassChange ? (
+          <section className="space-y-4" aria-label="Configuration (benefit class change)">
+            <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Configuration</h2>
+            <p className="max-w-[740px] text-sm text-[#5c5c5c]">
+              Select the classes that drive this communication (prototype; no field validation in UI).
+            </p>
+            <div className="grid max-w-[740px] gap-4 sm:grid-cols-2">
+              <div>
+                <p className="mb-1.5 text-sm font-medium text-[#12181d]">From benefit class *</p>
+                <Select
+                  value={bccFromClass || undefined}
+                  onValueChange={setBccFromClass}
+                >
+                  <SelectTrigger id={`${id}-bcc-from`} className="h-12 w-full rounded-lg border-[#a5aeb4]">
+                    <SelectValue placeholder="Select from class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BCC_FROM_CLASS_OPTIONS.map((o) => (
+                      <SelectItem key={o} value={o}>
+                        {o}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <p className="mb-1.5 text-sm font-medium text-[#12181d]">To benefit class *</p>
+                <Select
+                  value={bccToClass || undefined}
+                  onValueChange={setBccToClass}
+                >
+                  <SelectTrigger id={`${id}-bcc-to`} className="h-12 w-full rounded-lg border-[#a5aeb4]">
+                    <SelectValue placeholder="Select to class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BCC_TO_CLASS_OPTIONS.map((o) => (
+                      <SelectItem key={o} value={o}>
+                        {o}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </section>
         ) : null}
@@ -289,6 +370,7 @@ export function AddCommunicationForm() {
           </section>
         ) : null}
 
+        {hasConfigurationSelection ? (
         <section className="space-y-4" aria-label="Content">
           <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Content</h2>
           <div className="flex max-w-[740px] flex-col gap-4">
@@ -302,20 +384,20 @@ export function AddCommunicationForm() {
                   <SelectValue placeholder="Select a template" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(isUserId ? TEMPLATE_CHOICES.filter((t) => t.value !== 'oe-content-zone-22') : TEMPLATE_CHOICES).map(
-                    (t) => (
-                      <SelectItem key={t.value} value={t.value}>
-                        {t.label}
-                      </SelectItem>
-                    ),
-                  )}
+                  {contentTemplateOptions.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <p className="mt-1.5 text-xs text-[#5c5c5c]">Changes made here will not affect the original template.</p>
             </div>
           </div>
         </section>
+        ) : null}
 
+        {hasConfigurationSelection ? (
         <section className="space-y-4" aria-label="Email">
           <div className="flex max-w-[740px] items-start justify-between gap-4">
             <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Email</h2>
@@ -355,6 +437,7 @@ export function AddCommunicationForm() {
             />
           </div>
         </section>
+        ) : null}
 
         {isEnrollmentWindow ? (
           <section className="max-w-[740px] space-y-2" aria-label="Send options">
@@ -378,14 +461,25 @@ export function AddCommunicationForm() {
           </section>
         ) : null}
 
+        {hasConfigurationSelection ? (
         <section className="space-y-2" aria-label="Preview">
           <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Preview</h2>
           <p className="text-sm text-[#5c5c5c]">Content zone preview shows interpreted HTML (sanitized in-app).</p>
-          <div
-            className="max-h-[420px] max-w-[740px] overflow-y-auto rounded-lg border border-[#d1d6d8] bg-white p-4"
-            dangerouslySetInnerHTML={{ __html: safePreviewHtml }}
-          />
+          {safePreviewHtml ? (
+            <div
+              className="max-h-[420px] max-w-[740px] overflow-y-auto rounded-lg border border-[#d1d6d8] bg-white p-4"
+              dangerouslySetInnerHTML={{ __html: safePreviewHtml }}
+            />
+          ) : (
+            <div
+              className="flex min-h-[120px] max-w-[740px] items-center justify-center rounded-lg border border-dashed border-[#a5aeb4] bg-[#f9fafb] px-4 text-center text-sm text-[#5c5c5c]"
+              role="status"
+            >
+              Select a content template to load the content zone preview.
+            </div>
+          )}
         </section>
+        ) : null}
       </CardContent>
 
       <div className="mt-2 flex flex-col-reverse items-stretch justify-end gap-3 border-t border-[#E4E6E9] pt-4 sm:flex-row sm:items-center">
@@ -399,34 +493,36 @@ export function AddCommunicationForm() {
           >
             Cancel
           </Button>
-          <div className="inline-flex w-full min-w-0 sm:w-auto">
-            <Button
-              type="button"
-              intent="primary"
-              className="shrink-0 rounded-l-lg rounded-r-none border-r-0 px-4"
-              onClick={handleSchedule}
-            >
-              Schedule Send
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  intent="primary"
-                  className="rounded-l-none rounded-r-lg px-2.5"
-                  aria-label="More send options"
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => handleSchedule()}>Send now (prototype)</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => toast.message('Open schedule picker (prototype).')}>
-                  Choose date and time
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          {hasConfigurationSelection ? (
+            <div className="inline-flex w-full min-w-0 sm:w-auto">
+              <Button
+                type="button"
+                intent="primary"
+                className="shrink-0 rounded-l-lg rounded-r-none border-r-0 px-4"
+                onClick={handleSchedule}
+              >
+                Schedule Send
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    intent="primary"
+                    className="rounded-l-none rounded-r-lg px-2.5"
+                    aria-label="More send options"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => handleSchedule()}>Send now (prototype)</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => toast.message('Open schedule picker (prototype).')}>
+                    Choose date and time
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ) : null}
         </div>
       </div>
     </Card>
