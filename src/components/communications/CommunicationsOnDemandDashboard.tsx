@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   Badge,
   Breadcrumb,
@@ -537,7 +537,11 @@ function AutomatedCommunicationsSection() {
   )
 }
 
+type CommLocationState = { newCommunicationScheduled?: boolean; name?: string }
+
 export function CommunicationsOnDemandDashboard() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [topMode, setTopMode] = useState<TopMode>('self-service')
   const [scheduledQuery, setScheduledQuery] = useState('')
   const [sentQuery, setSentQuery] = useState('')
@@ -566,6 +570,16 @@ export function CommunicationsOnDemandDashboard() {
   const safePage = Math.min(sentPage, pageCount)
   const pageStart = (safePage - 1) * pageSizeNum
   const sentPageRows = filteredSent.slice(pageStart, pageStart + pageSizeNum)
+
+  useEffect(() => {
+    const s = (location.state ?? null) as CommLocationState | null
+    if (s?.newCommunicationScheduled) {
+      toast.success(
+        s.name ? `“${s.name}” is scheduled. (Prototype.)` : 'Communication scheduled. (Prototype.)',
+      )
+      navigate('/communications', { replace: true, state: null })
+    }
+  }, [location.state, navigate])
 
   if (topMode === 'automations') {
     return (
@@ -642,7 +656,7 @@ export function CommunicationsOnDemandDashboard() {
             type="button"
             intent="primary"
             className="w-full shrink-0 rounded-lg px-4 py-2 text-sm font-medium shadow-sm sm:w-auto"
-            onClick={() => toast.message('Add new communication (prototype).')}
+            onClick={() => navigate('/communications/new')}
           >
             Add New Communication
           </Button>

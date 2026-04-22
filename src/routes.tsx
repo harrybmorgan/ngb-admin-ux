@@ -15,6 +15,7 @@ const ReportDetailPage = React.lazy(() => import('@/pages/ReportDetailPage'))
 const ReportCustomizePage = React.lazy(() => import('@/pages/ReportCustomizePage'))
 const ContentPage = React.lazy(() => import('@/pages/ContentPage'))
 const CommunicationsPage = React.lazy(() => import('@/pages/CommunicationsPage'))
+const AddCommunicationUserIdsPage = React.lazy(() => import('@/pages/AddCommunicationUserIdsPage'))
 const ThemingPage = React.lazy(() => import('@/pages/ThemingPage'))
 const SettingsPage = React.lazy(() => import('@/pages/SettingsPage'))
 const TicketsPage = React.lazy(() => import('@/pages/TicketsPage'))
@@ -50,6 +51,7 @@ export function AppRoutes() {
         <Route path="reports/:reportId" element={withProtected(<ReportDetailPage />)} />
         <Route path="reports" element={withProtected(<ReportsPage />)} />
         <Route path="content" element={withProtected(<ContentPage />)} />
+        <Route path="communications/new" element={withProtected(<AddCommunicationUserIdsPage />)} />
         <Route path="communications" element={withProtected(<CommunicationsPage />)} />
         <Route path="theming" element={withProtected(<ThemingPage />)} />
         <Route path="settings" element={withProtected(<SettingsPage />)} />
