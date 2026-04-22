@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import {
   Badge,
   Breadcrumb,
@@ -44,6 +44,8 @@ import {
   Zap,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import type { CobraTerminationActiveCase, CobraTerminationPhase } from '@/hooks/useCobraTerminationPrototype'
+import { useCobraTerminationPrototype } from '@/hooks/useCobraTerminationPrototype'
 import { cn } from '@/lib/utils'
 
 /** Figma Communications dash — outer "Communactions Dash" (24px pad, 32px gap). */
@@ -268,6 +270,41 @@ function RowActionsMenu(label: string) {
   )
 }
 
+const COBRA_PROTO_SENT_ROW_ID = 'cobra-proto-general-rights-notice'
+
+function CobraProtoSentRowActions({
+  phase,
+  advancePhase,
+  clear,
+}: {
+  phase: CobraTerminationPhase
+  advancePhase: () => void
+  clear: () => void
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions for COBRA notice">
+          <MoreHorizontal className="h-4 w-4 text-[#5f6a94]" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem asChild>
+          <Link to="/enrollment">View in People</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/billing#cobra">Open Financials (COBRA)</Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {phase === 'notice_sent' ? (
+          <DropdownMenuItem onClick={() => advancePhase()}>Simulate election window opened</DropdownMenuItem>
+        ) : null}
+        <DropdownMenuItem onClick={() => clear()}>Clear demo</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 function automationStatusBadge(status: AutomationStatus) {
   if (status === 'active') {
     return (
@@ -398,6 +435,39 @@ function TablePaginationBar({
       </div>
     </div>
   )
+}
+
+function formatProtoIsoDate(iso: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso
+  return new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+/** Sent-table row for the unified termination → COBRA notice prototype (prepended to mock sent list). */
+function buildCobraProtoSentRow(activeCase: CobraTerminationActiveCase): SentRow {
+  const iso = activeCase.terminationDate
+  const sendDate = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+    ? new Date(`${iso}T09:00:00`).toLocaleString('en-US', {
+        month: 'numeric',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      })
+    : iso
+  return {
+    id: COBRA_PROTO_SENT_ROW_ID,
+    communication: 'COBRA general rights notice',
+    type: 'COBRA / Termination',
+    employeeSent: 1,
+    employeeTotal: 1,
+    sendDate,
+    status: 'complete',
+  }
 }
 
 function CommunicationsSearchFilter({
@@ -538,6 +608,8 @@ function AutomatedCommunicationsSection() {
 }
 
 export function CommunicationsOnDemandDashboard() {
+  const location = useLocation()
+  const { activeCase, advancePhase, clear } = useCobraTerminationPrototype()
   const [topMode, setTopMode] = useState<TopMode>('self-service')
   const [scheduledQuery, setScheduledQuery] = useState('')
   const [sentQuery, setSentQuery] = useState('')
@@ -545,13 +617,45 @@ export function CommunicationsOnDemandDashboard() {
   const [pageSize, setPageSize] = useState('10')
   const pageSizeNum = Number.parseInt(pageSize, 10) || 10
 
+  const mergedAllSent = useMemo(() => {
+    if (!activeCase) return ALL_SENT
+    return [buildCobraProtoSentRow(activeCase), ...ALL_SENT]
+  }, [activeCase])
+
   const filteredSent = useMemo(() => {
     const q = sentQuery.trim().toLowerCase()
-    if (!q) return ALL_SENT
-    return ALL_SENT.filter(
-      (r) => r.communication.toLowerCase().includes(q) || r.type.toLowerCase().includes(q),
-    )
-  }, [sentQuery])
+    if (!q) return mergedAllSent
+    return mergedAllSent.filter((r) => {
+      const comm = r.communication.toLowerCase().includes(q)
+      const typ = r.type.toLowerCase().includes(q)
+      if (comm || typ) return true
+      if (r.id === COBRA_PROTO_SENT_ROW_ID && activeCase) {
+        return (
+          activeCase.employeeName.toLowerCase().includes(q) ||
+          activeCase.reason.toLowerCase().includes(q) ||
+          activeCase.terminationDate.toLowerCase().includes(q)
+        )
+      }
+      return false
+    })
+  }, [sentQuery, mergedAllSent, activeCase])
+
+  useEffect(() => {
+    if (location.hash !== '#cobra') return
+    setSentPage(1)
+  }, [location.hash])
+
+  useEffect(() => {
+    if (location.hash !== '#cobra') return
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const row = document.getElementById('communications-cobra-notice-row')
+        const section = document.getElementById('communications-sent-comms')
+        ;(row ?? section)?.scrollIntoView({ behavior: 'smooth', block: row ? 'center' : 'start' })
+      })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [location.hash, sentPage, filteredSent.length, activeCase?.enrollmentRowId])
 
   const filteredScheduled = useMemo(() => {
     const q = scheduledQuery.trim().toLowerCase()
@@ -704,7 +808,7 @@ export function CommunicationsOnDemandDashboard() {
           </CardContent>
         </Card>
 
-        <Card className={commAutomationInnerCard}>
+        <Card id="communications-sent-comms" className={cn(commAutomationInnerCard, 'scroll-mt-6')}>
           <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-xl font-semibold leading-8 tracking-tight text-[#1d2c38]">Sent Communications</h2>
             <CommunicationsSearchFilter
@@ -737,31 +841,60 @@ export function CommunicationsOnDemandDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sentPageRows.map((row) => (
-                    <TableRow key={row.id} className={commAutoTr}>
-                      <TableCell className={cn('max-w-[280px]', commAutoTd)}>
-                        <span className="line-clamp-2 font-normal text-[#12181d]" title={row.communication}>
-                          {row.communication}
-                        </span>
-                      </TableCell>
-                      <TableCell className={commAutoTd}>{row.type}</TableCell>
-                      <TableCell className={commAutoTd}>
-                        <EmployeeCountCell row={row} />
-                      </TableCell>
-                      <TableCell className={cn('whitespace-nowrap', commAutoTd)}>
-                        {row.sendDate ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <Clock3 className="h-4 w-4 shrink-0 text-[#8b94b8]" aria-hidden />
-                            {row.sendDate}
-                          </span>
-                        ) : (
-                          <span className="text-[#8b94b8]">—</span>
+                  {sentPageRows.map((row) => {
+                    const isCobraProto = row.id === COBRA_PROTO_SENT_ROW_ID
+                    return (
+                      <TableRow
+                        key={row.id}
+                        id={isCobraProto ? 'communications-cobra-notice-row' : undefined}
+                        className={cn(
+                          commAutoTr,
+                          isCobraProto && 'bg-[#f4f6fc] ring-1 ring-inset ring-[#3958c3]/12',
                         )}
-                      </TableCell>
-                      <TableCell className={commAutoTd}>{sentStatusBadge(row.status)}</TableCell>
-                      <TableCell className={cn(commAutoTd, 'text-right')}>{RowActionsMenu(row.communication)}</TableCell>
-                    </TableRow>
-                  ))}
+                      >
+                        <TableCell className={cn('max-w-[280px]', commAutoTd)}>
+                          <span className="line-clamp-2 font-normal text-[#12181d]" title={row.communication}>
+                            {row.communication}
+                          </span>
+                          {isCobraProto && activeCase ? (
+                            <p className="mt-1 max-w-[min(100%,420px)] text-xs leading-snug text-[#5f6a94]">
+                              <span className="font-medium text-[#374056]">{activeCase.employeeName}</span>
+                              {' · '}Termination effective {formatProtoIsoDate(activeCase.terminationDate)} ·{' '}
+                              {activeCase.reason}
+                              {activeCase.phase === 'election_review' ? ' · Election window active' : ''}. Sent automatically
+                              from Ben Admin (prototype).
+                            </p>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className={commAutoTd}>{row.type}</TableCell>
+                        <TableCell className={commAutoTd}>
+                          <EmployeeCountCell row={row} />
+                        </TableCell>
+                        <TableCell className={cn('whitespace-nowrap', commAutoTd)}>
+                          {row.sendDate ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <Clock3 className="h-4 w-4 shrink-0 text-[#8b94b8]" aria-hidden />
+                              {row.sendDate}
+                            </span>
+                          ) : (
+                            <span className="text-[#8b94b8]">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className={commAutoTd}>{sentStatusBadge(row.status)}</TableCell>
+                        <TableCell className={cn(commAutoTd, 'text-right')}>
+                          {isCobraProto && activeCase ? (
+                            <CobraProtoSentRowActions
+                              phase={activeCase.phase}
+                              advancePhase={advancePhase}
+                              clear={clear}
+                            />
+                          ) : (
+                            RowActionsMenu(row.communication)
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>

@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, CardContent, FloatLabel } from '@wexinc-healthbenefits/ben-ui-kit'
-import { AlertCircle, Building2, Check, Eye, EyeOff, User, UserLock, X } from 'lucide-react'
+import { AlertCircle, Check, Eye, EyeOff, UserLock, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
 import { EMPLOYER } from '@/data/adminMockData'
 import { LoginPortalFooter } from '@/components/layout/LoginPortalFooter'
 import { cn } from '@/lib/utils'
 
-type Step = 'credentials' | 'mfa' | 'selectAccount' | 'resetPassword'
+type Step = 'credentials' | 'mfa' | 'resetPassword'
 
 /** Prototype-only gate; reset-password in the flow does not replace these for the next visit or refresh. */
 const PROTOTYPE_USERNAME = 'Shelly'
@@ -57,7 +57,6 @@ export default function LoginPage() {
   const [mfaInput, setMfaInput] = useState('')
   const [codeError, setCodeError] = useState(false)
   const [resendTimer, setResendTimer] = useState(13)
-  const [selectedPersona, setSelectedPersona] = useState<'admin' | 'employee' | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showNew, setShowNew] = useState(false)
@@ -108,22 +107,8 @@ export default function LoginPage() {
       return
     }
     setCodeError(false)
-    setSelectedPersona(null)
     setPasswordSubmitAttempted(false)
     setStep('resetPassword')
-  }
-
-  const onSelectAccountContinue = () => {
-    if (!selectedPersona) {
-      toast.error('Select an account to continue.')
-      return
-    }
-    if (selectedPersona === 'employee') {
-      navigate('/member-handoff', { replace: true })
-      return
-    }
-    login()
-    navigate('/', { replace: true })
   }
 
   const onResetComplete = (e: React.FormEvent) => {
@@ -133,8 +118,8 @@ export default function LoginPage() {
     if (!passwordMinLengthMet || !passwordComplexityMet || !passwordsMatchMet) {
       return
     }
-    setSelectedPersona('admin')
-    setStep('selectAccount')
+    login()
+    navigate('/', { replace: true })
   }
 
   const handleResendMfa = () => {
@@ -150,18 +135,14 @@ export default function LoginPage() {
       ? 'Welcome'
       : step === 'mfa'
         ? 'Verify your identity'
-        : step === 'resetPassword'
-          ? 'Set your new password'
-          : 'Select an account'
+        : 'Set your new password'
 
   const headerSubtitle =
     step === 'credentials'
       ? 'Please enter your username and temporary password to get started.'
       : step === 'mfa'
         ? "We've sent an email with your code to the address you have on file."
-        : step === 'resetPassword'
-          ? 'Password must contain at least 12 characters, including a number, symbol and a mix of upper/lowercase letters.'
-          : "Please select which account you'd like to access."
+        : 'Password must contain at least 12 characters, including a number, symbol and a mix of upper/lowercase letters.'
 
   return (
     <div className="login-portal-bg flex min-h-screen flex-col">
@@ -330,91 +311,6 @@ export default function LoginPage() {
                       Back
                     </Button>
                   </form>
-                )}
-
-                {step === 'selectAccount' && (
-                  <div className="flex flex-col gap-4">
-                    <p className="text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      {EMPLOYER.name}
-                    </p>
-                    <div className="flex flex-col gap-2">
-                      <div role="radiogroup" aria-label="Choose how you want to sign in">
-                        <button
-                          type="button"
-                          role="radio"
-                          aria-checked={selectedPersona === 'admin'}
-                          onClick={() => setSelectedPersona('admin')}
-                          className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                            selectedPersona === 'admin'
-                              ? 'border-[hsl(var(--wex-primary))] bg-[hsl(var(--wex-primary))]/5'
-                              : 'border-border hover:border-muted-foreground/40 hover:bg-muted/30'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <span
-                              className={`flex h-4 w-4 shrink-0 rounded-full border-2 ${
-                                selectedPersona === 'admin'
-                                  ? 'border-[hsl(var(--wex-primary))] bg-[hsl(var(--wex-primary))]'
-                                  : 'border-muted-foreground/50'
-                              }`}
-                              aria-hidden
-                            />
-                            <Building2 className="h-5 w-5 text-foreground" aria-hidden />
-                            <div>
-                              <p className="text-[16px] font-semibold leading-6 text-foreground">Admin</p>
-                              <p className="text-[13px] leading-5 text-muted-foreground">
-                                Plans, people, billing, and reporting for your organization
-                              </p>
-                            </div>
-                          </div>
-                        </button>
-                      </div>
-                      <div
-                        className="rounded-lg border border-dashed border-border bg-muted/30 p-4 text-left"
-                        aria-disabled="true"
-                      >
-                        <div className="flex items-center gap-3 opacity-70">
-                          <span
-                            className="flex h-4 w-4 shrink-0 rounded-full border-2 border-muted-foreground/35"
-                            aria-hidden
-                          />
-                          <User className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
-                          <div className="min-w-0">
-                            <p className="text-[16px] font-semibold leading-6 text-muted-foreground">Employee</p>
-                            <p className="text-[13px] leading-5 text-muted-foreground">
-                              Medical, spending, and claims in the member portal.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="text-left text-[14px] font-semibold text-[hsl(var(--wex-primary))] hover:underline"
-                      onClick={() => toast.message('Account linking is not available in this prototype.')}
-                    >
-                      Link another account
-                    </button>
-
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        type="button"
-                        className="h-10 w-full rounded-lg text-[14px] font-medium"
-                        onClick={onSelectAccountContinue}
-                      >
-                        Continue
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-10 w-full rounded-lg text-[14px] font-medium"
-                        onClick={() => setStep('resetPassword')}
-                      >
-                        Back
-                      </Button>
-                    </div>
-                  </div>
                 )}
 
                 {step === 'resetPassword' && (

@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react'
+import { COBRA_TERMINATION_STORAGE_KEY } from '@/hooks/useCobraTerminationPrototype'
 
 export const SETUP_STORAGE_KEY = 'ngb_admin_employer_setup'
 
@@ -70,6 +71,7 @@ export function resetGuidedSetupState() {
   if (typeof window === 'undefined') return
   localStorage.removeItem(GUIDED_SETUP_WIZARD_DRAFT_KEY)
   localStorage.removeItem(SETUP_STORAGE_KEY)
+  localStorage.removeItem(COBRA_TERMINATION_STORAGE_KEY)
   snapshotKey = null
   snapshotState = defaults
   emitSetupChanged()

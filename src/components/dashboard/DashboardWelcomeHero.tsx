@@ -5,6 +5,7 @@ import { Badge } from '@wexinc-healthbenefits/ben-ui-kit'
 import { Bell, Check, ChevronRight, CircleHelp, FileText, Landmark, Receipt, RefreshCw, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { EMPLOYER } from '@/data/adminMockData'
+import { useCobraTerminationPrototype } from '@/hooks/useCobraTerminationPrototype'
 import { useGuidedSetupHomeState } from '@/hooks/useGuidedSetupHomeState'
 import { formatStepsLeftPhrase, getWizardHeroMeta } from '@/lib/guidedSetupHome'
 import { cn } from '@/lib/utils'
@@ -157,6 +158,15 @@ function greetingLabel() {
   return 'Good evening'
 }
 
+function formatTerminationDateLabel(iso: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso
+  return new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
 const postLaunchPriorities = [
   {
     title: 'Review 12 life events',
@@ -180,10 +190,6 @@ const postLaunchPriorities = [
 
 const POST_LAUNCH_QUEUE_VISIBLE = 3 as const
 
-function postLaunchPriorityCount() {
-  return 1 + postLaunchPriorities.length
-}
-
 type DashboardWelcomeHeroProps = {
   onboardingComplete: boolean
   planReady: boolean
@@ -196,7 +202,11 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
   const navigate = useNavigate()
   const prefersReducedMotion = useReducedMotion()
   const { openAssistant } = useAdminAssist()
+  const { activeCase: cobraCase } = useCobraTerminationPrototype()
   const guidedSnapshot = useGuidedSetupHomeState()
+  const cobraAttentionCount = launchComplete && cobraCase ? 1 : 0
+  const attentionPrioritiesCount = 1 + postLaunchPriorities.length + cobraAttentionCount
+
   const [askValue, setAskValue] = useState('')
   const [getHelpOpen, setGetHelpOpen] = useState(false)
   const firstName = EMPLOYER.hrAdminName.split(' ')[0]
@@ -445,7 +455,7 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
               </div>
               {onboardingComplete ? (
                 <Badge intent="info" className="rounded-full border-0 bg-[#eef2ff] px-2.5 py-0.5 text-[11px] font-semibold text-[#3958c3]">
-                  {postLaunchPriorityCount()} priorit{postLaunchPriorityCount() === 1 ? 'y' : 'ies'}
+                  {attentionPrioritiesCount} priorit{attentionPrioritiesCount === 1 ? 'y' : 'ies'}
                 </Badge>
               ) : (
                 <Badge
@@ -521,10 +531,15 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
             ) : (
               <div
                 className="flex min-h-0 w-full flex-1 flex-col gap-2"
-                aria-label={`What needs attention: featured — ${setupCard.title}; also ${postLaunchPriorities
-                  .slice(0, POST_LAUNCH_QUEUE_VISIBLE)
-                  .map((t) => t.title)
-                  .join(', ')}.`}
+                aria-label={`What needs attention: featured — ${setupCard.title}; also ${[
+                  ...(launchComplete && cobraCase?.phase === 'notice_sent'
+                    ? ['COBRA rights notice sent — Communications']
+                    : []),
+                  ...(launchComplete && cobraCase?.phase === 'election_review'
+                    ? ['Review COBRA election status — Financials']
+                    : []),
+                  ...postLaunchPriorities.slice(0, POST_LAUNCH_QUEUE_VISIBLE).map((t) => t.title),
+                ].join(', ')}.`}
               >
                 <motion.div
                   variants={ctaCardVariants}
@@ -574,6 +589,62 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
                 </motion.div>
 
                 <ul className="m-0 flex list-none flex-col gap-1.5 p-0" aria-label="More priorities">
+                  {launchComplete && cobraCase?.phase === 'notice_sent' ? (
+                    <li key="dash-cobra-notice">
+                      <MotionLink
+                        to="/communications#cobra"
+                        whileTap={prefersReducedMotion ? undefined : { scale: 0.995 }}
+                        transition={{ duration: 0.15, ease: softEaseOut }}
+                        className={cn(
+                          'group flex items-start gap-3 rounded-xl border border-[#e8ecf4]/80 bg-[#fafbff]/90 px-3 py-2 text-left no-underline',
+                          'transition-colors duration-200 hover:border-[#d8deeb] hover:bg-white',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-2',
+                        )}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9aa3bd]">Communications</p>
+                          <p className="mt-0.5 text-[13px] font-semibold leading-snug text-[#14182c]">COBRA rights notice sent</p>
+                          <p className="mt-0.5 text-[11px] leading-snug text-[#5f6a94]">
+                            {cobraCase.employeeName} · Termination effective{' '}
+                            {formatTerminationDateLabel(cobraCase.terminationDate)}. Open Communications to review delivery
+                            details (prototype).
+                          </p>
+                        </div>
+                        <ChevronRight
+                          className="mt-0.5 h-4 w-4 shrink-0 text-[#c8cfdf] transition-colors group-hover:text-[#3958c3]"
+                          aria-hidden
+                        />
+                      </MotionLink>
+                    </li>
+                  ) : null}
+                  {launchComplete && cobraCase?.phase === 'election_review' ? (
+                    <li key="dash-cobra-election">
+                      <MotionLink
+                        to="/billing#cobra"
+                        whileTap={prefersReducedMotion ? undefined : { scale: 0.995 }}
+                        transition={{ duration: 0.15, ease: softEaseOut }}
+                        className={cn(
+                          'group flex items-start gap-3 rounded-xl border border-[#e8ecf4]/80 bg-[#fafbff]/90 px-3 py-2 text-left no-underline',
+                          'transition-colors duration-200 hover:border-[#d8deeb] hover:bg-white',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3958c3]/35 focus-visible:ring-offset-2',
+                        )}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9aa3bd]">Financials</p>
+                          <p className="mt-0.5 text-[13px] font-semibold leading-snug text-[#14182c]">
+                            Review COBRA election status
+                          </p>
+                          <p className="mt-0.5 text-[11px] leading-snug text-[#5f6a94]">
+                            {cobraCase.employeeName} · Election window active · Open Financials for COBRA counts (prototype).
+                          </p>
+                        </div>
+                        <ChevronRight
+                          className="mt-0.5 h-4 w-4 shrink-0 text-[#c8cfdf] transition-colors group-hover:text-[#3958c3]"
+                          aria-hidden
+                        />
+                      </MotionLink>
+                    </li>
+                  ) : null}
                   {postLaunchPriorities.slice(0, POST_LAUNCH_QUEUE_VISIBLE).map((item) => (
                     <li key={item.to}>
                       <MotionLink
