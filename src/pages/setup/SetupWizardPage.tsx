@@ -3052,12 +3052,12 @@ export default function SetupWizardPage() {
                 <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                   <div className="flex min-w-0 flex-1 gap-2.5">
                     <div
-                      className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background/80"
+                      className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3]"
                       aria-hidden
                     >
-                      <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                      <FileText className="h-4 w-4" />
                       <Sparkles
-                        className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 text-muted-foreground"
+                        className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5"
                         strokeWidth={2}
                         aria-hidden
                       />
@@ -5264,9 +5264,9 @@ export default function SetupWizardPage() {
                       >
                         <span
                           className={cn(
-                            'relative mt-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center text-muted-foreground',
+                            'relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3]',
                             stepInd.showActiveStepRing &&
-                              'rounded-md ring-2 ring-primary/35 ring-offset-2 ring-offset-background',
+                              'ring-2 ring-primary/35 ring-offset-2 ring-offset-background',
                             stepInd.isPastStep && !stepRowSelected && 'opacity-80',
                           )}
                           aria-hidden
