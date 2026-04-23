@@ -19,7 +19,15 @@ import {
 } from '@wexinc-healthbenefits/ben-ui-kit'
 import { ArrowRight, Pencil, Plus } from 'lucide-react'
 import { toast } from 'sonner'
-import { BCC_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML } from '@/components/communications/AddCommunicationForm'
+import { USER_ID_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML } from '@/components/communications/AddCommunicationForm'
+import {
+  DEFAULT_DELIVERY_PREFERENCE,
+  DELIVERY_METHOD_OPTIONS,
+  getSecondaryChannelTabLabel,
+  isDashboardDelivery,
+  isEmailChannelTabDisabled,
+  isSecondaryChannelTabDisabled,
+} from '@/components/communications/deliveryMethodChannel'
 import {
   AutomationSettingsDialog,
   type AutomationSettingsResult,
@@ -33,9 +41,6 @@ const formCardClass =
 
 const REQUIRED_DOT_CLASS =
   'pointer-events-none absolute left-[5px] top-[5px] z-10 size-[6px] rounded-full bg-[#e12d33]'
-
-const DELIVERY_OPTIONS = ['Default Delivery Preference', 'Custom delivery'] as const
-const DEFAULT_DELIVERY = DELIVERY_OPTIONS[0]!
 
 /** Figma: [Add Automation / SMS](https://www.figma.com/design/rH3S6MJJNltWf8lrrnU0jg/Communications-Builder?node-id=16323-77451) */
 const SMS_COMPOSE_PLACEHOLDER = 'Add SMS to get started!'
@@ -80,8 +85,8 @@ const GENERIC_OE_PREVIEW_HTML = `
 
 function templatePreviewFor(value: string): string {
   if (value === 'generic-oe') return GENERIC_OE_PREVIEW_HTML
-  if (value === 'benefit-class-change-1') return BCC_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML
-  return BCC_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML
+  if (value === 'benefit-class-change-1') return USER_ID_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML
+  return USER_ID_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML
 }
 
 function defaultSubjectForTemplate(id: string): string {
@@ -94,7 +99,7 @@ export function AddAutomationForm() {
   const id = useId()
 
   const [automationName, setAutomationName] = useState('')
-  const [deliveryMethod, setDeliveryMethod] = useState<string>(DEFAULT_DELIVERY)
+  const [deliveryMethod, setDeliveryMethod] = useState<string>(DEFAULT_DELIVERY_PREFERENCE)
   const [automationType, setAutomationType] = useState('')
 
   const [bccFromClass, setBccFromClass] = useState<string>(BCC_FROM_CLASS_OPTIONS[0]!)
@@ -111,7 +116,15 @@ export function AddAutomationForm() {
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false)
 
   const showRestOfForm = automationType !== ''
-  const showChannelTabs = deliveryMethod === DEFAULT_DELIVERY
+  const emailTabDisabled = isEmailChannelTabDisabled(deliveryMethod)
+  const secondaryTabDisabled = isSecondaryChannelTabDisabled(deliveryMethod)
+  const secondaryChannelLabel = getSecondaryChannelTabLabel(deliveryMethod)
+
+  const onDeliveryMethodChange = (v: string) => {
+    setDeliveryMethod(v)
+    if (v === 'Email only') setMessageChannelTab('email')
+    if (v === 'SMS' || v === 'Dashboard') setMessageChannelTab('sms')
+  }
 
   const previewSource = useMemo(() => {
     if (customContentHtml !== null) return customContentHtml
@@ -204,7 +217,7 @@ export function AddAutomationForm() {
                 </p>
                 <div className="relative">
                   <span className={REQUIRED_DOT_CLASS} aria-hidden />
-                  <Select value={deliveryMethod} onValueChange={setDeliveryMethod}>
+                  <Select value={deliveryMethod} onValueChange={onDeliveryMethodChange}>
                     <SelectTrigger
                       id={`${id}-delivery`}
                       className="h-12 w-full rounded-lg border-[#a5aeb4]"
@@ -213,7 +226,7 @@ export function AddAutomationForm() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {DELIVERY_OPTIONS.map((d) => (
+                      {DELIVERY_METHOD_OPTIONS.map((d) => (
                         <SelectItem key={d} value={d}>
                           {d}
                         </SelectItem>
@@ -312,28 +325,29 @@ export function AddAutomationForm() {
                 </Button>
               </section>
 
-              {showChannelTabs ? (
-                <Tabs
-                  value={messageChannelTab}
-                  onValueChange={(v) => setMessageChannelTab(v as 'email' | 'sms')}
-                  className="w-full max-w-[740px] space-y-4"
-                >
-                  <div className="w-full border-b border-[#e4e6e9]">
-                    <TabsList className="flex h-auto w-full min-h-0 flex-wrap items-stretch justify-start gap-0 rounded-none border-0 bg-transparent p-0">
-                      <TabsTrigger
-                        value="email"
-                        className="relative rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-[#12181d] shadow-none data-[state=active]:border-[#0058a3] data-[state=active]:text-[#0058a3] data-[state=inactive]:border-b data-[state=inactive]:border-[#e4e6e9] data-[state=inactive]:text-[#12181d]"
-                      >
-                        Email
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="sms"
-                        className="relative rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-[#12181d] shadow-none data-[state=active]:border-[#0058a3] data-[state=active]:text-[#0058a3] data-[state=inactive]:border-b data-[state=inactive]:border-[#e4e6e9] data-[state=inactive]:text-[#12181d]"
-                      >
-                        SMS (Text) Message
-                      </TabsTrigger>
-                    </TabsList>
-                  </div>
+              <Tabs
+                value={messageChannelTab}
+                onValueChange={(v) => setMessageChannelTab(v as 'email' | 'sms')}
+                className="w-full max-w-[740px] space-y-4"
+              >
+                <div className="w-full border-b border-[#e4e6e9]">
+                  <TabsList className="flex h-auto w-full min-h-0 flex-wrap items-stretch justify-start gap-0 rounded-none border-0 bg-transparent p-0">
+                    <TabsTrigger
+                      value="email"
+                      disabled={emailTabDisabled}
+                      className="relative rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-[#12181d] shadow-none data-[state=active]:border-[#0058a3] data-[state=active]:text-[#0058a3] data-[state=inactive]:border-b data-[state=inactive]:border-[#e4e6e9] data-[state=inactive]:text-[#12181d] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Email
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="sms"
+                      disabled={secondaryTabDisabled}
+                      className="relative rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-[#12181d] shadow-none data-[state=active]:border-[#0058a3] data-[state=active]:text-[#0058a3] data-[state=inactive]:border-b data-[state=inactive]:border-[#e4e6e9] data-[state=inactive]:text-[#12181d] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {secondaryChannelLabel}
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
 
                   <section className="space-y-4" aria-label="Content">
                     <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Content</h2>
@@ -408,9 +422,11 @@ export function AddAutomationForm() {
                     </div>
                   </TabsContent>
 
-                  <TabsContent value="sms" className="mt-0 space-y-3 focus-visible:outline-none" tabIndex={-1}>
+                <TabsContent value="sms" className="mt-0 space-y-3 focus-visible:outline-none" tabIndex={-1}>
                     <div className="flex items-start justify-between gap-4">
-                      <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">SMS</h2>
+                      <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">
+                        {isDashboardDelivery(deliveryMethod) ? 'Dashboard' : 'SMS'}
+                      </h2>
                       <Button
                         type="button"
                         variant="outline"
@@ -453,67 +469,6 @@ export function AddAutomationForm() {
                     </p>
                   </TabsContent>
                 </Tabs>
-              ) : (
-                <section className="w-full max-w-[740px] space-y-4" aria-label="Content">
-                  <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Content</h2>
-                  <div>
-                    <Label htmlFor={`${id}-subj`} className="sr-only">
-                      Email subject
-                    </Label>
-                    <FloatLabel
-                      id={`${id}-subj`}
-                      label="Email subject *"
-                      value={emailSubject}
-                      onChange={(e) => setEmailSubject(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <p className="mb-1.5 text-sm font-medium text-[#12181d]">Content template *</p>
-                    <Select value={templateId} onValueChange={onTemplateChange}>
-                      <SelectTrigger className="h-12 w-full rounded-lg border-[#a5aeb4]">
-                        <SelectValue placeholder="Select a template" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TEMPLATE_CHOICES.map((t) => (
-                          <SelectItem key={t.value} value={t.value}>
-                            {t.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="mt-1.5 text-xs text-[#5c5c5c]">Content zone preview displays interpreted HTML (sanitized).</p>
-                  </div>
-                  <div>
-                    <div className="flex items-start justify-between gap-4">
-                      <h3 className="text-base font-semibold text-[#1d2c38]">Email</h3>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        intent="primary"
-                        size="sm"
-                        className="h-8 shrink-0 gap-1.5 rounded-md border-[#0058a3] px-3 text-[#0058a3]"
-                        onClick={openEditEmail}
-                      >
-                        <Pencil className="h-4 w-4" aria-hidden />
-                        Edit email
-                      </Button>
-                    </div>
-                    <div className="mt-2 w-full overflow-hidden rounded-lg border border-[#a5aeb4] bg-white">
-                      <div className="px-4 py-3">
-                        <p className="text-[11px] font-normal leading-4 tracking-[0.055px] text-[#515f6b]">Preview</p>
-                        {safePreviewHtml ? (
-                          <div
-                            className="mt-2 max-h-[min(464px,70vh)] overflow-y-auto"
-                            dangerouslySetInnerHTML={{ __html: safePreviewHtml }}
-                          />
-                        ) : (
-                          <p className="mt-2 min-h-[120px] text-center text-sm text-[#5c5c5c]">No preview</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              )}
 
             </>
           ) : null}
