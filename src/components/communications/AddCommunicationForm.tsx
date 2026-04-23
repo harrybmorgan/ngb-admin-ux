@@ -41,7 +41,21 @@ import {
 } from '@/components/communications/deliveryMethodChannel'
 
 const formCardClass =
-  'flex w-full max-w-[1164px] flex-col items-center gap-10 rounded-lg border border-[#d1d6d8] bg-white p-4 sm:p-6'
+  'flex w-full max-w-[1164px] flex-col items-center gap-10 rounded-lg border border-border bg-card p-4 sm:p-6'
+
+const REQUIRED_DOT_CLASS =
+  'pointer-events-none absolute left-[5px] top-[5px] z-10 size-[6px] rounded-full bg-destructive'
+
+const COMM_FIELD_LABEL_CLASS =
+  'mb-1 text-[10px] font-normal leading-4 tracking-[0.1px] text-muted-foreground'
+
+const outlinePrimaryCtaClass =
+  'h-8 shrink-0 gap-1.5 rounded-md border border-link text-link'
+
+const tabsTriggerClassName =
+  'relative rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-foreground shadow-none data-[state=active]:border-link data-[state=active]:text-link data-[state=inactive]:border-b data-[state=inactive]:border-border data-[state=inactive]:text-foreground disabled:cursor-not-allowed disabled:opacity-50'
+
+const previewFrameLabelClass = 'text-[11px] font-normal leading-4 tracking-[0.055px] text-muted-foreground'
 
 /** Placeholder copy aligned with [SMS view in Communications-Builder](https://www.figma.com/design/rH3S6MJJNltWf8lrrnU0jg/Communications-Builder?node-id=15670-55448). */
 const SMS_COMPOSE_PLACEHOLDER = 'Add SMS to get started!'
@@ -488,38 +502,38 @@ export function AddCommunicationForm() {
   return (
     <Card className={cn(formCardClass, 'shadow-sm')}>
       <div className="w-full max-w-[740px]">
-        <h1 className="text-2xl font-semibold leading-8 tracking-tight text-[#1d2c38]">Add New Communication</h1>
-        {!hasConfigurationSelection ? (
-          <p className="mt-1 text-sm text-[#5c5c5c]">
-            Prototype · no field validation in UI. Choose Configuration Type to show the rest of the form.
-          </p>
-        ) : null}
+        <h1 className="text-2xl font-semibold leading-8 tracking-tight text-foreground">Add New Communication</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {hasConfigurationSelection
+            ? 'Prototype (no field validation in UI)'
+            : 'Choose a configuration type to configure targeting, content, and schedule.'}
+        </p>
       </div>
 
       <CardContent className="flex w-full max-w-[740px] flex-col gap-0 space-y-10 p-0">
-        <section className="space-y-4" aria-label="Details">
-          <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Details</h2>
+        <section className="max-w-[740px] space-y-4" aria-label="Details">
+          <h2 className="text-lg font-semibold leading-6 tracking-tight text-foreground">Details</h2>
           <div className="flex max-w-[740px] flex-col gap-4">
-            <div>
+            <div className="relative">
+              <span className={REQUIRED_DOT_CLASS} aria-hidden />
               <Label htmlFor={`${id}-name`} className="sr-only">
                 Communication name
               </Label>
               <FloatLabel
                 id={`${id}-name`}
-                label="Communication Name *"
+                label="Communication Name"
                 value={communicationName}
                 onChange={(e) => setCommunicationName(e.target.value)}
               />
             </div>
-            {isUserId || isEnrollmentWindow ? (
-              <div>
-                <p className="mb-1 text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">
-                  Delivery Method
-                </p>
+            <div>
+              <p className={COMM_FIELD_LABEL_CLASS}>Delivery Method</p>
+              <div className="relative">
+                <span className={REQUIRED_DOT_CLASS} aria-hidden />
                 <Select value={deliveryMethod} onValueChange={onDeliveryMethodChange}>
                   <SelectTrigger
                     id={`${id}-delivery`}
-                    className="h-12 w-full rounded-lg border-[#a5aeb4]"
+                    className="h-12 w-full rounded-lg border border-input"
                     aria-required
                   >
                     <SelectValue />
@@ -533,35 +547,18 @@ export function AddCommunicationForm() {
                   </SelectContent>
                 </Select>
               </div>
-            ) : (
-              <div>
-                <p className="mb-1.5 text-sm font-medium text-[#12181d]">Delivery Method *</p>
-                <Select value={deliveryMethod} onValueChange={onDeliveryMethodChange}>
-                  <SelectTrigger id={`${id}-delivery`} className="h-12 w-full rounded-lg border-[#a5aeb4]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DELIVERY_METHOD_OPTIONS.map((d) => (
-                      <SelectItem key={d} value={d}>
-                        {d}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {isUserId || isEnrollmentWindow ? (
-              <div>
-                <p className="mb-1 text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">
-                  Configuration Type
-                </p>
+            </div>
+            <div>
+              <p className={COMM_FIELD_LABEL_CLASS}>Configuration Type</p>
+              <div className="relative">
+                <span className={REQUIRED_DOT_CLASS} aria-hidden />
                 <Select
                   value={configurationType || undefined}
                   onValueChange={onConfigurationTypeChange}
                 >
                   <SelectTrigger
                     id={`${id}-config`}
-                    className="h-12 w-full rounded-lg border-[#a5aeb4]"
+                    className="h-12 w-full rounded-lg border border-input"
                     aria-required
                   >
                     <SelectValue placeholder="Select configuration type" />
@@ -575,42 +572,24 @@ export function AddCommunicationForm() {
                   </SelectContent>
                 </Select>
               </div>
-            ) : (
-              <div>
-                <p className="mb-1.5 text-sm font-medium text-[#12181d]">Configuration Type *</p>
-                <Select
-                  value={configurationType || undefined}
-                  onValueChange={onConfigurationTypeChange}
-                >
-                  <SelectTrigger id={`${id}-config`} className="h-12 w-full rounded-lg border-[#a5aeb4]">
-                    <SelectValue placeholder="Select configuration type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CONFIGURATION_TYPE_OPTIONS.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {!hasConfigurationSelection ? (
-                  <p className="mt-1.5 text-sm text-[#5c5c5c]">
-                    Select a type to see configuration, content, and email fields.
-                  </p>
-                ) : null}
-              </div>
-            )}
+              {!hasConfigurationSelection ? (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Select a type to see configuration, content, and email fields.
+                </p>
+              ) : null}
+            </div>
           </div>
         </section>
 
         {isUserId ? (
           <section className="max-w-[740px] space-y-4" aria-label="Configuration">
-            <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Configuration</h2>
+            <h2 className="text-lg font-semibold leading-6 tracking-tight text-foreground">Configuration</h2>
             <div className="space-y-1.5">
               <div className="relative">
+                <span className={REQUIRED_DOT_CLASS} aria-hidden />
                 <Label
                   htmlFor={`${id}-user-ids`}
-                  className="pointer-events-none absolute left-4 top-3 z-[1] text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]"
+                  className="pointer-events-none absolute left-4 top-3 z-[1] text-[10px] font-normal leading-4 tracking-[0.1px] text-muted-foreground"
                 >
                   User IDs (comma separated, ex: 1234, 4567, 7890)
                 </Label>
@@ -618,12 +597,12 @@ export function AddCommunicationForm() {
                   id={`${id}-user-ids`}
                   value={userIdsRaw}
                   onChange={(e) => setUserIdsRaw(e.target.value)}
-                  className="min-h-[132px] w-full resize-y rounded-lg border-[#a5aeb4] pt-8 text-sm text-[#12181d]"
+                  className="min-h-[132px] w-full resize-y rounded-lg border border-input bg-background pt-8 text-sm text-foreground"
                   autoComplete="off"
                   aria-required
                 />
               </div>
-              <p className="text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">
+              <p className={COMM_FIELD_LABEL_CLASS}>
                 {userIdCount === 0
                   ? '0 User IDs'
                   : userIdCount === 1
@@ -636,17 +615,17 @@ export function AddCommunicationForm() {
 
         {isBenefitClassChange ? (
           <section className="max-w-[740px] space-y-4" aria-label="Configuration (benefit class change)">
-            <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Configuration</h2>
+            <h2 className="text-lg font-semibold leading-6 tracking-tight text-foreground">Configuration</h2>
             <div className="flex w-full min-w-0 items-end gap-3 sm:gap-4">
               <div className="min-w-0 flex-1">
-                <p className="mb-1 text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">
-                  Moving From Benefit Class...
-                </p>
+                <p className={COMM_FIELD_LABEL_CLASS}>Moving From Benefit Class…</p>
+                <div className="relative">
+                  <span className={REQUIRED_DOT_CLASS} aria-hidden />
                 <Select
                   value={bccFromClass || undefined}
                   onValueChange={setBccFromClass}
                 >
-                  <SelectTrigger id={`${id}-bcc-from`} className="h-12 w-full rounded-lg border-[#a5aeb4]">
+                  <SelectTrigger id={`${id}-bcc-from`} className="h-12 w-full rounded-lg border border-input">
                     <SelectValue placeholder="Select from class" />
                   </SelectTrigger>
                   <SelectContent>
@@ -657,22 +636,23 @@ export function AddCommunicationForm() {
                     ))}
                   </SelectContent>
                 </Select>
+                </div>
               </div>
               <div
                 className="flex h-12 shrink-0 items-center justify-center self-end pb-0.5"
                 aria-hidden
               >
-                <ArrowRight className="h-5 w-5 text-[#243746]" />
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="mb-1 text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">
-                  To Benefit Class...
-                </p>
+                <p className={COMM_FIELD_LABEL_CLASS}>To Benefit Class…</p>
+                <div className="relative">
+                  <span className={REQUIRED_DOT_CLASS} aria-hidden />
                 <Select
                   value={bccToClass || undefined}
                   onValueChange={setBccToClass}
                 >
-                  <SelectTrigger id={`${id}-bcc-to`} className="h-12 w-full rounded-lg border-[#a5aeb4]">
+                  <SelectTrigger id={`${id}-bcc-to`} className="h-12 w-full rounded-lg border border-input">
                     <SelectValue placeholder="Select to class" />
                   </SelectTrigger>
                   <SelectContent>
@@ -683,95 +663,104 @@ export function AddCommunicationForm() {
                     ))}
                   </SelectContent>
                 </Select>
+                </div>
               </div>
             </div>
             <Button
               type="button"
               variant="ghost"
-              className="h-auto gap-1.5 p-0 text-sm font-medium text-[#0058a3] hover:bg-transparent hover:text-[#0058a3] hover:underline"
+              className="h-auto gap-1.5 p-0 text-sm font-medium text-link hover:bg-transparent hover:text-link hover:underline"
               onClick={() => toast.message('Additional from/to class rows are not wired in this prototype.')}
             >
               <Plus className="h-4 w-4" aria-hidden />
-              Add Another
+              Add another
             </Button>
           </section>
         ) : null}
 
         {isEnrollmentWindow ? (
           <section className="max-w-[740px] space-y-4" aria-label="Configuration (enrollment window)">
-            <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Configuration</h2>
+            <h2 className="text-lg font-semibold leading-6 tracking-tight text-foreground">Configuration</h2>
             <div className="flex flex-col gap-4">
               <div>
-                <p className="mb-1 text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">Enrollment Type</p>
-                <Select value={enrollmentType} onValueChange={setEnrollmentType}>
-                  <SelectTrigger
-                    id={`${id}-enrollment-type`}
-                    className="h-12 w-full rounded-lg border-[#a5aeb4]"
-                    aria-required
-                  >
-                    <SelectValue placeholder="Enrollment Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ENROLLMENT_TYPE_OPTIONS.map((o) => (
-                      <SelectItem key={o} value={o}>
-                        {o}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <p className={COMM_FIELD_LABEL_CLASS}>Enrollment Type</p>
+                <div className="relative">
+                  <span className={REQUIRED_DOT_CLASS} aria-hidden />
+                  <Select value={enrollmentType} onValueChange={setEnrollmentType}>
+                    <SelectTrigger
+                      id={`${id}-enrollment-type`}
+                      className="h-12 w-full rounded-lg border border-input"
+                      aria-required
+                    >
+                      <SelectValue placeholder="Enrollment Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ENROLLMENT_TYPE_OPTIONS.map((o) => (
+                        <SelectItem key={o} value={o}>
+                          {o}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2 sm:items-end">
                 <div>
-                  <p className="mb-1 text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">Status</p>
-                  <Select value={enrollmentStatus} onValueChange={setEnrollmentStatus}>
-                    <SelectTrigger
-                      id={`${id}-status`}
-                      className="h-12 w-full rounded-lg border-[#a5aeb4]"
-                      aria-required
-                    >
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ENROLLMENT_STATUS_OPTIONS.map((o) => (
-                        <SelectItem key={o} value={o}>
-                          {o}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <p className={COMM_FIELD_LABEL_CLASS}>Status</p>
+                  <div className="relative">
+                    <span className={REQUIRED_DOT_CLASS} aria-hidden />
+                    <Select value={enrollmentStatus} onValueChange={setEnrollmentStatus}>
+                      <SelectTrigger
+                        id={`${id}-status`}
+                        className="h-12 w-full rounded-lg border border-input"
+                        aria-required
+                      >
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ENROLLMENT_STATUS_OPTIONS.map((o) => (
+                          <SelectItem key={o} value={o}>
+                            {o}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div>
-                  <p className="mb-1 text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">Benefit Class</p>
-                  <Select value={benefitClass} onValueChange={setBenefitClass}>
-                    <SelectTrigger id={`${id}-benefit-class`} className="h-12 w-full rounded-lg border-[#a5aeb4]">
-                      <SelectValue placeholder="Benefit Class" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {BENEFIT_CLASS_OPTIONS.map((o) => (
-                        <SelectItem key={o} value={o}>
-                          {o}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <p className={COMM_FIELD_LABEL_CLASS}>Benefit Class</p>
+                  <div className="relative">
+                    <span className={REQUIRED_DOT_CLASS} aria-hidden />
+                    <Select value={benefitClass} onValueChange={setBenefitClass}>
+                      <SelectTrigger id={`${id}-benefit-class`} className="h-12 w-full rounded-lg border border-input">
+                        <SelectValue placeholder="Benefit Class" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {BENEFIT_CLASS_OPTIONS.map((o) => (
+                          <SelectItem key={o} value={o}>
+                            {o}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
               <div className="w-full sm:max-w-[min(100%,360px)]">
-                <p className="mb-1 text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">
-                  Enrollment Effective Start Date
-                </p>
+                <p className={COMM_FIELD_LABEL_CLASS}>Enrollment Effective Start Date</p>
                 <div className="relative">
+                  <span className={REQUIRED_DOT_CLASS} aria-hidden />
                   <input
                     id={`${id}-start-date`}
                     type="date"
                     value={enrollmentStartDate}
                     onChange={(e) => setEnrollmentStartDate(e.target.value)}
-                    className="h-12 w-full rounded-lg border border-[#a5aeb4] pr-10 pl-3 text-sm text-[#12181d]"
+                    className="h-12 w-full rounded-lg border border-input bg-background pr-10 pl-3 text-sm text-foreground"
                     aria-label="Enrollment effective start date"
                     aria-required
                   />
                   <Calendar
-                    className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5c5c5c]"
+                    className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                     aria-hidden
                   />
                 </div>
@@ -786,75 +775,56 @@ export function AddCommunicationForm() {
             onValueChange={(v) => setMessageChannelTab(v as 'email' | 'sms')}
             className="w-full max-w-[740px] space-y-4"
           >
-            <div className="w-full border-b border-[#e4e6e9]">
+            <div className="w-full border-b border-border">
               <TabsList className="flex h-auto w-full min-h-0 flex-wrap items-stretch justify-start gap-0 rounded-none border-0 bg-transparent p-0">
-                <TabsTrigger
-                  value="email"
-                  disabled={emailTabDisabled}
-                  className="relative rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-[#12181d] shadow-none data-[state=active]:border-[#0058a3] data-[state=active]:text-[#0058a3] data-[state=inactive]:border-b data-[state=inactive]:border-[#e4e6e9] data-[state=inactive]:text-[#12181d] disabled:cursor-not-allowed disabled:opacity-50"
-                >
+                <TabsTrigger value="email" disabled={emailTabDisabled} className={tabsTriggerClassName}>
                   Email
                 </TabsTrigger>
-                <TabsTrigger
-                  value="sms"
-                  disabled={secondaryTabDisabled}
-                  className="relative rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-[#12181d] shadow-none data-[state=active]:border-[#0058a3] data-[state=active]:text-[#0058a3] data-[state=inactive]:border-b data-[state=inactive]:border-[#e4e6e9] data-[state=inactive]:text-[#12181d] disabled:cursor-not-allowed disabled:opacity-50"
-                >
+                <TabsTrigger value="sms" disabled={secondaryTabDisabled} className={tabsTriggerClassName}>
                   {secondaryChannelLabel}
                 </TabsTrigger>
               </TabsList>
             </div>
 
             <section className="space-y-4" aria-label="Content">
-              <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Content</h2>
+              <h2 className="text-lg font-semibold leading-6 tracking-tight text-foreground">Content</h2>
               <div className="flex max-w-[740px] flex-col gap-4">
                 {isBenefitClassChange ? (
-                  <div>
+                  <div className="relative">
+                    <span className={REQUIRED_DOT_CLASS} aria-hidden />
                     <Label htmlFor={`${id}-bcc-email-subj-tab`} className="sr-only">
                       Email subject
                     </Label>
                     <FloatLabel
                       id={`${id}-bcc-email-subj-tab`}
-                      label="Email Subject *"
+                      label="Email Subject"
                       value={emailSubject}
                       onChange={(e) => setEmailSubject(e.target.value)}
                     />
                   </div>
                 ) : null}
                 <div>
-                  <p
-                    className={cn(
-                      isEnrollmentWindow
-                        ? 'mb-1 text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]'
-                        : 'mb-1.5 text-sm font-medium text-[#12181d]',
-                    )}
-                  >
-                    Content Template *
-                  </p>
-                  <Select value={templateSelectValue} onValueChange={onContentTemplateChange}>
-                    <SelectTrigger
-                      id={`${id}-template-tabbed`}
-                      className="h-12 w-full rounded-lg border-[#a5aeb4]"
-                      aria-required
-                    >
-                      <SelectValue placeholder="Select a template" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {contentTemplateOptions.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>
-                          {t.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p
-                    className={cn(
-                      'mt-1.5',
-                      isUserId || isEnrollmentWindow || isBenefitClassChange
-                        ? 'text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]'
-                        : 'text-xs text-[#5c5c5c]',
-                    )}
-                  >
+                  <p className={COMM_FIELD_LABEL_CLASS}>Content template</p>
+                  <div className="relative">
+                    <span className={REQUIRED_DOT_CLASS} aria-hidden />
+                    <Select value={templateSelectValue} onValueChange={onContentTemplateChange}>
+                      <SelectTrigger
+                        id={`${id}-template-tabbed`}
+                        className="h-12 w-full rounded-lg border border-input"
+                        aria-required
+                      >
+                        <SelectValue placeholder="Select a template" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {contentTemplateOptions.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            {t.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="mt-1.5 text-[10px] font-normal leading-4 tracking-[0.1px] text-muted-foreground">
                     Changes made here will not affect the original template.
                   </p>
                 </div>
@@ -865,25 +835,25 @@ export function AddCommunicationForm() {
               {isBenefitClassChange ? (
                 <>
                   <div className="flex items-start justify-between gap-4">
-                    <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Email</h2>
+                    <h2 className="text-lg font-semibold leading-6 tracking-tight text-foreground">Email</h2>
                     <Button
                       type="button"
                       variant="outline"
                       intent="primary"
                       size="sm"
-                      className="h-8 shrink-0 gap-1.5 rounded-md border-[#0058a3] px-3 text-[#0058a3]"
+                      className={outlinePrimaryCtaClass}
                       onClick={() => {
                         setBccEditSession((s) => s + 1)
                         setBccEditEmailOpen(true)
                       }}
                     >
                       <Pencil className="h-4 w-4" aria-hidden />
-                      Edit Email
+                      Edit email
                     </Button>
                   </div>
-                  <div className="w-full overflow-hidden rounded-lg border border-[#a5aeb4] bg-white">
+                  <div className="w-full overflow-hidden rounded-lg border border-input bg-card">
                     <div className="px-4 py-3">
-                      <p className="text-[11px] font-normal leading-4 tracking-[0.055px] text-[#515f6b]">Preview</p>
+                      <p className={previewFrameLabelClass}>Preview</p>
                       {safePreviewHtml ? (
                         <div
                           className="mt-2 max-h-[min(464px,70vh)] overflow-y-auto"
@@ -891,7 +861,7 @@ export function AddCommunicationForm() {
                         />
                       ) : (
                         <div
-                          className="mt-2 flex min-h-[120px] items-center justify-center text-center text-sm text-[#5c5c5c]"
+                          className="mt-2 flex min-h-[120px] items-center justify-center text-center text-sm text-muted-foreground"
                           role="status"
                         >
                           Select a content template to load the content zone preview.
@@ -904,58 +874,60 @@ export function AddCommunicationForm() {
               {isUserId ? (
                 <>
                   <div className="flex items-start justify-between gap-4">
-                    <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Email</h2>
+                    <h2 className="text-lg font-semibold leading-6 tracking-tight text-foreground">Email</h2>
                     <Button
                       type="button"
                       variant="outline"
                       intent="primary"
                       size="sm"
-                      className="h-8 shrink-0 gap-1.5 rounded-md border-[#0058a3] px-3 text-[#0058a3]"
+                      className={outlinePrimaryCtaClass}
                       onClick={() => {
                         setUserIdEditSession((s) => s + 1)
                         setUserIdEditEmailOpen(true)
                       }}
                     >
                       <Pencil className="h-4 w-4" aria-hidden />
-                      Edit Email
+                      Edit email
                     </Button>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
                     <div>
                       <div
-                        className="flex h-12 cursor-not-allowed flex-col justify-center overflow-hidden rounded-lg border border-[#a5aeb4] bg-white px-4"
+                        className="flex h-12 cursor-not-allowed flex-col justify-center overflow-hidden rounded-lg border border-input bg-card px-4"
                         aria-label="From address (read only)"
                       >
-                        <span className="text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">From</span>
-                        <span className="truncate text-sm leading-5 text-[#12181d]">{fromAddress}</span>
+                        <span className="text-[10px] font-normal leading-4 tracking-[0.1px] text-muted-foreground">From</span>
+                        <span className="truncate text-sm leading-5 text-foreground">{fromAddress}</span>
                       </div>
                     </div>
-                    <div>
+                    <div className="relative">
+                      <span className={REQUIRED_DOT_CLASS} aria-hidden />
                       <Label htmlFor={`${id}-sender-uid-t`} className="sr-only">
                         Show as sender
                       </Label>
                       <FloatLabel
                         id={`${id}-sender-uid-t`}
-                        label="Show as sender *"
+                        label="Show as sender"
                         value={showAsSender}
                         onChange={(e) => setShowAsSender(e.target.value)}
                       />
                     </div>
                   </div>
-                  <div>
+                  <div className="relative">
+                    <span className={REQUIRED_DOT_CLASS} aria-hidden />
                     <Label htmlFor={`${id}-email-subj-uid-t`} className="sr-only">
                       Email subject
                     </Label>
                     <FloatLabel
                       id={`${id}-email-subj-uid-t`}
-                      label="Email Subject *"
+                      label="Email Subject"
                       value={emailSubject}
                       onChange={(e) => setEmailSubject(e.target.value)}
                     />
                   </div>
-                  <div className="w-full overflow-hidden rounded-lg border border-[#a5aeb4] bg-white">
+                  <div className="w-full overflow-hidden rounded-lg border border-input bg-card">
                     <div className="px-4 py-3">
-                      <p className="text-[11px] font-normal leading-4 tracking-[0.055px] text-[#515f6b]">Preview</p>
+                      <p className={previewFrameLabelClass}>Preview</p>
                       {safePreviewHtml ? (
                         <div
                           className="mt-2 max-h-[min(464px,70vh)] overflow-y-auto"
@@ -963,7 +935,7 @@ export function AddCommunicationForm() {
                         />
                       ) : (
                         <div
-                          className="mt-2 flex min-h-[120px] items-center justify-center text-center text-sm text-[#5c5c5c]"
+                          className="mt-2 flex min-h-[120px] items-center justify-center text-center text-sm text-muted-foreground"
                           role="status"
                         >
                           Select a content template to load the content zone preview.
@@ -976,58 +948,60 @@ export function AddCommunicationForm() {
               {isEnrollmentWindow ? (
                 <>
                   <div className="flex items-start justify-between gap-4">
-                    <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Email</h2>
+                    <h2 className="text-lg font-semibold leading-6 tracking-tight text-foreground">Email</h2>
                     <Button
                       type="button"
                       variant="outline"
                       intent="primary"
                       size="sm"
-                      className="h-8 shrink-0 gap-1.5 rounded-md border-[#0058a3] px-3 text-[#0058a3]"
+                      className={outlinePrimaryCtaClass}
                       onClick={() => {
                         setEnrollmentEditSession((s) => s + 1)
                         setEnrollmentEditEmailOpen(true)
                       }}
                     >
                       <Pencil className="h-4 w-4" aria-hidden />
-                      Edit Email
+                      Edit email
                     </Button>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
                     <div>
                       <div
-                        className="flex h-12 flex-col justify-center overflow-hidden rounded-lg border border-[#a5aeb4] bg-white px-4"
+                        className="flex h-12 flex-col justify-center overflow-hidden rounded-lg border border-input bg-card px-4"
                         aria-label="From address (read only)"
                       >
-                        <span className="text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">From</span>
-                        <span className="truncate text-sm leading-5 text-[#12181d]">{fromAddress}</span>
+                        <span className="text-[10px] font-normal leading-4 tracking-[0.1px] text-muted-foreground">From</span>
+                        <span className="truncate text-sm leading-5 text-foreground">{fromAddress}</span>
                       </div>
                     </div>
-                    <div>
+                    <div className="relative">
+                      <span className={REQUIRED_DOT_CLASS} aria-hidden />
                       <Label htmlFor={`${id}-sender-oe-t`} className="sr-only">
                         Show as sender
                       </Label>
                       <FloatLabel
                         id={`${id}-sender-oe-t`}
-                        label="Show as sender *"
+                        label="Show as sender"
                         value={showAsSender}
                         onChange={(e) => setShowAsSender(e.target.value)}
                       />
                     </div>
                   </div>
-                  <div>
+                  <div className="relative">
+                    <span className={REQUIRED_DOT_CLASS} aria-hidden />
                     <Label htmlFor={`${id}-email-subj-oe-t`} className="sr-only">
                       Email subject
                     </Label>
                     <FloatLabel
                       id={`${id}-email-subj-oe-t`}
-                      label="Email Subject *"
+                      label="Email Subject"
                       value={emailSubject}
                       onChange={(e) => setEmailSubject(e.target.value)}
                     />
                   </div>
-                  <div className="w-full overflow-hidden rounded-lg border border-[#a5aeb4] bg-white">
+                  <div className="w-full overflow-hidden rounded-lg border border-input bg-card">
                     <div className="px-4 py-3">
-                      <p className="text-[11px] font-normal leading-4 tracking-[0.055px] text-[#515f6b]">Preview</p>
+                      <p className={previewFrameLabelClass}>Preview</p>
                       {safePreviewHtml ? (
                         <div
                           className="mt-2 max-h-[min(464px,70vh)] overflow-y-auto"
@@ -1035,7 +1009,7 @@ export function AddCommunicationForm() {
                         />
                       ) : (
                         <div
-                          className="mt-2 flex min-h-[120px] items-center justify-center text-center text-sm text-[#5c5c5c]"
+                          className="mt-2 flex min-h-[120px] items-center justify-center text-center text-sm text-muted-foreground"
                           role="status"
                         >
                           Select a content template to load the content zone preview.
@@ -1049,7 +1023,7 @@ export function AddCommunicationForm() {
 
             <TabsContent value="sms" className="mt-0 space-y-3 focus-visible:outline-none" tabIndex={-1}>
               <div className="flex items-start justify-between gap-4">
-                <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">
+                <h2 className="text-lg font-semibold leading-6 tracking-tight text-foreground">
                   {isDashboardDelivery(deliveryMethod) ? 'Dashboard' : 'SMS'}
                 </h2>
                 <Button
@@ -1057,7 +1031,7 @@ export function AddCommunicationForm() {
                   variant="outline"
                   intent="primary"
                   size="sm"
-                  className="h-8 shrink-0 gap-1.5 rounded-md border-[#0058a3] px-3 text-[#0058a3]"
+                  className={outlinePrimaryCtaClass}
                   onClick={() =>
                     toast.message('Edit SMS: update the message in the compose area (prototype).')
                   }
@@ -1066,28 +1040,33 @@ export function AddCommunicationForm() {
                   Edit SMS
                 </Button>
               </div>
-              <div className="grid min-h-[220px] w-full overflow-hidden rounded-lg border border-[#a5aeb4] bg-white sm:grid-cols-2">
-                <div className="flex flex-col border-[#a5aeb4] sm:border-r">
+              <div className="grid min-h-[220px] w-full overflow-hidden rounded-lg border border-input bg-card sm:grid-cols-2">
+                <div className="relative flex flex-col border-b border-input sm:border-b-0 sm:border-r sm:border-t-0 sm:border-l-0">
+                  <span className={REQUIRED_DOT_CLASS} aria-hidden />
                   <div className="min-h-0 flex-1 p-3">
                     <Textarea
                       id={`${id}-sms-compose`}
                       value={smsMessage}
                       onChange={(e) => setSmsMessage(e.target.value)}
                       placeholder={SMS_COMPOSE_PLACEHOLDER}
-                      className="min-h-[180px] w-full resize-y rounded-md border-0 bg-transparent p-0 text-sm text-[#12181d] shadow-none focus-visible:ring-0"
+                      className="min-h-[180px] w-full resize-y rounded-md border-0 bg-transparent p-0 text-sm text-foreground shadow-none focus-visible:ring-0"
                       aria-label="SMS message body"
+                      aria-required
                     />
                   </div>
                 </div>
-                <div className="flex flex-col bg-[#f2f2f2] p-3">
-                  <p className="text-[11px] font-normal leading-4 tracking-[0.055px] text-[#515f6b]">Preview</p>
+                <div className="flex flex-col bg-muted p-3">
+                  <p className={previewFrameLabelClass}>Preview</p>
                   <div className="mt-2 flex min-h-[160px] items-start justify-start">
-                    <div className="max-w-[min(100%,18rem)] rounded-2xl rounded-tl-sm bg-white px-3 py-2 text-sm leading-snug text-[#12181d] shadow-sm">
+                    <div className="max-w-[min(100%,18rem)] rounded-2xl rounded-tl-sm bg-card px-3 py-2 text-sm leading-snug text-foreground shadow-sm">
                       {smsMessage.trim() ? smsMessage : SMS_PREVIEW_PLACEHOLDER_TEXT}
                     </div>
                   </div>
                 </div>
               </div>
+              <p className="text-sm text-muted-foreground">
+                {smsMessage.length} characters | Text messages are limited to 160 characters.
+              </p>
             </TabsContent>
           </Tabs>
         ) : null}
@@ -1100,7 +1079,7 @@ export function AddCommunicationForm() {
             type="button"
             variant="outline"
             intent="primary"
-            className="rounded-lg border-[#0058a3] px-4 text-[#0058a3]"
+            className="h-9 rounded-md border border-link text-link"
             onClick={handleCancel}
           >
             Cancel
@@ -1112,7 +1091,7 @@ export function AddCommunicationForm() {
                   type="button"
                   variant="link"
                   intent="primary"
-                  className="h-auto min-h-0 gap-1.5 p-0 text-sm font-medium text-[#0058a3] no-underline hover:text-[#0058a3] hover:underline"
+                  className="h-auto min-h-0 gap-1.5 p-0 text-sm font-medium text-link no-underline hover:text-link hover:underline"
                   onClick={() => setMessageChannelTab('sms')}
                 >
                   {getContinueToSecondaryCta(deliveryMethod)}
@@ -1122,7 +1101,7 @@ export function AddCommunicationForm() {
                 <Button
                   type="button"
                   intent="primary"
-                  className="rounded-lg px-4"
+                  className="h-9 rounded-md px-4"
                   onClick={handleOpenScheduleDialog}
                 >
                   Continue to schedule
@@ -1133,7 +1112,7 @@ export function AddCommunicationForm() {
                 type="button"
                 variant="link"
                 intent="primary"
-                className="h-auto min-h-0 gap-1.5 p-0 text-sm font-medium text-[#0058a3] no-underline hover:text-[#0058a3] hover:underline"
+                className="h-auto min-h-0 gap-1.5 p-0 text-sm font-medium text-link no-underline hover:text-link hover:underline"
                 onClick={() => setMessageChannelTab('sms')}
               >
                 {getContinueToSecondaryCta(deliveryMethod)}
@@ -1145,7 +1124,7 @@ export function AddCommunicationForm() {
               <Button
                 type="button"
                 intent="primary"
-                className="rounded-lg px-4"
+                className="h-9 rounded-md px-4"
                 onClick={handleOpenScheduleDialog}
               >
                 Schedule Send
@@ -1155,7 +1134,7 @@ export function AddCommunicationForm() {
                 <Button
                   type="button"
                   intent="primary"
-                  className="shrink-0 rounded-l-lg rounded-r-none border-r-0 px-4"
+                  className="h-9 shrink-0 rounded-l-md rounded-r-none border-r-0 px-4"
                   onClick={() => {
                     handleOpenScheduleDialog()
                   }}
@@ -1167,7 +1146,7 @@ export function AddCommunicationForm() {
                     <Button
                       type="button"
                       intent="primary"
-                      className="rounded-l-none rounded-r-lg px-2.5"
+                      className="h-9 rounded-l-none rounded-r-md px-2.5"
                       aria-label="More send options"
                     >
                       <ChevronDown className="h-4 w-4" />

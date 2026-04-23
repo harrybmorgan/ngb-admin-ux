@@ -37,7 +37,7 @@ import { sanitizeEmailBodyHtml } from '@/lib/sanitizeHtml'
 import { cn } from '@/lib/utils'
 
 const formCardClass =
-  'flex w-full max-w-[1164px] flex-col items-center gap-10 rounded-lg border border-[#d1d6d8] bg-white p-4 sm:p-6'
+  'flex w-full max-w-[1164px] flex-col items-center gap-10 rounded-lg border border-border bg-card p-4 sm:p-6'
 
 const REQUIRED_DOT_CLASS =
   'pointer-events-none absolute left-[5px] top-[5px] z-10 size-[6px] rounded-full bg-[#e12d33]'
@@ -206,7 +206,7 @@ export function AddAutomationForm() {
                 </Label>
                 <FloatLabel
                   id={`${id}-name`}
-                  label="Automation Name *"
+                  label="Automation Name"
                   value={automationName}
                   onChange={(e) => setAutomationName(e.target.value)}
                 />
@@ -352,34 +352,40 @@ export function AddAutomationForm() {
                   <section className="space-y-4" aria-label="Content">
                     <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Content</h2>
                     <div className="flex max-w-[740px] flex-col gap-4">
-                      <div>
+                      <div className="relative">
+                        <span className={REQUIRED_DOT_CLASS} aria-hidden />
                         <Label htmlFor={`${id}-subj-tab`} className="sr-only">
                           Email subject
                         </Label>
                         <FloatLabel
                           id={`${id}-subj-tab`}
-                          label="Email Subject *"
+                          label="Email Subject"
                           value={emailSubject}
                           onChange={(e) => setEmailSubject(e.target.value)}
                         />
                       </div>
                       <div>
-                        <p className="mb-1.5 text-sm font-medium text-[#12181d]">Content template *</p>
-                        <Select value={templateId} onValueChange={onTemplateChange}>
-                          <SelectTrigger
-                            id={`${id}-template-tabbed`}
-                            className="h-12 w-full rounded-lg border-[#a5aeb4]"
-                          >
-                            <SelectValue placeholder="Select a template" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {TEMPLATE_CHOICES.map((t) => (
-                              <SelectItem key={t.value} value={t.value}>
-                                {t.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <p className="mb-1 text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">
+                          Content template
+                        </p>
+                        <div className="relative">
+                          <span className={REQUIRED_DOT_CLASS} aria-hidden />
+                          <Select value={templateId} onValueChange={onTemplateChange}>
+                            <SelectTrigger
+                              id={`${id}-template-tabbed`}
+                              className="h-12 w-full rounded-lg border-[#a5aeb4]"
+                            >
+                              <SelectValue placeholder="Select a template" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {TEMPLATE_CHOICES.map((t) => (
+                                <SelectItem key={t.value} value={t.value}>
+                                  {t.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <p className="mt-1.5 text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">
                           Changes made here will not affect the original template.
                         </p>
