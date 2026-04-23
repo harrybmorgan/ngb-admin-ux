@@ -84,7 +84,7 @@ function mergeTerminationIntoRow(
     plan: 'COBRA election pending',
     lastUpdated: activeCase.terminationDate,
     cobraNoticeLabel:
-      activeCase.phase === 'election_review' ? 'Review COBRA election status' : 'COBRA notice sent',
+      activeCase.phase === 'election_review' ? 'Review COBRA election status' : 'COBRA offer packet sent',
   }
 }
 
@@ -99,8 +99,8 @@ function appendCobraTerminationHistory(
     { dateLabel: `${d} · 9:00 AM`, title: 'Termination recorded', body: activeCase.reason },
     {
       dateLabel: `${d} · 9:00 AM`,
-      title: 'COBRA rights notice sent',
-      body: 'Automatic — Ben Admin and COBRA share one core (no file handoff).',
+      title: 'COBRA offer packet sent',
+      body: 'Termination qualifying event (prototype).',
     },
     {
       dateLabel: `${d} · 9:01 AM`,

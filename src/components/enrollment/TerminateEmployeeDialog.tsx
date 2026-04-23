@@ -66,7 +66,7 @@ export function TerminateEmployeeDialog({ open, onOpenChange, employee, onAfterS
       reason,
       phase: 'notice_sent',
     })
-    toast.success('Termination saved. COBRA rights notice and carrier update triggered automatically (prototype).')
+    toast.success('Termination saved. COBRA offer packet and carrier update triggered (prototype).')
     onAfterSubmit?.()
     onOpenChange(false)
   }
@@ -89,8 +89,9 @@ export function TerminateEmployeeDialog({ open, onOpenChange, employee, onAfterS
                 </span>
               ) : (
                 <span className="block pt-1">
-                  Submitting this termination automatically sends the COBRA rights notice to the employee and updates the
-                  carrier—no separate COBRA portal (prototype).
+                  Submitting this termination automatically sends the{' '}
+                  <span className="font-medium text-foreground">COBRA offer packet</span> and updates the carrier—no separate
+                  COBRA portal (prototype).
                 </span>
               )}
             </p>

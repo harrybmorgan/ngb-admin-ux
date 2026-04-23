@@ -533,7 +533,7 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
                 className="flex min-h-0 w-full flex-1 flex-col gap-2"
                 aria-label={`What needs attention: featured — ${setupCard.title}; also ${[
                   ...(launchComplete && cobraCase?.phase === 'notice_sent'
-                    ? ['COBRA rights notice sent — Communications']
+                    ? ['COBRA offer packet sent — Communications']
                     : []),
                   ...(launchComplete && cobraCase?.phase === 'election_review'
                     ? ['Review COBRA election status — Financials']
@@ -603,11 +603,11 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
                       >
                         <div className="min-w-0 flex-1">
                           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9aa3bd]">Communications</p>
-                          <p className="mt-0.5 text-[13px] font-semibold leading-snug text-[#14182c]">COBRA rights notice sent</p>
+                          <p className="mt-0.5 text-[13px] font-semibold leading-snug text-[#14182c]">COBRA offer packet sent</p>
                           <p className="mt-0.5 text-[11px] leading-snug text-[#5f6a94]">
                             {cobraCase.employeeName} · Termination effective{' '}
-                            {formatTerminationDateLabel(cobraCase.terminationDate)}. Open Communications to review delivery
-                            details (prototype).
+                            {formatTerminationDateLabel(cobraCase.terminationDate)}. Open Communications for delivery details
+                            (prototype).
                           </p>
                         </div>
                         <ChevronRight
