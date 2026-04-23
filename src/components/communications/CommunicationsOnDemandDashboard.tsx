@@ -270,7 +270,7 @@ function RowActionsMenu(label: string) {
   )
 }
 
-const COBRA_PROTO_SENT_ROW_ID = 'cobra-proto-general-rights-notice'
+const COBRA_PROTO_OFFER_PACKET_ROW_ID = 'cobra-proto-offer-packet'
 
 function CobraProtoSentRowActions({
   phase,
@@ -284,7 +284,7 @@ function CobraProtoSentRowActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions for COBRA notice">
+        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions for COBRA offer packet">
           <MoreHorizontal className="h-4 w-4 text-[#5f6a94]" />
         </Button>
       </DropdownMenuTrigger>
@@ -446,7 +446,7 @@ function formatProtoIsoDate(iso: string) {
   })
 }
 
-/** Sent-table row for the unified termination → COBRA notice prototype (prepended to mock sent list). */
+/** Sent-table row for termination → COBRA offer packet prototype (prepended to mock sent list). */
 function buildCobraProtoSentRow(activeCase: CobraTerminationActiveCase): SentRow {
   const iso = activeCase.terminationDate
   const sendDate = /^\d{4}-\d{2}-\d{2}$/.test(iso)
@@ -460,9 +460,9 @@ function buildCobraProtoSentRow(activeCase: CobraTerminationActiveCase): SentRow
       })
     : iso
   return {
-    id: COBRA_PROTO_SENT_ROW_ID,
-    communication: 'COBRA general rights notice',
-    type: 'COBRA / Termination',
+    id: COBRA_PROTO_OFFER_PACKET_ROW_ID,
+    communication: 'COBRA offer packet (termination)',
+    type: 'COBRA / Qualifying event',
     employeeSent: 1,
     employeeTotal: 1,
     sendDate,
@@ -629,11 +629,13 @@ export function CommunicationsOnDemandDashboard() {
       const comm = r.communication.toLowerCase().includes(q)
       const typ = r.type.toLowerCase().includes(q)
       if (comm || typ) return true
-      if (r.id === COBRA_PROTO_SENT_ROW_ID && activeCase) {
+      if (r.id === COBRA_PROTO_OFFER_PACKET_ROW_ID && activeCase) {
+        const protoTerms = ['dol', 'rights', 'enrollment', 'offer', 'packet', 'qualifying', 'termination']
         return (
           activeCase.employeeName.toLowerCase().includes(q) ||
           activeCase.reason.toLowerCase().includes(q) ||
-          activeCase.terminationDate.toLowerCase().includes(q)
+          activeCase.terminationDate.toLowerCase().includes(q) ||
+          protoTerms.some((t) => q.includes(t))
         )
       }
       return false
@@ -649,7 +651,7 @@ export function CommunicationsOnDemandDashboard() {
     if (location.hash !== '#cobra') return
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const row = document.getElementById('communications-cobra-notice-row')
+        const row = document.getElementById('communications-cobra-offer-packet-row')
         const section = document.getElementById('communications-sent-comms')
         ;(row ?? section)?.scrollIntoView({ behavior: 'smooth', block: row ? 'center' : 'start' })
       })
@@ -842,11 +844,11 @@ export function CommunicationsOnDemandDashboard() {
                 </TableHeader>
                 <TableBody>
                   {sentPageRows.map((row) => {
-                    const isCobraProto = row.id === COBRA_PROTO_SENT_ROW_ID
+                    const isCobraProto = row.id === COBRA_PROTO_OFFER_PACKET_ROW_ID
                     return (
                       <TableRow
                         key={row.id}
-                        id={isCobraProto ? 'communications-cobra-notice-row' : undefined}
+                        id={isCobraProto ? 'communications-cobra-offer-packet-row' : undefined}
                         className={cn(
                           commAutoTr,
                           isCobraProto && 'bg-[#f4f6fc] ring-1 ring-inset ring-[#3958c3]/12',
@@ -861,8 +863,7 @@ export function CommunicationsOnDemandDashboard() {
                               <span className="font-medium text-[#374056]">{activeCase.employeeName}</span>
                               {' · '}Termination effective {formatProtoIsoDate(activeCase.terminationDate)} ·{' '}
                               {activeCase.reason}
-                              {activeCase.phase === 'election_review' ? ' · Election window active' : ''}. Sent automatically
-                              from Ben Admin (prototype).
+                              {activeCase.phase === 'election_review' ? ' · Election window active' : ''} (prototype).
                             </p>
                           ) : null}
                         </TableCell>
