@@ -17,8 +17,8 @@ import {
   BarChart3,
   Building2,
   ChevronDown,
-  CreditCard,
   FolderOpen,
+  Landmark,
   Home,
   LogOut,
   Mail,
@@ -39,7 +39,7 @@ const mainNav: MainNavItem[] = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/enrollment', label: 'People', icon: Users },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
-  { to: '/billing', label: 'Payroll', icon: CreditCard },
+  { to: '/billing', label: 'Financials', icon: Landmark },
   { to: '/content', label: 'Library', icon: FolderOpen },
   { to: '/communications', label: 'Communications', icon: Mail },
 ]

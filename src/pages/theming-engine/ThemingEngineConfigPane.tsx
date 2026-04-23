@@ -40,9 +40,9 @@ export function ThemingEngineConfigPane({ embedded = false }: { embedded?: boole
           </AccordionTrigger>
           <AccordionContent className="pt-2 pb-4">
             <div className="space-y-5">
-              {/* Partner Logo Upload */}
+              {/* Company logo upload */}
               <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-foreground">Partner Logo</Label>
+                <Label className="text-sm font-medium text-foreground">Company Logo</Label>
                 <Controller
                   name="headerLogoFile"
                   control={control}

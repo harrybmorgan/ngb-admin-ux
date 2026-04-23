@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   Button,
   Card,
@@ -21,22 +23,39 @@ import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminDockablePageShell } from '@/components/layout/AdminDockablePageShell'
 import { AdminFooter } from '@/components/layout/AdminFooter'
 
+function initialFinancialsTab(): string {
+  if (typeof window === 'undefined') return 'marketplace'
+  return window.location.hash === '#cobra' ? 'cobra' : 'marketplace'
+}
+
 export default function BillingPage() {
+  const location = useLocation()
+  const [financialsTab, setFinancialsTab] = useState(initialFinancialsTab)
+
+  useEffect(() => {
+    if (location.hash === '#cobra') {
+      setFinancialsTab('cobra')
+      requestAnimationFrame(() => {
+        document.getElementById('financials-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    }
+  }, [location.hash])
+
   return (
     <div className="admin-app-bg flex min-h-screen flex-col font-sans">
       <AdminNavigation />
       <AdminDockablePageShell>
       <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Payroll</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Financials</h1>
           <p className="text-sm text-muted-foreground">
             Marketplace financials, remittance tools, payment methods, COBRA counts, and accounting actions — prototype
             layout.
           </p>
         </div>
 
-        <Tabs defaultValue="marketplace">
-          <TabsList className="flex w-full flex-wrap h-auto gap-1">
+        <Tabs value={financialsTab} onValueChange={setFinancialsTab}>
+          <TabsList id="financials-tabs" className="flex h-auto w-full flex-wrap gap-1">
             <TabsTrigger value="marketplace">Marketplace financials</TabsTrigger>
             <TabsTrigger value="recon">Remittance & reconciliation</TabsTrigger>
             <TabsTrigger value="pay">Payment methods</TabsTrigger>
