@@ -28,7 +28,7 @@ import { sanitizeEmailBodyHtml } from '@/lib/sanitizeHtml'
 import { cn } from '@/lib/utils'
 
 const formCardClass =
-  'flex w-full max-w-[1124px] flex-col gap-6 rounded-lg border border-[#d1d6d8] bg-white p-4 sm:p-6'
+  'flex w-full max-w-[1164px] flex-col items-center gap-10 rounded-lg border border-[#d1d6d8] bg-white p-4 sm:p-6'
 
 const DELIVERY_OPTIONS = ['Default Delivery Preference'] as const
 /** `Enrollment Window` = OE; `Benefit Class Change` = BCC (lightweight template + preview in this prototype). */
@@ -88,7 +88,7 @@ const TEMPLATE_PREVIEW_HTML: Record<string, string> = {
   `,
 }
 
-/** Rich BCC “Benefit Class Change 1” content zone; matches [Communications-Builder / Add New Communication / BCC](https://www.figma.com/design/rH3S6MJJNltWf8lrrnU0jg/Communications-Builder?node-id=13832-79643). */
+/** Open-enrollment style content zone (“Welcome to … Annual Open Enrollment”); used for Enrollment Window preview. Named historically — not the class-change eligibility template below. */
 const BCC_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML = `
   <div style="font-family: Inter, 'Open Sans', system-ui, sans-serif; color: #12181d; line-height: 1.5; max-width: 600px; margin: 0 auto; text-align: center">
     <p style="font-size: 20px; font-weight: 600; margin: 0 0 8px; color: #0b5fa5">ACME Health</p>
@@ -136,8 +136,8 @@ const USER_ID_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML = `
 const DEMO_USER_IDS_CSV =
   '1234, 4567, 7891, 9123, 9234, 9345, 9456, 9567, 9678, 9789'
 
-/** OE “22: Content Zone Name” preview; same rich zone as [Enrollment Window](https://www.figma.com/design/rH3S6MJJNltWf8lrrnU0jg/Communications-Builder?node-id=2136-24968) (matches User ID benefit-class template body). */
-const ENROLLMENT_OE_22_FIGMA_PREVIEW_HTML = USER_ID_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML
+/** OE “22: Content Zone Name” preview; same rich zone as [Enrollment Window](https://www.figma.com/design/rH3S6MJJNltWf8lrrnU0jg/Communications-Builder?node-id=2136-24968) — open-enrollment style body (not the class-change eligibility template). */
+const ENROLLMENT_OE_22_FIGMA_PREVIEW_HTML = BCC_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML
 
 function countUserIds(raw: string): number {
   return raw
@@ -222,7 +222,7 @@ export function AddCommunicationForm() {
     if (isBenefitClassChange) {
       if (bccCustomContentHtml !== null) return bccCustomContentHtml
       if (effectiveTemplateId === 'benefit-class-change-1') {
-        return BCC_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML
+        return USER_ID_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML
       }
       if (effectiveTemplateId) {
         return TEMPLATE_PREVIEW_HTML[effectiveTemplateId] ?? ''
@@ -270,7 +270,7 @@ export function AddCommunicationForm() {
   const bccEditInitialHtml = useMemo(() => {
     if (bccCustomContentHtml !== null) return bccCustomContentHtml
     if (effectiveTemplateId === 'benefit-class-change-1') {
-      return BCC_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML
+      return USER_ID_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML
     }
     if (effectiveTemplateId) return TEMPLATE_PREVIEW_HTML[effectiveTemplateId] ?? ''
     return ''
@@ -352,7 +352,7 @@ export function AddCommunicationForm() {
 
   return (
     <Card className={cn(formCardClass, 'shadow-sm')}>
-      <div className="border-b border-[#E4E6E9] pb-4">
+      <div className="w-full max-w-[740px]">
         <h1 className="text-2xl font-semibold leading-8 tracking-tight text-[#1d2c38]">Add New Communication</h1>
         {!hasConfigurationSelection ? (
           <p className="mt-1 text-sm text-[#5c5c5c]">
@@ -361,7 +361,7 @@ export function AddCommunicationForm() {
         ) : null}
       </div>
 
-      <CardContent className="flex flex-col gap-0 space-y-8 p-0">
+      <CardContent className="flex w-full max-w-[740px] flex-col gap-0 space-y-10 p-0">
         <section className="space-y-4" aria-label="Details">
           <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Details</h2>
           <div className="flex max-w-[740px] flex-col gap-4">
@@ -918,8 +918,8 @@ export function AddCommunicationForm() {
 
       </CardContent>
 
-      <div className="mt-2 border-t border-[#E4E6E9] pt-4">
-        <div className="flex w-full max-w-[740px] flex-wrap items-center justify-end gap-2">
+      <div className="w-full max-w-[740px]">
+        <div className="flex w-full flex-wrap items-center justify-end gap-2">
           <Button
             type="button"
             variant="outline"
