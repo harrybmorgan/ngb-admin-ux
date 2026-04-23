@@ -537,7 +537,13 @@ function AutomatedCommunicationsSection() {
   )
 }
 
-type CommLocationState = { newCommunicationScheduled?: boolean; name?: string }
+type CommLocationState = {
+  newCommunicationScheduled?: boolean
+  name?: string
+  newAutomationScheduled?: boolean
+  automationName?: string
+  defaultCommTab?: 'automations'
+}
 
 export function CommunicationsOnDemandDashboard() {
   const navigate = useNavigate()
@@ -573,10 +579,26 @@ export function CommunicationsOnDemandDashboard() {
 
   useEffect(() => {
     const s = (location.state ?? null) as CommLocationState | null
-    if (s?.newCommunicationScheduled) {
+    if (!s) return
+    if (s.newCommunicationScheduled) {
       toast.success(
         s.name ? `“${s.name}” is scheduled. (Prototype.)` : 'Communication scheduled. (Prototype.)',
       )
+      navigate('/communications', { replace: true, state: null })
+      return
+    }
+    if (s.newAutomationScheduled) {
+      setTopMode('automations')
+      toast.success(
+        s.automationName
+          ? `“${s.automationName}” is scheduled. (Prototype.)`
+          : 'Automation scheduled. (Prototype.)',
+      )
+      navigate('/communications', { replace: true, state: null })
+      return
+    }
+    if (s.defaultCommTab === 'automations') {
+      setTopMode('automations')
       navigate('/communications', { replace: true, state: null })
     }
   }, [location.state, navigate])
@@ -613,7 +635,7 @@ export function CommunicationsOnDemandDashboard() {
               type="button"
               intent="primary"
               className="w-full shrink-0 rounded-lg px-4 py-2 text-sm font-medium shadow-sm sm:w-auto"
-              onClick={() => toast.message('Add new automation (prototype).')}
+              onClick={() => navigate('/communications/automations/new')}
             >
               Add New Automation
             </Button>

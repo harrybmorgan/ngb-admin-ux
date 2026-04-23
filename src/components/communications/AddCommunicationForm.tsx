@@ -129,7 +129,7 @@ const TEMPLATE_PREVIEW_HTML: Record<string, string> = {
 }
 
 /** Open-enrollment style content zone (“Welcome to … Annual Open Enrollment”); used for Enrollment Window preview. Named historically — not the class-change eligibility template below. */
-const BCC_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML = `
+export const BCC_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML = `
   <div style="font-family: Inter, 'Open Sans', system-ui, sans-serif; color: #12181d; line-height: 1.5; max-width: 600px; margin: 0 auto; text-align: center">
     <p style="font-size: 20px; font-weight: 600; margin: 0 0 8px; color: #0b5fa5">ACME Health</p>
     <div style="background: #f1fafe; padding: 16px; margin: 0 -8px 16px; border-radius: 0">
