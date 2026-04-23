@@ -176,6 +176,56 @@ const USER_ID_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML = `
 const DEMO_USER_IDS_CSV =
   '1234, 4567, 7891, 9123, 9234, 9345, 9456, 9567, 9678, 9789'
 
+type EmailSubjectConfig = 'userId' | 'enrollment' | 'bcc'
+
+function resolveUserIdTemplateId(t: string): string {
+  return t === 'oe-content-zone-22' || t === '' ? USER_ID_DEFAULT_TEMPLATE : t
+}
+
+/**
+ * Default subject line aligned to the active content template + preview for each
+ * configuration type. Updated when the user changes configuration or template.
+ */
+function getDefaultEmailSubjectForTemplate(config: EmailSubjectConfig, templateId: string): string {
+  const raw = templateId || ''
+  switch (config) {
+    case 'userId': {
+      const id = resolveUserIdTemplateId(raw)
+      if (id === USER_ID_DEFAULT_TEMPLATE) {
+        return 'Your User ID and benefits sign-in'
+      }
+      if (id === 'benefit-class-change-1') {
+        return 'Your benefits eligibility has changed'
+      }
+      if (id === 'generic-oe') {
+        return 'Open enrollment ends soon'
+      }
+      return 'Message from your benefits team'
+    }
+    case 'enrollment':
+      if (raw === 'oe-content-zone-22') {
+        return 'Welcome to 2025 Open Enrollment'
+      }
+      if (raw === 'generic-oe') {
+        return 'Reminder: open enrollment is closing soon'
+      }
+      if (raw === 'benefit-class-change-1') {
+        return 'Your benefit eligibility is ready to review'
+      }
+      return 'Open Enrollment 2025'
+    case 'bcc':
+      if (raw === 'benefit-class-change-1') {
+        return 'Your benefits eligibility has changed'
+      }
+      if (raw === 'generic-oe') {
+        return 'Open enrollment reminder'
+      }
+      return 'Update from your benefits team'
+    default:
+      return 'Message from your benefits team'
+  }
+}
+
 /** OE “22: Content Zone Name” preview; same rich zone as [Enrollment Window](https://www.figma.com/design/rH3S6MJJNltWf8lrrnU0jg/Communications-Builder?node-id=2136-24968) — open-enrollment style body (not the class-change eligibility template). */
 const ENROLLMENT_OE_22_FIGMA_PREVIEW_HTML = BCC_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML
 
@@ -243,24 +293,25 @@ export function AddCommunicationForm() {
     if (v === 'Enrollment Window') {
       setTemplateId('oe-content-zone-22')
       setCommunicationName((n) => n || '2025 Open Enrollment Email')
-      setEmailSubject((s) => s || 'Open Enrollment 2025')
+      setEmailSubject(getDefaultEmailSubjectForTemplate('enrollment', 'oe-content-zone-22'))
       setEnrollmentCustomContentHtml(null)
       setMessageChannelTab('email')
       setSmsMessage(SMS_PLACEHOLDER_ENROLLMENT)
     } else if (v === 'User ID') {
-      setTemplateId((t) =>
-        t === 'oe-content-zone-22' || t === '' ? USER_ID_DEFAULT_TEMPLATE : t,
-      )
+      setTemplateId((t) => {
+        const next = t === 'oe-content-zone-22' || t === '' ? USER_ID_DEFAULT_TEMPLATE : t
+        setEmailSubject(getDefaultEmailSubjectForTemplate('userId', next))
+        return next
+      })
       setCommunicationName((n) => n || 'Communication to UserID')
       setUserIdsRaw((r) => r || DEMO_USER_IDS_CSV)
-      setEmailSubject((s) => s || 'Your User ID and benefits sign-in')
       setUserIdCustomContentHtml(null)
       setEnrollmentCustomContentHtml(null)
       setMessageChannelTab('email')
       setSmsMessage(SMS_PLACEHOLDER_USER_ID)
     } else if (v === 'Benefit Class Change') {
       setCommunicationName('')
-      setEmailSubject("Congrats on going full time! Here's what you need to know.")
+      setEmailSubject(getDefaultEmailSubjectForTemplate('bcc', 'benefit-class-change-1'))
       setTemplateId('benefit-class-change-1')
       setBccFromClass('Benefit Class A')
       setBccToClass('Benefit Class B')
@@ -355,9 +406,20 @@ export function AddCommunicationForm() {
 
   const onContentTemplateChange = (v: string) => {
     setTemplateId(v)
-    if (isBenefitClassChange) setBccCustomContentHtml(null)
-    if (isUserId) setUserIdCustomContentHtml(null)
-    if (isEnrollmentWindow) setEnrollmentCustomContentHtml(null)
+    if (isBenefitClassChange) {
+      setBccCustomContentHtml(null)
+      setEmailSubject(getDefaultEmailSubjectForTemplate('bcc', v))
+    }
+    if (isUserId) {
+      setUserIdCustomContentHtml(null)
+      setEmailSubject(
+        getDefaultEmailSubjectForTemplate('userId', resolveUserIdTemplateId(v)),
+      )
+    }
+    if (isEnrollmentWindow) {
+      setEnrollmentCustomContentHtml(null)
+      setEmailSubject(getDefaultEmailSubjectForTemplate('enrollment', v))
+    }
   }
 
   const handleCancel = () => {
