@@ -63,8 +63,29 @@ const TEMPLATE_CHOICES: { value: string; label: string }[] = [
   { value: 'oe-content-zone-22', label: '22: Content Zone Name' },
 ]
 
+/** User ID configuration: default content template (dropdown + preview). */
+const USER_ID_DEFAULT_TEMPLATE = 'user-id-reminder-1' as const
+
+const USER_ID_CONTENT_TEMPLATE_CHOICES: { value: string; label: string }[] = [
+  { value: USER_ID_DEFAULT_TEMPLATE, label: 'User ID & sign-in reminder' },
+  { value: 'benefit-class-change-1', label: 'Benefit Class Change 1' },
+  { value: 'generic-oe', label: 'Open enrollment reminder' },
+]
+
 /** Rich HTML for preview; sanitized before `dangerouslySetInnerHTML`. */
 const TEMPLATE_PREVIEW_HTML: Record<string, string> = {
+  [USER_ID_DEFAULT_TEMPLATE]: `
+    <div style="font-family: 'Open Sans', system-ui, sans-serif; color: #12181d; line-height: 1.5; max-width: 600px; margin: 0 auto">
+      <p style="font-size: 18px; font-weight: 600; margin: 0 0 12px; color: #1d2c38">Your benefits User ID</p>
+      <p style="margin: 0 0 12px">We are sending this message to share or remind you of the <strong>User ID</strong> you use to sign in to your employer&rsquo;s benefits website. Use it with your password (or the sign-in method your plan uses) to access your account.</p>
+      <p style="margin: 0 0 8px; font-size: 14px; color: #243746"><span style="font-weight: 600">User ID:</span> [User ID will appear here]</p>
+      <p style="margin: 0 0 12px; font-size: 14px; color: #243746">If you&rsquo;ve forgotten your password, use <strong>Forgot password</strong> on the sign-in page&mdash;do not reply to this email with your password.</p>
+      <p style="margin: 0 0 12px">
+        <a href="#" style="color: #0058a3; font-weight: 500">Go to sign in</a>
+      </p>
+      <p style="margin: 0; color: #5c5c5c; font-size: 14px">This message was sent to the address on file for your account. For help, contact your benefits administrator.</p>
+    </div>
+  `,
   'benefit-class-change-1': `
     <div style="font-family: 'Open Sans', system-ui, sans-serif; color: #12181d; line-height: 1.5">
       <p style="font-size: 18px; font-weight: 600; margin: 0 0 12px">Your benefit eligibility is ready to review</p>
@@ -196,11 +217,11 @@ export function AddCommunicationForm() {
       setEnrollmentCustomContentHtml(null)
     } else if (v === 'User ID') {
       setTemplateId((t) =>
-        t === 'oe-content-zone-22' || t === '' ? 'benefit-class-change-1' : t,
+        t === 'oe-content-zone-22' || t === '' ? USER_ID_DEFAULT_TEMPLATE : t,
       )
       setCommunicationName((n) => n || 'Communication to UserID')
       setUserIdsRaw((r) => r || DEMO_USER_IDS_CSV)
-      setEmailSubject((s) => s || 'Welcome New Hires')
+      setEmailSubject((s) => s || 'Your User ID and benefits sign-in')
       setUserIdCustomContentHtml(null)
       setEnrollmentCustomContentHtml(null)
     } else if (v === 'Benefit Class Change') {
@@ -215,7 +236,7 @@ export function AddCommunicationForm() {
   }
 
   const effectiveTemplateId = (
-    isUserId && templateId === 'oe-content-zone-22' ? 'benefit-class-change-1' : templateId
+    isUserId && templateId === 'oe-content-zone-22' ? USER_ID_DEFAULT_TEMPLATE : templateId
   ) as string
   const previewSource = useMemo(() => {
     if (!hasConfigurationSelection) return ''
@@ -235,7 +256,9 @@ export function AddCommunicationForm() {
         return USER_ID_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML
       }
       if (effectiveTemplateId) {
-        return TEMPLATE_PREVIEW_HTML[effectiveTemplateId] ?? TEMPLATE_PREVIEW_HTML['benefit-class-change-1']!
+        return (
+          TEMPLATE_PREVIEW_HTML[effectiveTemplateId] ?? TEMPLATE_PREVIEW_HTML[USER_ID_DEFAULT_TEMPLATE]!
+        )
       }
       return ''
     }
@@ -342,10 +365,10 @@ export function AddCommunicationForm() {
   }
 
   const templateSelectValue =
-    isUserId && templateId === 'oe-content-zone-22' ? 'benefit-class-change-1' : templateId || undefined
+    isUserId && templateId === 'oe-content-zone-22' ? USER_ID_DEFAULT_TEMPLATE : templateId || undefined
 
   const contentTemplateOptions = isUserId
-    ? TEMPLATE_CHOICES.filter((t) => t.value !== 'oe-content-zone-22')
+    ? USER_ID_CONTENT_TEMPLATE_CHOICES
     : isBenefitClassChange
       ? TEMPLATE_CHOICES.filter((t) => t.value === 'benefit-class-change-1' || t.value === 'generic-oe')
       : TEMPLATE_CHOICES
