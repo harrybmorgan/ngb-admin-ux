@@ -15,6 +15,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   Textarea,
 } from '@wexinc-healthbenefits/ben-ui-kit'
 import { ArrowRight, Calendar, ChevronDown, Pencil, Plus } from 'lucide-react'
@@ -31,6 +35,21 @@ const formCardClass =
   'flex w-full max-w-[1164px] flex-col items-center gap-10 rounded-lg border border-[#d1d6d8] bg-white p-4 sm:p-6'
 
 const DELIVERY_OPTIONS = ['Default Delivery Preference'] as const
+const DEFAULT_DELIVERY_PREFERENCE = DELIVERY_OPTIONS[0]!
+
+/** Placeholder copy aligned with [SMS view in Communications-Builder](https://www.figma.com/design/rH3S6MJJNltWf8lrrnU0jg/Communications-Builder?node-id=15670-55448). */
+const SMS_COMPOSE_PLACEHOLDER = 'Add SMS to get started!'
+const SMS_PREVIEW_PLACEHOLDER_TEXT = 'Your message preview will be shown here.'
+
+const SMS_PLACEHOLDER_USER_ID =
+  "ACME Health: Use your User ID to sign in to the benefits portal. Do not share your password or User ID. Questions? [support phone]"
+
+const SMS_PLACEHOLDER_ENROLLMENT =
+  'Open enrollment: complete your 2026 elections by [deadline]. Sign in: [portal] — ACME Health. Reply STOP to opt out.'
+
+const SMS_PLACEHOLDER_BCC =
+  "Congrats on your new benefit class! Sign in to review your elections. Questions? [support] Reply STOP to opt out."
+
 /** `Enrollment Window` = OE; `Benefit Class Change` = BCC (lightweight template + preview in this prototype). */
 const CONFIGURATION_TYPE_OPTIONS = ['User ID', 'Enrollment Window', 'Benefit Class Change'] as const
 
@@ -205,8 +224,19 @@ export function AddCommunicationForm() {
   const [fromAddress] = useState('DoNotReply@wexapps.com')
   const [showAsSender, setShowAsSender] = useState('WEX Benefits')
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false)
+  /**
+   * Default delivery: Email | SMS (Text) Message above Content per
+   * [Figma 15521:22806](https://www.figma.com/design/rH3S6MJJNltWf8lrrnU0jg/Communications-Builder?node-id=15521-22806).
+   */
+  const [messageChannelTab, setMessageChannelTab] = useState<'email' | 'sms'>('email')
+  const [smsMessage, setSmsMessage] = useState('')
 
   const userIdCount = useMemo(() => countUserIds(userIdsRaw), [userIdsRaw])
+  const showDefaultDeliveryChannelTabs = deliveryMethod === DEFAULT_DELIVERY_PREFERENCE
+  const useTabbedDefaultDeliveryLayout =
+    hasConfigurationSelection &&
+    showDefaultDeliveryChannelTabs &&
+    (isUserId || isEnrollmentWindow || isBenefitClassChange)
 
   const onConfigurationTypeChange = (v: string) => {
     setConfigurationType(v)
@@ -215,6 +245,8 @@ export function AddCommunicationForm() {
       setCommunicationName((n) => n || '2025 Open Enrollment Email')
       setEmailSubject((s) => s || 'Open Enrollment 2025')
       setEnrollmentCustomContentHtml(null)
+      setMessageChannelTab('email')
+      setSmsMessage(SMS_PLACEHOLDER_ENROLLMENT)
     } else if (v === 'User ID') {
       setTemplateId((t) =>
         t === 'oe-content-zone-22' || t === '' ? USER_ID_DEFAULT_TEMPLATE : t,
@@ -224,6 +256,8 @@ export function AddCommunicationForm() {
       setEmailSubject((s) => s || 'Your User ID and benefits sign-in')
       setUserIdCustomContentHtml(null)
       setEnrollmentCustomContentHtml(null)
+      setMessageChannelTab('email')
+      setSmsMessage(SMS_PLACEHOLDER_USER_ID)
     } else if (v === 'Benefit Class Change') {
       setCommunicationName('')
       setEmailSubject("Congrats on going full time! Here's what you need to know.")
@@ -232,6 +266,8 @@ export function AddCommunicationForm() {
       setBccToClass('Benefit Class B')
       setBccCustomContentHtml(null)
       setEnrollmentCustomContentHtml(null)
+      setMessageChannelTab('email')
+      setSmsMessage(SMS_PLACEHOLDER_BCC)
     }
   }
 
@@ -668,7 +704,315 @@ export function AddCommunicationForm() {
           </section>
         ) : null}
 
-        {hasConfigurationSelection && isBenefitClassChange ? (
+        {useTabbedDefaultDeliveryLayout ? (
+          <Tabs
+            value={messageChannelTab}
+            onValueChange={(v) => setMessageChannelTab(v as 'email' | 'sms')}
+            className="w-full max-w-[740px] space-y-4"
+          >
+            <div className="w-full border-b border-[#e4e6e9]">
+              <TabsList className="flex h-auto w-full min-h-0 flex-wrap items-stretch justify-start gap-0 rounded-none border-0 bg-transparent p-0">
+                <TabsTrigger
+                  value="email"
+                  className="relative rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-[#12181d] shadow-none data-[state=active]:border-[#0058a3] data-[state=active]:text-[#0058a3] data-[state=inactive]:border-b data-[state=inactive]:border-[#e4e6e9] data-[state=inactive]:text-[#12181d]"
+                >
+                  Email
+                </TabsTrigger>
+                <TabsTrigger
+                  value="sms"
+                  className="relative rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-[#12181d] shadow-none data-[state=active]:border-[#0058a3] data-[state=active]:text-[#0058a3] data-[state=inactive]:border-b data-[state=inactive]:border-[#e4e6e9] data-[state=inactive]:text-[#12181d]"
+                >
+                  SMS (Text) Message
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <section className="space-y-4" aria-label="Content">
+              <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Content</h2>
+              <div className="flex max-w-[740px] flex-col gap-4">
+                {isBenefitClassChange ? (
+                  <div>
+                    <Label htmlFor={`${id}-bcc-email-subj-tab`} className="sr-only">
+                      Email subject
+                    </Label>
+                    <FloatLabel
+                      id={`${id}-bcc-email-subj-tab`}
+                      label="Email Subject *"
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                    />
+                  </div>
+                ) : null}
+                <div>
+                  <p
+                    className={cn(
+                      isEnrollmentWindow
+                        ? 'mb-1 text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]'
+                        : 'mb-1.5 text-sm font-medium text-[#12181d]',
+                    )}
+                  >
+                    Content Template *
+                  </p>
+                  <Select value={templateSelectValue} onValueChange={onContentTemplateChange}>
+                    <SelectTrigger
+                      id={`${id}-template-tabbed`}
+                      className="h-12 w-full rounded-lg border-[#a5aeb4]"
+                      aria-required
+                    >
+                      <SelectValue placeholder="Select a template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {contentTemplateOptions.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>
+                          {t.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p
+                    className={cn(
+                      'mt-1.5',
+                      isUserId || isEnrollmentWindow || isBenefitClassChange
+                        ? 'text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]'
+                        : 'text-xs text-[#5c5c5c]',
+                    )}
+                  >
+                    Changes made here will not affect the original template.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <TabsContent value="email" className="mt-0 space-y-4 focus-visible:outline-none" tabIndex={-1}>
+              {isBenefitClassChange ? (
+                <>
+                  <div className="flex items-start justify-between gap-4">
+                    <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Email</h2>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      intent="primary"
+                      size="sm"
+                      className="h-8 shrink-0 gap-1.5 rounded-md border-[#0058a3] px-3 text-[#0058a3]"
+                      onClick={() => {
+                        setBccEditSession((s) => s + 1)
+                        setBccEditEmailOpen(true)
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" aria-hidden />
+                      Edit Email
+                    </Button>
+                  </div>
+                  <div className="w-full overflow-hidden rounded-lg border border-[#a5aeb4] bg-white">
+                    <div className="px-4 py-3">
+                      <p className="text-[11px] font-normal leading-4 tracking-[0.055px] text-[#515f6b]">Preview</p>
+                      {safePreviewHtml ? (
+                        <div
+                          className="mt-2 max-h-[min(464px,70vh)] overflow-y-auto"
+                          dangerouslySetInnerHTML={{ __html: safePreviewHtml }}
+                        />
+                      ) : (
+                        <div
+                          className="mt-2 flex min-h-[120px] items-center justify-center text-center text-sm text-[#5c5c5c]"
+                          role="status"
+                        >
+                          Select a content template to load the content zone preview.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : null}
+              {isUserId ? (
+                <>
+                  <div className="flex items-start justify-between gap-4">
+                    <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Email</h2>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      intent="primary"
+                      size="sm"
+                      className="h-8 shrink-0 gap-1.5 rounded-md border-[#0058a3] px-3 text-[#0058a3]"
+                      onClick={() => {
+                        setUserIdEditSession((s) => s + 1)
+                        setUserIdEditEmailOpen(true)
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" aria-hidden />
+                      Edit Email
+                    </Button>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
+                    <div>
+                      <div
+                        className="flex h-12 cursor-not-allowed flex-col justify-center overflow-hidden rounded-lg border border-[#a5aeb4] bg-white px-4"
+                        aria-label="From address (read only)"
+                      >
+                        <span className="text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">From</span>
+                        <span className="truncate text-sm leading-5 text-[#12181d]">{fromAddress}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor={`${id}-sender-uid-t`} className="sr-only">
+                        Show as sender
+                      </Label>
+                      <FloatLabel
+                        id={`${id}-sender-uid-t`}
+                        label="Show as sender *"
+                        value={showAsSender}
+                        onChange={(e) => setShowAsSender(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor={`${id}-email-subj-uid-t`} className="sr-only">
+                      Email subject
+                    </Label>
+                    <FloatLabel
+                      id={`${id}-email-subj-uid-t`}
+                      label="Email Subject *"
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                    />
+                  </div>
+                  <div className="w-full overflow-hidden rounded-lg border border-[#a5aeb4] bg-white">
+                    <div className="px-4 py-3">
+                      <p className="text-[11px] font-normal leading-4 tracking-[0.055px] text-[#515f6b]">Preview</p>
+                      {safePreviewHtml ? (
+                        <div
+                          className="mt-2 max-h-[min(464px,70vh)] overflow-y-auto"
+                          dangerouslySetInnerHTML={{ __html: safePreviewHtml }}
+                        />
+                      ) : (
+                        <div
+                          className="mt-2 flex min-h-[120px] items-center justify-center text-center text-sm text-[#5c5c5c]"
+                          role="status"
+                        >
+                          Select a content template to load the content zone preview.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : null}
+              {isEnrollmentWindow ? (
+                <>
+                  <div className="flex items-start justify-between gap-4">
+                    <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Email</h2>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      intent="primary"
+                      size="sm"
+                      className="h-8 shrink-0 gap-1.5 rounded-md border-[#0058a3] px-3 text-[#0058a3]"
+                      onClick={() => {
+                        setEnrollmentEditSession((s) => s + 1)
+                        setEnrollmentEditEmailOpen(true)
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" aria-hidden />
+                      Edit Email
+                    </Button>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
+                    <div>
+                      <div
+                        className="flex h-12 flex-col justify-center overflow-hidden rounded-lg border border-[#a5aeb4] bg-white px-4"
+                        aria-label="From address (read only)"
+                      >
+                        <span className="text-[10px] font-normal leading-4 tracking-[0.1px] text-[#243746]">From</span>
+                        <span className="truncate text-sm leading-5 text-[#12181d]">{fromAddress}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor={`${id}-sender-oe-t`} className="sr-only">
+                        Show as sender
+                      </Label>
+                      <FloatLabel
+                        id={`${id}-sender-oe-t`}
+                        label="Show as sender *"
+                        value={showAsSender}
+                        onChange={(e) => setShowAsSender(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor={`${id}-email-subj-oe-t`} className="sr-only">
+                      Email subject
+                    </Label>
+                    <FloatLabel
+                      id={`${id}-email-subj-oe-t`}
+                      label="Email Subject *"
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                    />
+                  </div>
+                  <div className="w-full overflow-hidden rounded-lg border border-[#a5aeb4] bg-white">
+                    <div className="px-4 py-3">
+                      <p className="text-[11px] font-normal leading-4 tracking-[0.055px] text-[#515f6b]">Preview</p>
+                      {safePreviewHtml ? (
+                        <div
+                          className="mt-2 max-h-[min(464px,70vh)] overflow-y-auto"
+                          dangerouslySetInnerHTML={{ __html: safePreviewHtml }}
+                        />
+                      ) : (
+                        <div
+                          className="mt-2 flex min-h-[120px] items-center justify-center text-center text-sm text-[#5c5c5c]"
+                          role="status"
+                        >
+                          Select a content template to load the content zone preview.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </TabsContent>
+
+            <TabsContent value="sms" className="mt-0 space-y-3 focus-visible:outline-none" tabIndex={-1}>
+              <div className="flex items-start justify-between gap-4">
+                <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">SMS</h2>
+                <Button
+                  type="button"
+                  variant="outline"
+                  intent="primary"
+                  size="sm"
+                  className="h-8 shrink-0 gap-1.5 rounded-md border-[#0058a3] px-3 text-[#0058a3]"
+                  onClick={() =>
+                    toast.message('Edit SMS: update the message in the compose area (prototype).')
+                  }
+                >
+                  <Pencil className="h-4 w-4" aria-hidden />
+                  Edit SMS
+                </Button>
+              </div>
+              <div className="grid min-h-[220px] w-full overflow-hidden rounded-lg border border-[#a5aeb4] bg-white sm:grid-cols-2">
+                <div className="flex flex-col border-[#a5aeb4] sm:border-r">
+                  <div className="min-h-0 flex-1 p-3">
+                    <Textarea
+                      id={`${id}-sms-compose`}
+                      value={smsMessage}
+                      onChange={(e) => setSmsMessage(e.target.value)}
+                      placeholder={SMS_COMPOSE_PLACEHOLDER}
+                      className="min-h-[180px] w-full resize-y rounded-md border-0 bg-transparent p-0 text-sm text-[#12181d] shadow-none focus-visible:ring-0"
+                      aria-label="SMS message body"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col bg-[#f2f2f2] p-3">
+                  <p className="text-[11px] font-normal leading-4 tracking-[0.055px] text-[#515f6b]">Preview</p>
+                  <div className="mt-2 flex min-h-[160px] items-start justify-start">
+                    <div className="max-w-[min(100%,18rem)] rounded-2xl rounded-tl-sm bg-white px-3 py-2 text-sm leading-snug text-[#12181d] shadow-sm">
+                      {smsMessage.trim() ? smsMessage : SMS_PREVIEW_PLACEHOLDER_TEXT}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        ) : null}
+
+        {hasConfigurationSelection && isBenefitClassChange && !useTabbedDefaultDeliveryLayout ? (
           <section className="max-w-[740px] space-y-4" aria-label="Content (benefit class change)">
             <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Content</h2>
             <div className="flex flex-col gap-4">
@@ -740,7 +1084,7 @@ export function AddCommunicationForm() {
           </section>
         ) : null}
 
-        {hasConfigurationSelection && !isBenefitClassChange ? (
+        {hasConfigurationSelection && !isBenefitClassChange && !useTabbedDefaultDeliveryLayout ? (
           <section className="space-y-4" aria-label="Content">
             <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Content</h2>
             <div className="flex max-w-[740px] flex-col gap-4">
@@ -788,7 +1132,7 @@ export function AddCommunicationForm() {
           </section>
         ) : null}
 
-        {hasConfigurationSelection && !isBenefitClassChange && isUserId ? (
+        {hasConfigurationSelection && !isBenefitClassChange && isUserId && !useTabbedDefaultDeliveryLayout ? (
           <section className="max-w-[740px] space-y-4" aria-label="Email (user id)">
             <div className="flex items-start justify-between gap-4">
               <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Email</h2>
@@ -843,7 +1187,7 @@ export function AddCommunicationForm() {
           </section>
         ) : null}
 
-        {hasConfigurationSelection && isEnrollmentWindow ? (
+        {hasConfigurationSelection && isEnrollmentWindow && !useTabbedDefaultDeliveryLayout ? (
           <section className="max-w-[740px] space-y-4" aria-label="Email (enrollment window)">
             <div className="flex items-start justify-between gap-4">
               <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Email</h2>
@@ -916,7 +1260,7 @@ export function AddCommunicationForm() {
           </section>
         ) : null}
 
-        {hasConfigurationSelection && !isBenefitClassChange && isUserId ? (
+        {hasConfigurationSelection && !isBenefitClassChange && isUserId && !useTabbedDefaultDeliveryLayout ? (
           <section className="max-w-[740px] space-y-0" aria-label="Preview (user id)">
             <div className="w-full overflow-hidden rounded-lg border border-[#a5aeb4] bg-white">
               <div className="px-4 py-3">
@@ -954,13 +1298,57 @@ export function AddCommunicationForm() {
           </Button>
           {hasConfigurationSelection ? (
             isBenefitClassChange ? (
+              useTabbedDefaultDeliveryLayout ? (
+                messageChannelTab === 'email' ? (
+                  <Button
+                    type="button"
+                    variant="link"
+                    intent="primary"
+                    className="h-auto min-h-0 gap-1.5 p-0 text-sm font-medium text-[#0058a3] no-underline hover:text-[#0058a3] hover:underline"
+                    onClick={() => setMessageChannelTab('sms')}
+                  >
+                    Continue to SMS
+                    <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    intent="primary"
+                    className="rounded-lg px-4"
+                    onClick={handleOpenScheduleDialog}
+                  >
+                    Continue to schedule
+                  </Button>
+                )
+              ) : (
+                <Button
+                  type="button"
+                  intent="primary"
+                  className="rounded-lg px-4"
+                  onClick={handleOpenScheduleDialog}
+                >
+                  Continue to schedule
+                </Button>
+              )
+            ) : useTabbedDefaultDeliveryLayout && messageChannelTab === 'email' ? (
+              <Button
+                type="button"
+                variant="link"
+                intent="primary"
+                className="h-auto min-h-0 gap-1.5 p-0 text-sm font-medium text-[#0058a3] no-underline hover:text-[#0058a3] hover:underline"
+                onClick={() => setMessageChannelTab('sms')}
+              >
+                Continue to SMS
+                <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+              </Button>
+            ) : useTabbedDefaultDeliveryLayout && messageChannelTab === 'sms' ? (
               <Button
                 type="button"
                 intent="primary"
                 className="rounded-lg px-4"
                 onClick={handleOpenScheduleDialog}
               >
-                Continue to schedule
+                Schedule Send
               </Button>
             ) : (
               <div className="inline-flex w-full min-w-0 sm:w-auto">
@@ -968,7 +1356,9 @@ export function AddCommunicationForm() {
                   type="button"
                   intent="primary"
                   className="shrink-0 rounded-l-lg rounded-r-none border-r-0 px-4"
-                  onClick={handleOpenScheduleDialog}
+                  onClick={() => {
+                    handleOpenScheduleDialog()
+                  }}
                 >
                   Schedule Send
                 </Button>
