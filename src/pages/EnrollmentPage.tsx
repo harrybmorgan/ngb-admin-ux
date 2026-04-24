@@ -33,7 +33,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@wexinc-healthbenefits/ben-ui-kit'
-import { ChevronDown, MoreVertical, Plus, UserMinus } from 'lucide-react'
+import { MoreVertical, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminDockablePageShell } from '@/components/layout/AdminDockablePageShell'
@@ -246,7 +246,7 @@ export default function EnrollmentPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">People</h1>
           <p className="text-sm text-muted-foreground">
-            Search people, open profiles, and use quick adds — all census fields in one prototype workspace.
+            Search people, open profiles, and work with census data in this prototype workspace.
           </p>
         </div>
 
@@ -256,29 +256,21 @@ export default function EnrollmentPage() {
               <CardTitle>Consumer records</CardTitle>
               <CardDescription>Paginated roster with filters (demo data).</CardDescription>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button type="button" variant="outline" className="gap-1">
-                    Quick add
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Quick add employee</DropdownMenuItem>
-                  <DropdownMenuItem>Quick add dependent</DropdownMenuItem>
-                  <DropdownMenuItem>Quick add authorized user</DropdownMenuItem>
-                  <DropdownMenuItem>Quick add authorized signer / cardholder</DropdownMenuItem>
-                  <DropdownMenuItem>Quick add beneficiary</DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive">
-                    <UserMinus className="mr-2 h-4 w-4" />
-                    Quick term employee
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button type="button" className="gap-1">
-                <Plus className="h-4 w-4" />
-                New enrollment
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => toast.message('Add employee (prototype).')}
+              >
+                Add employee
+              </Button>
+              <Button
+                type="button"
+                className="gap-1"
+                onClick={() => toast.message('Upload census (prototype).')}
+              >
+                <Upload className="h-4 w-4" aria-hidden />
+                Upload census
               </Button>
             </div>
           </CardHeader>
@@ -358,7 +350,7 @@ export default function EnrollmentPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Department</TableHead>
+                  <TableHead>Division/Class</TableHead>
                   <TableHead>Plan</TableHead>
                   <TableHead>Updated</TableHead>
                   <TableHead className="w-[1%] whitespace-nowrap text-right">Actions</TableHead>
