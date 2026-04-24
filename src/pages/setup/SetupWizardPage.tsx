@@ -58,9 +58,11 @@ import {
   Loader2,
   Lock,
   Minus,
+  PawPrint,
   Pencil,
   Plus,
   Rocket,
+  Shield,
   Sparkles,
   SkipForward,
   Trash2,
@@ -4533,34 +4535,210 @@ export default function SetupWizardPage() {
           </div>
         )
       }
-      case 8:
+      case 8: {
+        const medicalSelected = draft.selectedProducts.includes('medical')
+
+        type MktDef = {
+          id: 'lyra' | 'pet' | 'legal'
+          title: string
+          value: string
+          Icon: typeof HeartPulse
+          chips: readonly string[]
+        }
+
+        const MARKETPLACE_ADDONS: readonly MktDef[] = [
+          {
+            id: 'lyra',
+            title: 'Lyra Health',
+            value:
+              'Gives your team confidential mental health, counseling, and work-life support that pairs with major medical—often requested by employees and helpful for productivity and retention.',
+            Icon: HeartPulse,
+            chips: ['Voluntary', 'Partner enrollment only', 'Easy setup'] as const,
+          },
+          {
+            id: 'pet',
+            title: 'Pet insurance',
+            value:
+              'Helps people budget for unexpected vet costs with voluntary, employee-funded coverage that differentiates your package without adding employer premium load.',
+            Icon: PawPrint,
+            chips: ['Voluntary', 'Employee-paid', 'Carrier file or API'] as const,
+          },
+          {
+            id: 'legal',
+            title: 'Legal / ID shield',
+            value:
+              'Extends protection with expert legal guidance and identity monitoring so employees can resolve life events and fraud with less financial stress.',
+            Icon: Shield,
+            chips: ['Voluntary', 'Employee-paid', 'Partner enrollment only'] as const,
+          },
+        ] as const
+
+        const accent: Record<
+          MktDef['id'],
+          { iconTile: string; iconFg: string; topLine: string; metaChip: string }
+        > = {
+          lyra: {
+            iconTile: 'border-violet-500/25 bg-violet-500/[0.1]',
+            iconFg: 'text-violet-800 dark:text-violet-200',
+            topLine: 'bg-violet-500/50',
+            metaChip:
+              'border-violet-500/15 bg-violet-500/5 text-foreground/90 dark:text-foreground/85',
+          },
+          pet: {
+            iconTile: 'border-amber-500/30 bg-amber-500/10',
+            iconFg: 'text-amber-900 dark:text-amber-200',
+            topLine: 'bg-amber-500/45',
+            metaChip:
+              'border-amber-500/20 bg-amber-500/6 text-foreground/90 dark:text-foreground/85',
+          },
+          legal: {
+            iconTile: 'border-slate-500/30 bg-slate-500/10',
+            iconFg: 'text-slate-800 dark:text-slate-200',
+            topLine: 'bg-slate-500/45',
+            metaChip: 'border-slate-500/20 bg-slate-500/6 text-foreground/90 dark:text-foreground/80',
+          },
+        }
+
+        const byId = (id: MktDef['id']) => MARKETPLACE_ADDONS.find((a) => a.id === id)!
+
+        const recommended: MktDef[] = medicalSelected ? [byId('lyra')] : []
+        const explore: MktDef[] = medicalSelected
+          ? [byId('pet'), byId('legal')]
+          : [byId('lyra'), byId('pet'), byId('legal')]
+
+        const listBadge = (row: MktDef, list: 'recommended' | 'explore'): 'popular' | 'recommended' | null => {
+          if (row.id === 'lyra' && list === 'recommended') return 'recommended'
+          if (row.id === 'lyra' && list === 'explore' && !medicalSelected) return 'recommended'
+          if (row.id === 'pet' && list === 'explore') return 'popular'
+          return null
+        }
+
+        const renderAddonRow = (addon: MktDef, list: 'recommended' | 'explore') => {
+          const b = listBadge(addon, list)
+          const CategoryIcon = addon.Icon
+          const a = accent[addon.id]
+          const chipsList =
+            b === 'popular' || b === 'recommended'
+              ? [b === 'popular' ? 'Popular' : 'Recommended', ...addon.chips.slice(0, 2)]
+              : [...addon.chips]
+          return (
+            <Card
+              key={`${list}-${addon.id}`}
+              className="relative overflow-hidden border border-border/80 bg-card shadow-none"
+            >
+              <div
+                className={cn('absolute left-0 right-0 top-0 h-0.5', a.topLine)}
+                aria-hidden
+              />
+              <CardHeader className="space-y-0 pt-4 pb-3">
+                <div className="flex gap-3">
+                  <div
+                    className={cn(
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border',
+                      a.iconTile,
+                      a.iconFg,
+                    )}
+                    aria-hidden
+                  >
+                    <CategoryIcon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <CardTitle className="text-sm font-semibold leading-snug">{addon.title}</CardTitle>
+                    <p className="text-sm leading-relaxed text-muted-foreground">{addon.value}</p>
+                    <div className="flex flex-wrap gap-1.5" aria-label="Offer details">
+                      {chipsList.map((c) => {
+                        const isStatus = c === 'Popular' || c === 'Recommended'
+                        return (
+                          <Badge
+                            key={`${addon.id}-${c}`}
+                            intent="outline"
+                            className={cn(
+                              'h-5 max-w-full shrink border px-2 py-0 text-[10px] font-medium normal-case leading-none tracking-normal',
+                              isStatus
+                                ? c === 'Popular'
+                                  ? 'border-amber-500/30 bg-amber-500/10 text-amber-950 dark:text-amber-100'
+                                  : 'border-primary/30 bg-primary/10 text-foreground'
+                                : a.metaChip,
+                            )}
+                          >
+                            {c}
+                          </Badge>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                    title="Overview, eligibility, and what to expect before you turn this on (prototype)"
+                  >
+                    Learn more
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 text-xs">
+                    Configure (optional)
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        }
+
         return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              <strong className="font-medium text-foreground">Optional.</strong> Marketplace is for third-party add-ons
-              (pet, legal, identity, and similar)—not core medical or dental. Skip if you do not offer these products.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                { t: 'Pet insurance', d: 'Voluntary, per-vendor feeds' },
-                { t: 'Legal / ID shield', d: 'Partner enrollment only' },
-                { t: 'Supplemental life', d: 'Carrier file or API' },
-              ].map((x) => (
-                <Card key={x.t}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">{x.t}</CardTitle>
-                    <CardDescription>{x.d}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button type="button" variant="outline" size="sm">
-                      Configure (optional)
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+          <div className="space-y-6">
+            <div className="space-y-2 text-sm leading-relaxed text-muted-foreground">
+              <p>
+                <span className="font-medium text-foreground">Marketplace is optional.</span> It covers curated voluntary
+                add-ons that <span className="text-foreground/90">complement</span> your core health and financial
+                benefits—think of these as sidecar programs, not replacements for medical, dental, or vision. Turn on
+                what fits your people and policies; you can return later to adjust.
+              </p>
             </div>
+
+            {recommended.length > 0 ? (
+              <section className="space-y-3" aria-labelledby="marketplace-recommended-heading">
+                <div className="space-y-1">
+                  <h2
+                    id="marketplace-recommended-heading"
+                    className="text-sm font-semibold tracking-tight text-foreground"
+                  >
+                    Recommended for your setup
+                  </h2>
+                  <p className="text-xs leading-snug text-muted-foreground">
+                    We surface options that line up with what you already said you are offering. Because you have medical
+                    selected, mental health support is a common next add-on to round out the package.
+                  </p>
+                </div>
+                <div className="grid max-w-2xl gap-3">
+                  {recommended.map((a) => renderAddonRow(a, 'recommended'))}
+                </div>
+              </section>
+            ) : null}
+
+            {recommended.length > 0 && explore.length > 0 ? (
+              <Separator className="bg-border/60" aria-hidden />
+            ) : null}
+
+            <section className="space-y-3" aria-labelledby="marketplace-explore-heading">
+              <div className="space-y-1">
+                <h2 id="marketplace-explore-heading" className="text-sm font-semibold tracking-tight text-foreground">
+                  Explore marketplace add-ons
+                </h2>
+                <p className="text-xs leading-snug text-muted-foreground">
+                  Scan voluntary programs, compare how they are funded and integrated, and enable the ones you want
+                  when your teams are ready. Nothing here is required to finish setup.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">{explore.map((a) => renderAddonRow(a, 'explore'))}</div>
+            </section>
           </div>
         )
+      }
       case 9: {
         const ediStatus = draft.connectSystemsLineState.edi
         const carrierStatus: ConnectLineUiState =
