@@ -895,6 +895,17 @@ function employeeContributionDisplay(
   return formatContributionDollars((total * (100 - p)) / 100)
 }
 
+/**
+ * COBRA continuation: employee’s share as dollars when the input is a % of premium
+ * (e.g. 102% of tier total = total × 1.02). Employer is shown separately as $0 in that scenario.
+ */
+function cobraEmployeePercentToDollarsDisplay(totalStr: string, employeePercentStr: string): string {
+  const total = parseMoneyInput(totalStr)
+  const p = parsePercentInput(employeePercentStr)
+  if (total === null || p === null) return '—'
+  return formatContributionDollars((total * p) / 100)
+}
+
 type SandboxVerifyCheckResult = 'pass' | 'warning' | 'fail'
 
 type SandboxVerifyRunSlot = {
@@ -4319,6 +4330,13 @@ export default function SetupWizardPage() {
               if (!editSet) return null
               const setIdx = editPc.contributionSets.findIndex((s) => s.id === contributionEditSheet.setId)
               const inputEmployer = editSet.contributionInputParty === 'employer'
+              /** COBRA-only set: show employee % of premium as $ to the employee; employer is always $0. */
+              const isCobraEmployeePercentSameTiers =
+                editSet.groupIds.length === 1 &&
+                editSet.groupIds[0] === 'cobra' &&
+                !inputEmployer &&
+                editSet.contributionType === 'percent' &&
+                editSet.applySameToAllTiers
               const patchSet = (next: ContributionSetRow) => {
                 setDraft((d) => {
                   const pc =
@@ -4515,9 +4533,11 @@ export default function SetupWizardPage() {
                             <TableHead>
                               {inputEmployer
                                 ? 'Employee'
-                                : editSet.contributionType === 'dollar'
+                                : isCobraEmployeePercentSameTiers
                                   ? 'Employee ($)'
-                                  : 'Employee (%)'}
+                                  : editSet.contributionType === 'dollar'
+                                    ? 'Employee ($)'
+                                    : 'Employee (%)'}
                             </TableHead>
                           </TableRow>
                         </TableHeader>
@@ -4530,6 +4550,10 @@ export default function SetupWizardPage() {
                               editPc.totalCosts[tierKey],
                               inputVal,
                               editSet.contributionType,
+                            )
+                            const cobraEmployeeDollarDisplay = cobraEmployeePercentToDollarsDisplay(
+                              editPc.totalCosts[tierKey],
+                              inputVal,
                             )
                             return (
                               <TableRow key={tierKey}>
@@ -4569,7 +4593,9 @@ export default function SetupWizardPage() {
                                     )
                                   ) : (
                                     <span className="tabular-nums text-xs font-medium text-foreground">
-                                      {otherDisplay}
+                                      {isCobraEmployeePercentSameTiers
+                                        ? formatContributionDollars(0)
+                                        : otherDisplay}
                                     </span>
                                   )}
                                 </TableCell>
@@ -4583,13 +4609,21 @@ export default function SetupWizardPage() {
                                   {inputEmployer ? (
                                     otherDisplay
                                   ) : editSet.applySameToAllTiers ? (
-                                    <span className="text-xs text-muted-foreground">
-                                      {editSet.employerByTier.ee_only.trim() !== ''
-                                        ? editSet.contributionType === 'dollar'
-                                          ? editSet.employerByTier.ee_only
-                                          : `${editSet.employerByTier.ee_only}%`
-                                        : '—'}
-                                    </span>
+                                    isCobraEmployeePercentSameTiers ? (
+                                      <span className="tabular-nums text-xs font-medium text-foreground">
+                                        {editSet.employerByTier.ee_only.trim() !== ''
+                                          ? cobraEmployeeDollarDisplay
+                                          : '—'}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground">
+                                        {editSet.employerByTier.ee_only.trim() !== ''
+                                          ? editSet.contributionType === 'dollar'
+                                            ? editSet.employerByTier.ee_only
+                                            : `${editSet.employerByTier.ee_only}%`
+                                          : '—'}
+                                      </span>
+                                    )
                                   ) : (
                                     <FloatLabel
                                       label={editSet.contributionType === 'dollar' ? '$' : '%'}
