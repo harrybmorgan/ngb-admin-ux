@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Badge,
   Button,
@@ -33,7 +33,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@wexinc-healthbenefits/ben-ui-kit'
-import { MoreVertical, Upload } from 'lucide-react'
+import { ChevronRight, MoreVertical, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { AdminDockablePageShell } from '@/components/layout/AdminDockablePageShell'
@@ -42,6 +42,7 @@ import { TerminateEmployeeDialog } from '@/components/enrollment/TerminateEmploy
 import { ENROLLMENT_ROWS, type EnrollmentRow } from '@/data/adminMockData'
 import type { CobraTerminationActiveCase } from '@/hooks/useCobraTerminationPrototype'
 import { useCobraTerminationPrototype } from '@/hooks/useCobraTerminationPrototype'
+import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 8
 
@@ -66,6 +67,107 @@ function compareIsoDates(a: string, b: string): number {
 }
 
 type DisplayEnrollmentRow = EnrollmentRow & { cobraNoticeLabel?: string }
+
+type RosterGroup = { row: DisplayEnrollmentRow; dependents: DisplayEnrollmentRow[] }
+
+function nameStatusMatch(r: DisplayEnrollmentRow, query: string, status: string): boolean {
+  const q = query.trim().toLowerCase()
+  const matchQ = !q || r.name.toLowerCase().includes(q) || r.plan.toLowerCase().includes(q)
+  const matchS = status === 'all' || r.status === status
+  return matchQ && matchS
+}
+
+const NESTED_IN_PARENT = new Set<EnrollmentRow['role']>(['Dependent', 'Authorized user', 'Beneficiary'])
+
+function isRowNestedUnderParent(
+  r: DisplayEnrollmentRow,
+  hasParentInRoster: (id: string) => boolean,
+): boolean {
+  return (
+    NESTED_IN_PARENT.has(r.role) && !!r.parentEmployeeId && hasParentInRoster(r.parentEmployeeId)
+  )
+}
+
+function buildRosterGroups(merged: DisplayEnrollmentRow[]): RosterGroup[] {
+  const hasParentInRoster = (parentId: string) => merged.some((p) => p.id === parentId)
+  const byParent = new Map<string, DisplayEnrollmentRow[]>()
+  for (const r of merged) {
+    if (isRowNestedUnderParent(r, hasParentInRoster)) {
+      const list = byParent.get(r.parentEmployeeId!) ?? []
+      list.push(r)
+      byParent.set(r.parentEmployeeId!, list)
+    }
+  }
+  for (const list of byParent.values()) {
+    list.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  }
+  const topLevel = merged.filter((r) => !isRowNestedUnderParent(r, hasParentInRoster))
+  return topLevel.map((row) => ({
+    row,
+    dependents: byParent.get(row.id) ?? [],
+  }))
+}
+
+function rosterGroupMatches(
+  g: RosterGroup,
+  query: string,
+  status: string,
+  roleFilter: 'all' | EnrollmentRow['role'],
+): boolean {
+  if (roleFilter === 'all') {
+    if (nameStatusMatch(g.row, query, status)) return true
+    return g.dependents.some((d) => nameStatusMatch(d, query, status))
+  }
+  if (roleFilter === 'Employee') {
+    if (g.row.role !== 'Employee') return false
+    if (nameStatusMatch(g.row, query, status)) return true
+    return g.dependents.some((d) => nameStatusMatch(d, query, status))
+  }
+  if (roleFilter === 'Dependent') {
+    if (g.row.role !== 'Employee' || g.dependents.length === 0) return false
+    return g.dependents.some(
+      (d) => d.role === 'Dependent' && nameStatusMatch(d, query, status),
+    )
+  }
+  if (roleFilter === 'Authorized user') {
+    if (g.row.role === 'Authorized user' && nameStatusMatch(g.row, query, status)) return true
+    if (g.row.role === 'Employee' && g.dependents.length) {
+      return g.dependents.some(
+        (d) => d.role === 'Authorized user' && nameStatusMatch(d, query, status),
+      )
+    }
+    return false
+  }
+  if (roleFilter === 'Beneficiary') {
+    if (g.row.role === 'Beneficiary' && nameStatusMatch(g.row, query, status)) return true
+    if (g.row.role === 'Employee' && g.dependents.length) {
+      return g.dependents.some(
+        (d) => d.role === 'Beneficiary' && nameStatusMatch(d, query, status),
+      )
+    }
+    return false
+  }
+  return false
+}
+
+function sortRosterGroups(groups: RosterGroup[], rosterSort: RosterSort): RosterGroup[] {
+  return [...groups].sort((a, b) => {
+    const x = a.row
+    const y = b.row
+    switch (rosterSort) {
+      case 'name_asc':
+        return x.name.localeCompare(y.name, undefined, { sensitivity: 'base' })
+      case 'name_desc':
+        return y.name.localeCompare(x.name, undefined, { sensitivity: 'base' })
+      case 'updated_desc':
+        return compareIsoDates(y.lastUpdated, x.lastUpdated)
+      case 'updated_asc':
+        return compareIsoDates(x.lastUpdated, y.lastUpdated)
+      default:
+        return 0
+    }
+  })
+}
 
 type PeopleHistoryEvent = {
   dateLabel: string
@@ -206,37 +308,31 @@ export default function EnrollmentPage() {
     [activeCase],
   )
 
-  const displayedRows = useMemo(() => {
-    const rows = mergedRows.filter((r) => {
-      const q = query.trim().toLowerCase()
-      const matchQ = !q || r.name.toLowerCase().includes(q) || r.plan.toLowerCase().includes(q)
-      const matchS = status === 'all' || r.status === status
-      const matchRole = roleFilter === 'all' || r.role === roleFilter
-      return matchQ && matchS && matchRole
-    })
-    return [...rows].sort((a, b) => {
-      switch (rosterSort) {
-        case 'name_asc':
-          return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-        case 'name_desc':
-          return b.name.localeCompare(a.name, undefined, { sensitivity: 'base' })
-        case 'updated_desc':
-          return compareIsoDates(b.lastUpdated, a.lastUpdated)
-        case 'updated_asc':
-          return compareIsoDates(a.lastUpdated, b.lastUpdated)
-        default:
-          return 0
-      }
-    })
-  }, [mergedRows, query, status, roleFilter, rosterSort])
+  const rosterGroups = useMemo(() => buildRosterGroups(mergedRows), [mergedRows])
 
-  const pageCount = Math.max(1, Math.ceil(displayedRows.length / PAGE_SIZE))
+  const displayedRosterGroups = useMemo(() => {
+    const filtered = rosterGroups.filter((g) => rosterGroupMatches(g, query, status, roleFilter))
+    return sortRosterGroups(filtered, rosterSort)
+  }, [rosterGroups, query, status, roleFilter, rosterSort])
+
+  const [expandedEmployeeIds, setExpandedEmployeeIds] = useState<Set<string>>(() => new Set())
+
+  const toggleEmployeeExpanded = useCallback((employeeId: string) => {
+    setExpandedEmployeeIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(employeeId)) next.delete(employeeId)
+      else next.add(employeeId)
+      return next
+    })
+  }, [])
+
+  const pageCount = Math.max(1, Math.ceil(displayedRosterGroups.length / PAGE_SIZE))
 
   useEffect(() => {
     setPage((p) => (p >= pageCount ? Math.max(0, pageCount - 1) : p))
   }, [pageCount])
 
-  const slice = displayedRows.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
+  const slice = displayedRosterGroups.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
 
   return (
     <div className="admin-app-bg flex min-h-screen flex-col font-sans">
@@ -357,79 +453,184 @@ export default function EnrollmentPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {slice.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium">{row.name}</TableCell>
-                    <TableCell>{row.role}</TableCell>
-                    <TableCell>
-                      <Badge
-                        intent={
-                          row.status === 'Active'
-                            ? 'success'
-                            : row.status === 'Pending'
-                              ? 'warning'
-                              : row.status === 'Terminated'
-                                ? 'destructive'
-                                : 'default'
-                        }
+                {slice.map((group) => {
+                  const { row, dependents } = group
+                  const isExpandable = row.role === 'Employee' && dependents.length > 0
+                  const isExpanded = expandedEmployeeIds.has(row.id)
+                  return (
+                    <Fragment key={row.id}>
+                      <TableRow
+                        onClick={isExpandable ? () => toggleEmployeeExpanded(row.id) : undefined}
+                        className={isExpandable ? 'cursor-pointer hover:bg-muted/50' : undefined}
                       >
-                        {row.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{row.department}</TableCell>
-                    <TableCell className="max-w-[220px]">
-                      <div className="truncate">{row.plan}</div>
-                      {row.cobraNoticeLabel ? (
-                        <div className="mt-0.5 truncate text-xs text-muted-foreground">{row.cobraNoticeLabel}</div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>{row.lastUpdated}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0"
-                            aria-label={`Actions for ${row.name}`}
+                        <TableCell>
+                          <div className="flex min-w-0 items-center gap-1">
+                            <div className="flex h-7 w-5 shrink-0 items-center justify-center" aria-hidden>
+                              {isExpandable ? (
+                                <ChevronRight
+                                  className={cn(
+                                    'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+                                    isExpanded && 'rotate-90',
+                                  )}
+                                />
+                              ) : null}
+                            </div>
+                            <span className="min-w-0 font-medium">{row.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{row.role}</TableCell>
+                        <TableCell>
+                          <Badge
+                            intent={
+                              row.status === 'Active'
+                                ? 'success'
+                                : row.status === 'Pending'
+                                  ? 'warning'
+                                  : row.status === 'Terminated'
+                                    ? 'destructive'
+                                    : 'default'
+                            }
                           >
-                            <MoreVertical className="h-4 w-4" aria-hidden />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setSelected(row)}>View details</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => toast.message('Edit person (prototype).')}>Edit</DropdownMenuItem>
-                          {row.role === 'Employee' ? (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onClick={() => {
-                                  setTermEmployee({
-                                    id: row.id,
-                                    name: row.name,
-                                    status: row.status,
-                                    role: row.role,
-                                  })
-                                  setTermDialogOpen(true)
+                            {row.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{row.department}</TableCell>
+                        <TableCell className="max-w-[220px]">
+                          <div className="truncate">{row.plan}</div>
+                          {row.cobraNoticeLabel ? (
+                            <div className="mt-0.5 truncate text-xs text-muted-foreground">{row.cobraNoticeLabel}</div>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>{row.lastUpdated}</TableCell>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 shrink-0"
+                                aria-label={`Actions for ${row.name}`}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreVertical className="h-4 w-4" aria-hidden />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setSelected(row)}>View details</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => toast.message('Edit person (prototype).')}>Edit</DropdownMenuItem>
+                              {row.role === 'Employee' ? (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => {
+                                      setTermEmployee({
+                                        id: row.id,
+                                        name: row.name,
+                                        status: row.status,
+                                        role: row.role,
+                                      })
+                                      setTermDialogOpen(true)
+                                    }}
+                                  >
+                                    Terminate
+                                  </DropdownMenuItem>
+                                </>
+                              ) : null}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                      {isExpandable && isExpanded
+                        ? dependents.map((dep) => (
+                            <TableRow
+                              key={dep.id}
+                              className="cursor-pointer bg-muted/25 hover:bg-muted/40"
+                              onClick={() => setSelected(dep)}
+                            >
+                              <TableCell>
+                                <div className="ml-3 flex min-w-0 border-l-2 border-border pl-3 text-muted-foreground">
+                                  <span className="min-w-0 text-foreground">{dep.name}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-muted-foreground">{dep.role}</span>
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  intent={
+                                    dep.status === 'Active'
+                                      ? 'success'
+                                      : dep.status === 'Pending'
+                                        ? 'warning'
+                                        : dep.status === 'Terminated'
+                                          ? 'destructive'
+                                          : 'default'
+                                  }
+                                >
+                                  {dep.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-muted-foreground">{dep.department}</span>
+                              </TableCell>
+                              <TableCell className="max-w-[220px]">
+                                <div className="truncate text-muted-foreground">{dep.plan}</div>
+                                {dep.cobraNoticeLabel ? (
+                                  <div className="mt-0.5 truncate text-xs text-muted-foreground">{dep.cobraNoticeLabel}</div>
+                                ) : null}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">{dep.lastUpdated}</TableCell>
+                              <TableCell
+                                className="text-right"
+                                onClick={(e) => {
+                                  e.stopPropagation()
                                 }}
                               >
-                                Terminate
-                              </DropdownMenuItem>
-                            </>
-                          ) : null}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 shrink-0"
+                                      aria-label={`Actions for ${dep.name}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <MoreVertical className="h-4 w-4" aria-hidden />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => setSelected(dep)}>View details</DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() =>
+                                        toast.message(
+                                          dep.role === 'Authorized user'
+                                            ? 'Edit authorized user (prototype).'
+                                            : dep.role === 'Beneficiary'
+                                              ? 'Edit beneficiary (prototype).'
+                                              : 'Edit dependent (prototype).',
+                                        )
+                                      }
+                                    >
+                                      Edit
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        : null}
+                    </Fragment>
+                  )
+                })}
               </TableBody>
             </Table>
 
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
               <span className="text-muted-foreground">
-                Showing {slice.length} of {displayedRows.length} · Page {page + 1} of {pageCount}
+                Showing {slice.length} of {displayedRosterGroups.length} · Page {page + 1} of {pageCount}
               </span>
               <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
