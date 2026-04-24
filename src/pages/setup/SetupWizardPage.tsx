@@ -52,6 +52,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  FileText,
   HeartPulse,
   Link2,
   Loader2,
@@ -60,6 +61,7 @@ import {
   Pencil,
   Plus,
   Rocket,
+  Sparkles,
   SkipForward,
   Trash2,
   Users,
@@ -3041,6 +3043,56 @@ export default function SetupWizardPage() {
               Select every benefit category you offer. Each selection becomes a plan you configure in{' '}
               <strong className="font-medium text-foreground">Configure plans</strong>—you can add more categories later.
             </p>
+            <Card
+              role="region"
+              aria-label="Optional: prefill benefits from plan documents"
+              className="border border-border/60 bg-muted/20 shadow-none"
+            >
+              <CardContent className="p-2.5 sm:p-3">
+                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                  <div className="flex min-w-0 flex-1 gap-2.5">
+                    <div
+                      className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3]"
+                      aria-hidden
+                    >
+                      <FileText className="h-4 w-4" />
+                      <Sparkles
+                        className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5"
+                        strokeWidth={2}
+                        aria-hidden
+                      />
+                    </div>
+                    <div className="min-w-0 space-y-0.5 sm:space-y-1">
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <p className="text-sm font-semibold leading-snug text-foreground">
+                          Prefill benefits from plan documents
+                        </p>
+                        <Badge
+                          intent="outline"
+                          className="h-5 shrink-0 border-border/60 px-1.5 text-[10px] font-medium text-muted-foreground"
+                        >
+                          Optional
+                        </Badge>
+                      </div>
+                      <p className="text-xs leading-snug text-muted-foreground sm:text-sm">
+                        Upload benefit documents to preselect matching benefits. You’ll review and confirm selections
+                        before continuing.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="shrink-0 sm:pt-0.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full min-w-0 sm:w-auto"
+                    >
+                      Upload plan documents
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
             <div ref={benefitsOfferGridRef} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {benefitsOfferDisplayOrder.map((p) => (
                 <label
@@ -5212,9 +5264,9 @@ export default function SetupWizardPage() {
                       >
                         <span
                           className={cn(
-                            'relative mt-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center text-muted-foreground',
+                            'relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#3958c3]',
                             stepInd.showActiveStepRing &&
-                              'rounded-md ring-2 ring-primary/35 ring-offset-2 ring-offset-background',
+                              'ring-2 ring-primary/35 ring-offset-2 ring-offset-background',
                             stepInd.isPastStep && !stepRowSelected && 'opacity-80',
                           )}
                           aria-hidden
