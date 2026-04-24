@@ -229,6 +229,8 @@ export type EnrollmentRow = {
   department: string
   plan: string
   lastUpdated: string
+  /** Subscriber / employee this person belongs to for nested roster display (`Dependent`, `Authorized user`, `Beneficiary`). */
+  parentEmployeeId?: string
 }
 
 export const ENROLLMENT_ROWS: EnrollmentRow[] = [
@@ -249,6 +251,17 @@ export const ENROLLMENT_ROWS: EnrollmentRow[] = [
     department: '—',
     plan: 'Medical PPO',
     lastUpdated: '2026-03-28',
+    parentEmployeeId: '1',
+  },
+  {
+    id: '2b',
+    name: 'Riley Lee (child)',
+    role: 'Dependent',
+    status: 'Active',
+    department: '—',
+    plan: 'Medical PPO + dental',
+    lastUpdated: '2026-03-30',
+    parentEmployeeId: '1',
   },
   {
     id: '3',
@@ -258,6 +271,16 @@ export const ENROLLMENT_ROWS: EnrollmentRow[] = [
     department: 'Retail',
     plan: 'Enrollment in progress',
     lastUpdated: '2026-04-07',
+  },
+  {
+    id: '3-dep',
+    name: 'Aiden Shah (child)',
+    role: 'Dependent',
+    status: 'Active',
+    department: '—',
+    plan: 'Will enroll with parent',
+    lastUpdated: '2026-04-01',
+    parentEmployeeId: '3',
   },
   {
     id: '4',
@@ -276,6 +299,7 @@ export const ENROLLMENT_ROWS: EnrollmentRow[] = [
     department: '—',
     plan: 'HSA cardholder',
     lastUpdated: '2026-01-09',
+    parentEmployeeId: '1',
   },
   {
     id: '6',
@@ -285,6 +309,7 @@ export const ENROLLMENT_ROWS: EnrollmentRow[] = [
     department: '—',
     plan: 'Life — 50% allocation',
     lastUpdated: '2025-11-02',
+    parentEmployeeId: '1',
   },
   ...Array.from({ length: 24 }, (_, i) => ({
     id: `gen-${i}`,
@@ -295,6 +320,56 @@ export const ENROLLMENT_ROWS: EnrollmentRow[] = [
     plan: ['Medical PPO', 'Medical HDHP', 'HSA only', 'Dental + Vision'][i % 4]!,
     lastUpdated: `2026-03-${String((i % 28) + 1).padStart(2, '0')}`,
   })),
+  {
+    id: 'dep-g0-1',
+    name: 'Sample Spouse 7',
+    role: 'Dependent',
+    status: 'Active',
+    department: '—',
+    plan: 'Medical PPO (family)',
+    lastUpdated: '2026-03-20',
+    parentEmployeeId: 'gen-0',
+  },
+  {
+    id: 'dep-g0-2',
+    name: 'Sample Child 7a',
+    role: 'Dependent',
+    status: 'Active',
+    department: '—',
+    plan: 'Medical + dental (child)',
+    lastUpdated: '2026-03-22',
+    parentEmployeeId: 'gen-0',
+  },
+  {
+    id: 'dep-g1-1',
+    name: 'Spouse of Sample 8',
+    role: 'Dependent',
+    status: 'Active',
+    department: '—',
+    plan: 'HDHP (spouse)',
+    lastUpdated: '2026-03-10',
+    parentEmployeeId: 'gen-1',
+  },
+  {
+    id: 'auth-g2-1',
+    name: 'Cardholder for Sample 9',
+    role: 'Authorized user',
+    status: 'Active',
+    department: '—',
+    plan: 'HSA cardholder (authorized)',
+    lastUpdated: '2026-02-01',
+    parentEmployeeId: 'gen-2',
+  },
+  {
+    id: 'ben-g3-1',
+    name: 'Contingent beneficiary (Sample 10)',
+    role: 'Beneficiary',
+    status: 'Active',
+    department: '—',
+    plan: 'Supplemental life — contingent',
+    lastUpdated: '2025-12-15',
+    parentEmployeeId: 'gen-3',
+  },
 ]
 
 export const CONNECTORS = [

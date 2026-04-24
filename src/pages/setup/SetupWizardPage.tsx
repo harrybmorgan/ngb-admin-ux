@@ -58,9 +58,11 @@ import {
   Loader2,
   Lock,
   Minus,
+  PawPrint,
   Pencil,
   Plus,
   Rocket,
+  Shield,
   Sparkles,
   SkipForward,
   Trash2,
@@ -744,8 +746,11 @@ type PlanTotalCosts = Record<CoverageTierKey, string>
 type ContributionSetRow = {
   id: string
   groupIds: string[]
+  /** Which side the user is entering in the third column: employer $/% or employee $/%. The other side is derived from total. */
+  contributionInputParty: 'employer' | 'employee'
   contributionType: 'dollar' | 'percent'
   applySameToAllTiers: boolean
+  /** Amounts the user types for the side selected by `contributionInputParty` (dollar, or that party’s % of premium). */
   employerByTier: PlanTotalCosts
 }
 
@@ -769,6 +774,7 @@ function defaultContributionSet(): ContributionSetRow {
   return {
     id: newContributionSetId(),
     groupIds: ['full-time'],
+    contributionInputParty: 'employer',
     contributionType: 'dollar',
     applySameToAllTiers: false,
     employerByTier: emptyTierCosts(),
@@ -802,9 +808,11 @@ function normalizeContributionSet(raw: unknown): ContributionSetRow {
     ? o.groupIds.filter((x): x is string => typeof x === 'string')
     : []
   const contributionType = o.contributionType === 'percent' ? 'percent' : 'dollar'
+  const contributionInputParty = o.contributionInputParty === 'employee' ? 'employee' : 'employer'
   return {
     id: typeof o.id === 'string' && o.id.length > 0 ? o.id : newContributionSetId(),
     groupIds: groupIds.length > 0 ? groupIds : ['full-time'],
+    contributionInputParty,
     contributionType,
     applySameToAllTiers: o.applySameToAllTiers === true,
     employerByTier: normalizeEmployerByTier(o.employerByTier),
@@ -858,11 +866,18 @@ function parsePercentInput(s: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-function formatUsd(n: number): string {
-  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+/** Formats a signed currency line; negatives render as -$X.XX (not $-X.XX). */
+function formatContributionDollars(n: number): string {
+  const abs = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  if (n < 0) return `-$${abs}`
+  return `$${abs}`
 }
 
-/** Employee share from total premium and employer input (dollar ER amount or ER % of premium). */
+/**
+ * Complementary share in dollars: total premium minus the entered $ or the entered % of premium
+ * (second argument is the side stored in the row, historically employer; same math for either party).
+ * Over-allocation (e.g. more than 100% of premium or dollars above the tier total) yields a negative amount.
+ */
 function employeeContributionDisplay(
   totalStr: string,
   employerStr: string,
@@ -873,11 +888,22 @@ function employeeContributionDisplay(
   if (mode === 'dollar') {
     const er = parseMoneyInput(employerStr)
     if (er === null) return '—'
-    return `$${formatUsd(Math.max(0, total - er))}`
+    return formatContributionDollars(total - er)
   }
   const p = parsePercentInput(employerStr)
   if (p === null) return '—'
-  return `$${formatUsd(Math.max(0, (total * (100 - p)) / 100))}`
+  return formatContributionDollars((total * (100 - p)) / 100)
+}
+
+/**
+ * COBRA continuation: employee’s share as dollars when the input is a % of premium
+ * (e.g. 102% of tier total = total × 1.02). Employer is shown separately as $0 in that scenario.
+ */
+function cobraEmployeePercentToDollarsDisplay(totalStr: string, employeePercentStr: string): string {
+  const total = parseMoneyInput(totalStr)
+  const p = parsePercentInput(employeePercentStr)
+  if (total === null || p === null) return '—'
+  return formatContributionDollars((total * p) / 100)
 }
 
 type SandboxVerifyCheckResult = 'pass' | 'warning' | 'fail'
@@ -4303,6 +4329,14 @@ export default function SetupWizardPage() {
               const editSet = editPc.contributionSets.find((s) => s.id === contributionEditSheet.setId)
               if (!editSet) return null
               const setIdx = editPc.contributionSets.findIndex((s) => s.id === contributionEditSheet.setId)
+              const inputEmployer = editSet.contributionInputParty === 'employer'
+              /** COBRA-only set: show employee % of premium as $ to the employee; employer is always $0. */
+              const isCobraEmployeePercentSameTiers =
+                editSet.groupIds.length === 1 &&
+                editSet.groupIds[0] === 'cobra' &&
+                !inputEmployer &&
+                editSet.contributionType === 'percent' &&
+                editSet.applySameToAllTiers
               const patchSet = (next: ContributionSetRow) => {
                 setDraft((d) => {
                   const pc =
@@ -4380,7 +4414,28 @@ export default function SetupWizardPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <p className="text-xs font-medium text-foreground">Employer contribution</p>
+                      <p className="text-xs font-medium text-foreground">Enter amounts for</p>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant={editSet.contributionInputParty === 'employer' ? 'solid' : 'outline'}
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={() => patchSet({ ...editSet, contributionInputParty: 'employer' })}
+                        >
+                          Employer
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={editSet.contributionInputParty === 'employee' ? 'solid' : 'outline'}
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={() => patchSet({ ...editSet, contributionInputParty: 'employee' })}
+                        >
+                          Employee
+                        </Button>
+                      </div>
+                      <p className="text-xs font-medium text-foreground">Dollar or percent of premium</p>
                       <div className="flex gap-2">
                         <Button
                           type="button"
@@ -4426,8 +4481,8 @@ export default function SetupWizardPage() {
                       <span className="text-sm leading-snug">
                         <span className="font-medium text-foreground">Apply same value to all tiers</span>
                         <span className="mt-0.5 block text-xs text-muted-foreground">
-                          One employer input is copied to every coverage tier; employee share still uses each tier&apos;s
-                          total.
+                          One input (employer or employee) is copied to every coverage tier; the other side still uses
+                          each tier&apos;s total.
                         </span>
                       </span>
                     </label>
@@ -4437,9 +4492,13 @@ export default function SetupWizardPage() {
                       {editSet.applySameToAllTiers ? (
                         <FloatLabel
                           label={
-                            editSet.contributionType === 'dollar'
-                              ? 'Employer contribution (all tiers)'
-                              : 'Employer % of premium (all tiers)'
+                            inputEmployer
+                              ? editSet.contributionType === 'dollar'
+                                ? 'Employer contribution (all tiers)'
+                                : 'Employer % of premium (all tiers)'
+                              : editSet.contributionType === 'dollar'
+                                ? 'Employee contribution (all tiers)'
+                                : 'Employee % of premium (all tiers)'
                           }
                           id={`contrib-sheet-same-${editSet.id}`}
                           className="bg-background"
@@ -4464,60 +4523,129 @@ export default function SetupWizardPage() {
                           <TableRow>
                             <TableHead className="w-[28%]">Coverage tier</TableHead>
                             <TableHead>Total</TableHead>
-                            <TableHead>{editSet.contributionType === 'dollar' ? 'Employer ($)' : 'Employer (%)'}</TableHead>
-                            <TableHead>Employee</TableHead>
+                            <TableHead>
+                              {inputEmployer
+                                ? editSet.contributionType === 'dollar'
+                                  ? 'Employer ($)'
+                                  : 'Employer (%)'
+                                : 'Employer ($)'}
+                            </TableHead>
+                            <TableHead>
+                              {inputEmployer
+                                ? 'Employee'
+                                : isCobraEmployeePercentSameTiers
+                                  ? 'Employee ($)'
+                                  : editSet.contributionType === 'dollar'
+                                    ? 'Employee ($)'
+                                    : 'Employee (%)'}
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {COVERAGE_TIER_KEYS.map((tierKey) => (
-                            <TableRow key={tierKey}>
-                              <TableCell className="font-medium text-foreground">
-                                {COVERAGE_TIER_LABELS[tierKey]}
-                              </TableCell>
-                              <TableCell className="tabular-nums text-xs text-muted-foreground">
-                                {editPc.totalCosts[tierKey].trim() !== ''
-                                  ? editPc.totalCosts[tierKey]
-                                  : '—'}
-                              </TableCell>
-                              <TableCell>
-                                {editSet.applySameToAllTiers ? (
-                                  <span className="text-xs text-muted-foreground">
-                                    {editSet.employerByTier.ee_only.trim() !== ''
-                                      ? editSet.contributionType === 'dollar'
-                                        ? editSet.employerByTier.ee_only
-                                        : `${editSet.employerByTier.ee_only}%`
-                                      : '—'}
-                                  </span>
-                                ) : (
-                                  <FloatLabel
-                                    label={editSet.contributionType === 'dollar' ? '$' : '%'}
-                                    id={`contrib-${editSet.id}-${tierKey}`}
-                                    className="bg-background text-xs"
-                                    inputMode="decimal"
-                                    value={editSet.employerByTier[tierKey]}
-                                    onChange={(e) =>
-                                      patchSet({
-                                        ...editSet,
-                                        employerByTier: {
-                                          ...editSet.employerByTier,
-                                          [tierKey]: e.target.value,
-                                        },
-                                      })
-                                    }
-                                  />
-                                )}
-                              </TableCell>
-                              <TableCell className="tabular-nums text-xs font-medium text-foreground">
-                                {employeeContributionDisplay(
-                                  editPc.totalCosts[tierKey],
-                                  editSet.applySameToAllTiers
-                                    ? editSet.employerByTier.ee_only
-                                    : editSet.employerByTier[tierKey],
-                                  editSet.contributionType,
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                          {COVERAGE_TIER_KEYS.map((tierKey) => {
+                            const inputVal = editSet.applySameToAllTiers
+                              ? editSet.employerByTier.ee_only
+                              : editSet.employerByTier[tierKey]
+                            const otherDisplay = employeeContributionDisplay(
+                              editPc.totalCosts[tierKey],
+                              inputVal,
+                              editSet.contributionType,
+                            )
+                            const cobraEmployeeDollarDisplay = cobraEmployeePercentToDollarsDisplay(
+                              editPc.totalCosts[tierKey],
+                              inputVal,
+                            )
+                            return (
+                              <TableRow key={tierKey}>
+                                <TableCell className="font-medium text-foreground">
+                                  {COVERAGE_TIER_LABELS[tierKey]}
+                                </TableCell>
+                                <TableCell className="tabular-nums text-xs text-muted-foreground">
+                                  {editPc.totalCosts[tierKey].trim() !== '' ? editPc.totalCosts[tierKey] : '—'}
+                                </TableCell>
+                                <TableCell>
+                                  {inputEmployer ? (
+                                    editSet.applySameToAllTiers ? (
+                                      <span className="text-xs text-muted-foreground">
+                                        {editSet.employerByTier.ee_only.trim() !== ''
+                                          ? editSet.contributionType === 'dollar'
+                                            ? editSet.employerByTier.ee_only
+                                            : `${editSet.employerByTier.ee_only}%`
+                                          : '—'}
+                                      </span>
+                                    ) : (
+                                      <FloatLabel
+                                        label={editSet.contributionType === 'dollar' ? '$' : '%'}
+                                        id={`contrib-${editSet.id}-${tierKey}`}
+                                        className="bg-background text-xs"
+                                        inputMode="decimal"
+                                        value={editSet.employerByTier[tierKey]}
+                                        onChange={(e) =>
+                                          patchSet({
+                                            ...editSet,
+                                            employerByTier: {
+                                              ...editSet.employerByTier,
+                                              [tierKey]: e.target.value,
+                                            },
+                                          })
+                                        }
+                                      />
+                                    )
+                                  ) : (
+                                    <span className="tabular-nums text-xs font-medium text-foreground">
+                                      {isCobraEmployeePercentSameTiers
+                                        ? formatContributionDollars(0)
+                                        : otherDisplay}
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell
+                                  className={
+                                    inputEmployer
+                                      ? 'tabular-nums text-xs font-medium text-foreground'
+                                      : 'p-2'
+                                  }
+                                >
+                                  {inputEmployer ? (
+                                    otherDisplay
+                                  ) : editSet.applySameToAllTiers ? (
+                                    isCobraEmployeePercentSameTiers ? (
+                                      <span className="tabular-nums text-xs font-medium text-foreground">
+                                        {editSet.employerByTier.ee_only.trim() !== ''
+                                          ? cobraEmployeeDollarDisplay
+                                          : '—'}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground">
+                                        {editSet.employerByTier.ee_only.trim() !== ''
+                                          ? editSet.contributionType === 'dollar'
+                                            ? editSet.employerByTier.ee_only
+                                            : `${editSet.employerByTier.ee_only}%`
+                                          : '—'}
+                                      </span>
+                                    )
+                                  ) : (
+                                    <FloatLabel
+                                      label={editSet.contributionType === 'dollar' ? '$' : '%'}
+                                      id={`contrib-ee-${editSet.id}-${tierKey}`}
+                                      className="bg-background text-xs"
+                                      inputMode="decimal"
+                                      value={editSet.employerByTier[tierKey]}
+                                      onChange={(e) =>
+                                        patchSet({
+                                          ...editSet,
+                                          employerByTier: {
+                                            ...editSet.employerByTier,
+                                            [tierKey]: e.target.value,
+                                          },
+                                        })
+                                      }
+                                    />
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
                         </TableBody>
                       </Table>
                     </div>
@@ -4533,34 +4661,210 @@ export default function SetupWizardPage() {
           </div>
         )
       }
-      case 8:
+      case 8: {
+        const medicalSelected = draft.selectedProducts.includes('medical')
+
+        type MktDef = {
+          id: 'lyra' | 'pet' | 'legal'
+          title: string
+          value: string
+          Icon: typeof HeartPulse
+          chips: readonly string[]
+        }
+
+        const MARKETPLACE_ADDONS: readonly MktDef[] = [
+          {
+            id: 'lyra',
+            title: 'Lyra Health',
+            value:
+              'Gives your team confidential mental health, counseling, and work-life support that pairs with major medical—often requested by employees and helpful for productivity and retention.',
+            Icon: HeartPulse,
+            chips: ['Voluntary', 'Partner enrollment only', 'Easy setup'] as const,
+          },
+          {
+            id: 'pet',
+            title: 'Pet insurance',
+            value:
+              'Helps people budget for unexpected vet costs with voluntary, employee-funded coverage that differentiates your package without adding employer premium load.',
+            Icon: PawPrint,
+            chips: ['Voluntary', 'Employee-paid', 'Carrier file or API'] as const,
+          },
+          {
+            id: 'legal',
+            title: 'Legal / ID shield',
+            value:
+              'Extends protection with expert legal guidance and identity monitoring so employees can resolve life events and fraud with less financial stress.',
+            Icon: Shield,
+            chips: ['Voluntary', 'Employee-paid', 'Partner enrollment only'] as const,
+          },
+        ] as const
+
+        const accent: Record<
+          MktDef['id'],
+          { iconTile: string; iconFg: string; topLine: string; metaChip: string }
+        > = {
+          lyra: {
+            iconTile: 'border-violet-500/25 bg-violet-500/[0.1]',
+            iconFg: 'text-violet-800 dark:text-violet-200',
+            topLine: 'bg-violet-500/50',
+            metaChip:
+              'border-violet-500/15 bg-violet-500/5 text-foreground/90 dark:text-foreground/85',
+          },
+          pet: {
+            iconTile: 'border-amber-500/30 bg-amber-500/10',
+            iconFg: 'text-amber-900 dark:text-amber-200',
+            topLine: 'bg-amber-500/45',
+            metaChip:
+              'border-amber-500/20 bg-amber-500/6 text-foreground/90 dark:text-foreground/85',
+          },
+          legal: {
+            iconTile: 'border-slate-500/30 bg-slate-500/10',
+            iconFg: 'text-slate-800 dark:text-slate-200',
+            topLine: 'bg-slate-500/45',
+            metaChip: 'border-slate-500/20 bg-slate-500/6 text-foreground/90 dark:text-foreground/80',
+          },
+        }
+
+        const byId = (id: MktDef['id']) => MARKETPLACE_ADDONS.find((a) => a.id === id)!
+
+        const recommended: MktDef[] = medicalSelected ? [byId('lyra')] : []
+        const explore: MktDef[] = medicalSelected
+          ? [byId('pet'), byId('legal')]
+          : [byId('lyra'), byId('pet'), byId('legal')]
+
+        const listBadge = (row: MktDef, list: 'recommended' | 'explore'): 'popular' | 'recommended' | null => {
+          if (row.id === 'lyra' && list === 'recommended') return 'recommended'
+          if (row.id === 'lyra' && list === 'explore' && !medicalSelected) return 'recommended'
+          if (row.id === 'pet' && list === 'explore') return 'popular'
+          return null
+        }
+
+        const renderAddonRow = (addon: MktDef, list: 'recommended' | 'explore') => {
+          const b = listBadge(addon, list)
+          const CategoryIcon = addon.Icon
+          const a = accent[addon.id]
+          const chipsList =
+            b === 'popular' || b === 'recommended'
+              ? [b === 'popular' ? 'Popular' : 'Recommended', ...addon.chips.slice(0, 2)]
+              : [...addon.chips]
+          return (
+            <Card
+              key={`${list}-${addon.id}`}
+              className="relative overflow-hidden border border-border/80 bg-card shadow-none"
+            >
+              <div
+                className={cn('absolute left-0 right-0 top-0 h-0.5', a.topLine)}
+                aria-hidden
+              />
+              <CardHeader className="space-y-0 pt-4 pb-3">
+                <div className="flex gap-3">
+                  <div
+                    className={cn(
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border',
+                      a.iconTile,
+                      a.iconFg,
+                    )}
+                    aria-hidden
+                  >
+                    <CategoryIcon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <CardTitle className="text-sm font-semibold leading-snug">{addon.title}</CardTitle>
+                    <p className="text-sm leading-relaxed text-muted-foreground">{addon.value}</p>
+                    <div className="flex flex-wrap gap-1.5" aria-label="Offer details">
+                      {chipsList.map((c) => {
+                        const isStatus = c === 'Popular' || c === 'Recommended'
+                        return (
+                          <Badge
+                            key={`${addon.id}-${c}`}
+                            intent="outline"
+                            className={cn(
+                              'h-5 max-w-full shrink border px-2 py-0 text-[10px] font-medium normal-case leading-none tracking-normal',
+                              isStatus
+                                ? c === 'Popular'
+                                  ? 'border-amber-500/30 bg-amber-500/10 text-amber-950 dark:text-amber-100'
+                                  : 'border-primary/30 bg-primary/10 text-foreground'
+                                : a.metaChip,
+                            )}
+                          >
+                            {c}
+                          </Badge>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                    title="Overview, eligibility, and what to expect before you turn this on (prototype)"
+                  >
+                    Learn more
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 text-xs">
+                    Configure (optional)
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        }
+
         return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              <strong className="font-medium text-foreground">Optional.</strong> Marketplace is for third-party add-ons
-              (pet, legal, identity, and similar)—not core medical or dental. Skip if you do not offer these products.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                { t: 'Pet insurance', d: 'Voluntary, per-vendor feeds' },
-                { t: 'Legal / ID shield', d: 'Partner enrollment only' },
-                { t: 'Supplemental life', d: 'Carrier file or API' },
-              ].map((x) => (
-                <Card key={x.t}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">{x.t}</CardTitle>
-                    <CardDescription>{x.d}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button type="button" variant="outline" size="sm">
-                      Configure (optional)
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+          <div className="space-y-6">
+            <div className="space-y-2 text-sm leading-relaxed text-muted-foreground">
+              <p>
+                <span className="font-medium text-foreground">Marketplace is optional.</span> It covers curated voluntary
+                add-ons that <span className="text-foreground/90">complement</span> your core health and financial
+                benefits—think of these as sidecar programs, not replacements for medical, dental, or vision. Turn on
+                what fits your people and policies; you can return later to adjust.
+              </p>
             </div>
+
+            {recommended.length > 0 ? (
+              <section className="space-y-3" aria-labelledby="marketplace-recommended-heading">
+                <div className="space-y-1">
+                  <h2
+                    id="marketplace-recommended-heading"
+                    className="text-sm font-semibold tracking-tight text-foreground"
+                  >
+                    Recommended for your setup
+                  </h2>
+                  <p className="text-xs leading-snug text-muted-foreground">
+                    We surface options that line up with what you already said you are offering. Because you have medical
+                    selected, mental health support is a common next add-on to round out the package.
+                  </p>
+                </div>
+                <div className="grid max-w-2xl gap-3">
+                  {recommended.map((a) => renderAddonRow(a, 'recommended'))}
+                </div>
+              </section>
+            ) : null}
+
+            {recommended.length > 0 && explore.length > 0 ? (
+              <Separator className="bg-border/60" aria-hidden />
+            ) : null}
+
+            <section className="space-y-3" aria-labelledby="marketplace-explore-heading">
+              <div className="space-y-1">
+                <h2 id="marketplace-explore-heading" className="text-sm font-semibold tracking-tight text-foreground">
+                  Explore marketplace add-ons
+                </h2>
+                <p className="text-xs leading-snug text-muted-foreground">
+                  Scan voluntary programs, compare how they are funded and integrated, and enable the ones you want
+                  when your teams are ready. Nothing here is required to finish setup.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">{explore.map((a) => renderAddonRow(a, 'explore'))}</div>
+            </section>
           </div>
         )
+      }
       case 9: {
         const ediStatus = draft.connectSystemsLineState.edi
         const carrierStatus: ConnectLineUiState =

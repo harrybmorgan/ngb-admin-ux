@@ -2,7 +2,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Badge } from '@wexinc-healthbenefits/ben-ui-kit'
-import { Bell, Check, ChevronRight, CircleHelp, FileText, Landmark, Receipt, RefreshCw, Upload } from 'lucide-react'
+import {
+  Bell,
+  Check,
+  ChevronRight,
+  CircleHelp,
+  FileText,
+  Landmark,
+  LineChart,
+  Receipt,
+  RefreshCw,
+  Upload,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { EMPLOYER } from '@/data/adminMockData'
 import { useCobraTerminationPrototype } from '@/hooks/useCobraTerminationPrototype'
@@ -392,6 +403,19 @@ export function DashboardWelcomeHero({ onboardingComplete, planReady, launchComp
                     Sync payroll data
                   </motion.button>
                 )}
+                {onboardingComplete ? (
+                  <motion.button
+                    variants={pillVariants}
+                    type="button"
+                    onClick={() => navigate('/reports')}
+                    whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
+                    transition={{ duration: 0.2, ease: softEaseOut }}
+                    className={pillClass}
+                  >
+                    <LineChart className="h-4 w-4 text-[#5f6a94]" aria-hidden />
+                    ACA Tracking
+                  </motion.button>
+                ) : null}
                 <motion.button
                   variants={pillVariants}
                   type="button"

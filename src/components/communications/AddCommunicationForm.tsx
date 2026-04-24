@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Button,
@@ -30,14 +30,16 @@ import {
 } from '@/components/communications/ScheduleSendDialog'
 import { sanitizeEmailBodyHtml } from '@/lib/sanitizeHtml'
 import { cn } from '@/lib/utils'
+import { DeliveryMethodMultiselect } from '@/components/communications/DeliveryMethodMultiselect'
+import { LetterDocumentPreview } from '@/components/communications/LetterDocumentPreview'
 import {
   DEFAULT_DELIVERY_PREFERENCE,
-  DELIVERY_METHOD_OPTIONS,
-  getContinueToSecondaryCta,
-  getSecondaryChannelTabLabel,
-  isDashboardDelivery,
-  isEmailChannelTabDisabled,
-  isSecondaryChannelTabDisabled,
+  type ChannelTabId,
+  getChannelTabLabel,
+  getContinueToNextLabel,
+  getNextChannelTab,
+  getVisibleChannelTabs,
+  shouldUseSingleScheduleButton,
 } from '@/components/communications/deliveryMethodChannel'
 
 const formCardClass =
@@ -262,7 +264,9 @@ export function AddCommunicationForm() {
 
   const [configurationType, setConfigurationType] = useState<string>('')
   const [communicationName, setCommunicationName] = useState('')
-  const [deliveryMethod, setDeliveryMethod] = useState<string>(DEFAULT_DELIVERY_PREFERENCE)
+  const [deliveryMethodSelection, setDeliveryMethodSelection] = useState<string[]>([
+    DEFAULT_DELIVERY_PREFERENCE,
+  ])
 
   const isUserId = configurationType === 'User ID'
   const isEnrollmentWindow = configurationType === 'Enrollment Window'
@@ -298,23 +302,31 @@ export function AddCommunicationForm() {
    * Default delivery: Email | SMS (Text) Message above Content per
    * [Figma 15521:22806](https://www.figma.com/design/rH3S6MJJNltWf8lrrnU0jg/Communications-Builder?node-id=15521-22806).
    */
-  const [messageChannelTab, setMessageChannelTab] = useState<'email' | 'sms'>('email')
+  const [messageChannelTab, setMessageChannelTab] = useState<ChannelTabId>('email')
   const [smsMessage, setSmsMessage] = useState('')
+  const [dashboardMessage, setDashboardMessage] = useState('')
+  const [letterBody, setLetterBody] = useState('')
+
+  const visibleChannelTabs = useMemo(
+    () => getVisibleChannelTabs(deliveryMethodSelection),
+    [deliveryMethodSelection],
+  )
+
+  useEffect(() => {
+    if (visibleChannelTabs.length > 0 && !visibleChannelTabs.includes(messageChannelTab)) {
+      setMessageChannelTab(visibleChannelTabs[0]!)
+    }
+  }, [visibleChannelTabs, messageChannelTab])
 
   const userIdCount = useMemo(() => countUserIds(userIdsRaw), [userIdsRaw])
 
-  const emailTabDisabled = isEmailChannelTabDisabled(deliveryMethod)
-  const secondaryTabDisabled = isSecondaryChannelTabDisabled(deliveryMethod)
-  const secondaryChannelLabel = getSecondaryChannelTabLabel(deliveryMethod)
-  const isDefaultDelivery = deliveryMethod === DEFAULT_DELIVERY_PREFERENCE
-  const isEmailOnlyDelivery = deliveryMethod === 'Email only'
-  const isSmsOrDashboardOnly = deliveryMethod === 'SMS' || deliveryMethod === 'Dashboard'
-
-  const onDeliveryMethodChange = (v: string) => {
-    setDeliveryMethod(v)
-    if (v === 'Email only') setMessageChannelTab('email')
-    if (v === 'SMS' || v === 'Dashboard') setMessageChannelTab('sms')
-  }
+  const nextChannelTab = getNextChannelTab(visibleChannelTabs, messageChannelTab)
+  const showChannelContinue = nextChannelTab !== null
+  const useSingleSchedule = shouldUseSingleScheduleButton(
+    deliveryMethodSelection,
+    messageChannelTab,
+    visibleChannelTabs,
+  )
 
   const onConfigurationTypeChange = (v: string) => {
     setConfigurationType(v)
@@ -530,22 +542,13 @@ export function AddCommunicationForm() {
               <p className={COMM_FIELD_LABEL_CLASS}>Delivery Method</p>
               <div className="relative">
                 <span className={REQUIRED_DOT_CLASS} aria-hidden />
-                <Select value={deliveryMethod} onValueChange={onDeliveryMethodChange}>
-                  <SelectTrigger
-                    id={`${id}-delivery`}
-                    className="h-12 w-full rounded-lg border border-input"
-                    aria-required
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DELIVERY_METHOD_OPTIONS.map((d) => (
-                      <SelectItem key={d} value={d}>
-                        {d}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <DeliveryMethodMultiselect
+                  id={`${id}-delivery`}
+                  value={deliveryMethodSelection}
+                  onChange={setDeliveryMethodSelection}
+                  className="border-input"
+                  triggerClassName="border-input"
+                />
               </div>
             </div>
             <div>
@@ -772,17 +775,16 @@ export function AddCommunicationForm() {
         {hasConfigurationSelection ? (
           <Tabs
             value={messageChannelTab}
-            onValueChange={(v) => setMessageChannelTab(v as 'email' | 'sms')}
+            onValueChange={(v) => setMessageChannelTab(v as ChannelTabId)}
             className="w-full max-w-[740px] space-y-4"
           >
             <div className="w-full border-b border-border">
               <TabsList className="flex h-auto w-full min-h-0 flex-wrap items-stretch justify-start gap-0 rounded-none border-0 bg-transparent p-0">
-                <TabsTrigger value="email" disabled={emailTabDisabled} className={tabsTriggerClassName}>
-                  Email
-                </TabsTrigger>
-                <TabsTrigger value="sms" disabled={secondaryTabDisabled} className={tabsTriggerClassName}>
-                  {secondaryChannelLabel}
-                </TabsTrigger>
+                {visibleChannelTabs.map((tab) => (
+                  <TabsTrigger key={tab} value={tab} className={tabsTriggerClassName}>
+                    {getChannelTabLabel(tab)}
+                  </TabsTrigger>
+                ))}
               </TabsList>
             </div>
 
@@ -1023,9 +1025,7 @@ export function AddCommunicationForm() {
 
             <TabsContent value="sms" className="mt-0 space-y-3 focus-visible:outline-none" tabIndex={-1}>
               <div className="flex items-start justify-between gap-4">
-                <h2 className="text-lg font-semibold leading-6 tracking-tight text-foreground">
-                  {isDashboardDelivery(deliveryMethod) ? 'Dashboard' : 'SMS'}
-                </h2>
+                <h2 className="text-lg font-semibold leading-6 tracking-tight text-foreground">SMS</h2>
                 <Button
                   type="button"
                   variant="outline"
@@ -1068,6 +1068,97 @@ export function AddCommunicationForm() {
                 {smsMessage.length} characters | Text messages are limited to 160 characters.
               </p>
             </TabsContent>
+
+            <TabsContent value="dashboard" className="mt-0 space-y-3 focus-visible:outline-none" tabIndex={-1}>
+              <div className="flex items-start justify-between gap-4">
+                <h2 className="text-lg font-semibold leading-6 tracking-tight text-foreground">
+                  Dashboard Notification
+                </h2>
+                <Button
+                  type="button"
+                  variant="outline"
+                  intent="primary"
+                  size="sm"
+                  className={outlinePrimaryCtaClass}
+                  onClick={() =>
+                    toast.message(
+                      'Edit notification: update the message in the compose area (prototype).',
+                    )
+                  }
+                >
+                  <Pencil className="h-4 w-4" aria-hidden />
+                  Edit notification
+                </Button>
+              </div>
+              <div className="grid min-h-[220px] w-full overflow-hidden rounded-lg border border-input bg-card sm:grid-cols-2">
+                <div className="relative flex flex-col border-b border-input sm:border-b-0 sm:border-r">
+                  <span className={REQUIRED_DOT_CLASS} aria-hidden />
+                  <div className="min-h-0 flex-1 p-3">
+                    <Textarea
+                      id={`${id}-dashboard-compose`}
+                      value={dashboardMessage}
+                      onChange={(e) => setDashboardMessage(e.target.value)}
+                      placeholder="Add a dashboard notification to get started!"
+                      className="min-h-[180px] w-full resize-y rounded-md border-0 bg-transparent p-0 text-sm text-foreground shadow-none focus-visible:ring-0"
+                      aria-label="Dashboard notification message"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col bg-muted p-3">
+                  <p className={previewFrameLabelClass}>Preview</p>
+                  <div className="mt-2 flex min-h-[160px] items-start">
+                    <div
+                      className="w-full max-w-md rounded-lg border border-border bg-card p-3 text-left shadow-sm"
+                      role="status"
+                    >
+                      <p className="text-xs font-medium text-muted-foreground">Notification</p>
+                      <p className="mt-2 text-sm text-foreground">
+                        {dashboardMessage.trim() ? dashboardMessage : 'Preview will appear here.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="letter" className="mt-0 space-y-3 focus-visible:outline-none" tabIndex={-1}>
+              <div className="flex items-start justify-between gap-4">
+                <h2 className="text-lg font-semibold leading-6 tracking-tight text-foreground">Letter</h2>
+                <Button
+                  type="button"
+                  variant="outline"
+                  intent="primary"
+                  size="sm"
+                  className={outlinePrimaryCtaClass}
+                  onClick={() => toast.message('Edit letter: update the body in the compose area (prototype).')}
+                >
+                  <Pencil className="h-4 w-4" aria-hidden />
+                  Edit letter
+                </Button>
+              </div>
+              <div className="grid min-h-[220px] w-full overflow-hidden rounded-lg border border-input bg-card sm:grid-cols-2">
+                <div className="relative flex flex-col border-b border-input sm:border-b-0 sm:border-r">
+                  <span className={REQUIRED_DOT_CLASS} aria-hidden />
+                  <div className="min-h-0 flex-1 p-3">
+                    <Textarea
+                      id={`${id}-letter-compose`}
+                      value={letterBody}
+                      onChange={(e) => setLetterBody(e.target.value)}
+                      placeholder="Add letter copy to get started."
+                      className="min-h-[180px] w-full resize-y rounded-md border-0 bg-transparent p-0 text-sm text-foreground shadow-none focus-visible:ring-0"
+                      aria-label="Letter body"
+                    />
+                  </div>
+                </div>
+                <div className="flex min-h-0 flex-col bg-muted p-3">
+                  <p className={previewFrameLabelClass}>Preview</p>
+                  <LetterDocumentPreview
+                    body={letterBody}
+                    emptyHint="Letter copy will appear in the body of this message."
+                  />
+                </div>
+              </div>
+            </TabsContent>
           </Tabs>
         ) : null}
 
@@ -1086,15 +1177,15 @@ export function AddCommunicationForm() {
           </Button>
           {hasConfigurationSelection ? (
             isBenefitClassChange ? (
-              isDefaultDelivery && messageChannelTab === 'email' ? (
+              showChannelContinue && nextChannelTab ? (
                 <Button
                   type="button"
                   variant="link"
                   intent="primary"
                   className="h-auto min-h-0 gap-1.5 p-0 text-sm font-medium text-link no-underline hover:text-link hover:underline"
-                  onClick={() => setMessageChannelTab('sms')}
+                  onClick={() => setMessageChannelTab(nextChannelTab)}
                 >
-                  {getContinueToSecondaryCta(deliveryMethod)}
+                  {getContinueToNextLabel(nextChannelTab)}
                   <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
                 </Button>
               ) : (
@@ -1107,20 +1198,18 @@ export function AddCommunicationForm() {
                   Continue to schedule
                 </Button>
               )
-            ) : isDefaultDelivery && messageChannelTab === 'email' ? (
+            ) : showChannelContinue && nextChannelTab ? (
               <Button
                 type="button"
                 variant="link"
                 intent="primary"
                 className="h-auto min-h-0 gap-1.5 p-0 text-sm font-medium text-link no-underline hover:text-link hover:underline"
-                onClick={() => setMessageChannelTab('sms')}
+                onClick={() => setMessageChannelTab(nextChannelTab)}
               >
-                {getContinueToSecondaryCta(deliveryMethod)}
+                {getContinueToNextLabel(nextChannelTab)}
                 <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
               </Button>
-            ) : (isDefaultDelivery && messageChannelTab === 'sms') ||
-              (isEmailOnlyDelivery && messageChannelTab === 'email') ||
-              (isSmsOrDashboardOnly && messageChannelTab === 'sms') ? (
+            ) : useSingleSchedule ? (
               <Button
                 type="button"
                 intent="primary"
