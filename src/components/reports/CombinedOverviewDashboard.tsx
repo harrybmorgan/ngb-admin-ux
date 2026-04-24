@@ -58,9 +58,9 @@ const ENROLLMENT_TREND_DATA = [
 ]
 
 const DISTRIBUTION_DATA = [
-  { name: 'Member & Benefits', active: 10, pending: 1 },
-  { name: 'Contributions & Funding', active: 4, pending: 2 },
-  { name: 'Claims & Spending', active: 9, pending: 0 },
+  { name: 'Benefit Admin', active: 10, pending: 1 },
+  { name: 'COBRA/Direct Bill', active: 4, pending: 2 },
+  { name: 'Accounts/Payments', active: 9, pending: 0 },
 ]
 
 const PAGE_SIZE = 10
@@ -168,7 +168,7 @@ export function CombinedOverviewDashboard({ periodLabel = 'February 2026 · Stan
                 <Line
                   type="monotone"
                   dataKey="memberBenefits"
-                  name="Member & Benefits"
+                  name="Benefit Admin"
                   stroke="#1a2b4a"
                   strokeWidth={2}
                   dot={false}
@@ -176,7 +176,7 @@ export function CombinedOverviewDashboard({ periodLabel = 'February 2026 · Stan
                 <Line
                   type="monotone"
                   dataKey="contributionsFunding"
-                  name="Contributions & Funding"
+                  name="COBRA/Direct Bill"
                   stroke="#c41e3a"
                   strokeWidth={2}
                   strokeDasharray="4 4"
@@ -185,7 +185,7 @@ export function CombinedOverviewDashboard({ periodLabel = 'February 2026 · Stan
                 <Line
                   type="monotone"
                   dataKey="claimsSpending"
-                  name="Claims & Spending"
+                  name="Accounts/Payments"
                   stroke="#7c6ad8"
                   strokeWidth={2}
                   strokeDasharray="2 6"
@@ -326,13 +326,13 @@ export function CombinedOverviewDashboard({ periodLabel = 'February 2026 · Stan
                   Plan
                 </TableHead>
                 <TableHead className="whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-[#3958c3]">
-                  Member &amp; Benefits
+                  Benefit Admin
                 </TableHead>
                 <TableHead className="whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-[#7c6ad8]">
-                  Contributions &amp; Funding
+                  COBRA/Direct Bill
                 </TableHead>
                 <TableHead className="whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-[#059669]">
-                  Claims &amp; Spending
+                  Accounts/Payments
                 </TableHead>
                 <TableHead className="whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-[#5f6a94]">
                   Coverage level
