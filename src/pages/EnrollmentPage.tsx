@@ -447,7 +447,6 @@ export default function EnrollmentPage() {
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Division/Class</TableHead>
-                  <TableHead>Plan</TableHead>
                   <TableHead>Updated</TableHead>
                   <TableHead className="w-[1%] whitespace-nowrap text-right">Actions</TableHead>
                 </TableRow>
@@ -495,12 +494,6 @@ export default function EnrollmentPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>{row.department}</TableCell>
-                        <TableCell className="max-w-[220px]">
-                          <div className="truncate">{row.plan}</div>
-                          {row.cobraNoticeLabel ? (
-                            <div className="mt-0.5 truncate text-xs text-muted-foreground">{row.cobraNoticeLabel}</div>
-                          ) : null}
-                        </TableCell>
                         <TableCell>{row.lastUpdated}</TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
@@ -574,12 +567,6 @@ export default function EnrollmentPage() {
                               </TableCell>
                               <TableCell>
                                 <span className="text-muted-foreground">{dep.department}</span>
-                              </TableCell>
-                              <TableCell className="max-w-[220px]">
-                                <div className="truncate text-muted-foreground">{dep.plan}</div>
-                                {dep.cobraNoticeLabel ? (
-                                  <div className="mt-0.5 truncate text-xs text-muted-foreground">{dep.cobraNoticeLabel}</div>
-                                ) : null}
                               </TableCell>
                               <TableCell className="text-muted-foreground">{dep.lastUpdated}</TableCell>
                               <TableCell
