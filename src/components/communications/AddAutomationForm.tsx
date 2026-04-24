@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Button,
@@ -20,13 +20,13 @@ import {
 import { ArrowRight, Pencil, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { USER_ID_BENEFIT_CLASS_CHANGE_1_PREVIEW_HTML } from '@/components/communications/AddCommunicationForm'
+import { DeliveryMethodMultiselect } from '@/components/communications/DeliveryMethodMultiselect'
+import { LetterDocumentPreview } from '@/components/communications/LetterDocumentPreview'
 import {
   DEFAULT_DELIVERY_PREFERENCE,
-  DELIVERY_METHOD_OPTIONS,
-  getSecondaryChannelTabLabel,
-  isDashboardDelivery,
-  isEmailChannelTabDisabled,
-  isSecondaryChannelTabDisabled,
+  type ChannelTabId,
+  getChannelTabLabel,
+  getVisibleChannelTabs,
 } from '@/components/communications/deliveryMethodChannel'
 import {
   AutomationSettingsDialog,
@@ -69,6 +69,7 @@ const BCC_TO_CLASS_OPTIONS = [
   'Salaried — Class B (Core medical)',
   'Full-time — Retail',
   'Part-time — Limited benefits',
+  'Terminated',
 ] as const
 
 const TEMPLATE_CHOICES: { value: string; label: string }[] = [
@@ -99,7 +100,9 @@ export function AddAutomationForm() {
   const id = useId()
 
   const [automationName, setAutomationName] = useState('')
-  const [deliveryMethod, setDeliveryMethod] = useState<string>(DEFAULT_DELIVERY_PREFERENCE)
+  const [deliveryMethodSelection, setDeliveryMethodSelection] = useState<string[]>([
+    DEFAULT_DELIVERY_PREFERENCE,
+  ])
   const [automationType, setAutomationType] = useState('')
 
   const [bccFromClass, setBccFromClass] = useState<string>(BCC_FROM_CLASS_OPTIONS[0]!)
@@ -110,21 +113,24 @@ export function AddAutomationForm() {
   const [customContentHtml, setCustomContentHtml] = useState<string | null>(null)
   const [editEmailOpen, setEditEmailOpen] = useState(false)
   const [editSession, setEditSession] = useState(0)
-  const [messageChannelTab, setMessageChannelTab] = useState<'email' | 'sms'>('email')
+  const [messageChannelTab, setMessageChannelTab] = useState<ChannelTabId>('email')
   const [smsMessage, setSmsMessage] = useState(SMS_DEFAULT_AUTOMATION)
+  const [dashboardMessage, setDashboardMessage] = useState('')
+  const [letterBody, setLetterBody] = useState('')
 
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false)
 
   const showRestOfForm = automationType !== ''
-  const emailTabDisabled = isEmailChannelTabDisabled(deliveryMethod)
-  const secondaryTabDisabled = isSecondaryChannelTabDisabled(deliveryMethod)
-  const secondaryChannelLabel = getSecondaryChannelTabLabel(deliveryMethod)
+  const visibleChannelTabs = useMemo(
+    () => getVisibleChannelTabs(deliveryMethodSelection),
+    [deliveryMethodSelection],
+  )
 
-  const onDeliveryMethodChange = (v: string) => {
-    setDeliveryMethod(v)
-    if (v === 'Email only') setMessageChannelTab('email')
-    if (v === 'SMS' || v === 'Dashboard') setMessageChannelTab('sms')
-  }
+  useEffect(() => {
+    if (visibleChannelTabs.length > 0 && !visibleChannelTabs.includes(messageChannelTab)) {
+      setMessageChannelTab(visibleChannelTabs[0]!)
+    }
+  }, [visibleChannelTabs, messageChannelTab])
 
   const previewSource = useMemo(() => {
     if (customContentHtml !== null) return customContentHtml
@@ -217,22 +223,13 @@ export function AddAutomationForm() {
                 </p>
                 <div className="relative">
                   <span className={REQUIRED_DOT_CLASS} aria-hidden />
-                  <Select value={deliveryMethod} onValueChange={onDeliveryMethodChange}>
-                    <SelectTrigger
-                      id={`${id}-delivery`}
-                      className="h-12 w-full rounded-lg border-[#a5aeb4]"
-                      aria-label="Delivery method"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DELIVERY_METHOD_OPTIONS.map((d) => (
-                        <SelectItem key={d} value={d}>
-                          {d}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <DeliveryMethodMultiselect
+                    id={`${id}-delivery`}
+                    value={deliveryMethodSelection}
+                    onChange={setDeliveryMethodSelection}
+                    className="border-[#a5aeb4] text-[#12181d]"
+                    triggerClassName="border-[#a5aeb4]"
+                  />
                 </div>
               </div>
               <div>
@@ -327,25 +324,20 @@ export function AddAutomationForm() {
 
               <Tabs
                 value={messageChannelTab}
-                onValueChange={(v) => setMessageChannelTab(v as 'email' | 'sms')}
+                onValueChange={(v) => setMessageChannelTab(v as ChannelTabId)}
                 className="w-full max-w-[740px] space-y-4"
               >
                 <div className="w-full border-b border-[#e4e6e9]">
                   <TabsList className="flex h-auto w-full min-h-0 flex-wrap items-stretch justify-start gap-0 rounded-none border-0 bg-transparent p-0">
-                    <TabsTrigger
-                      value="email"
-                      disabled={emailTabDisabled}
-                      className="relative rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-[#12181d] shadow-none data-[state=active]:border-[#0058a3] data-[state=active]:text-[#0058a3] data-[state=inactive]:border-b data-[state=inactive]:border-[#e4e6e9] data-[state=inactive]:text-[#12181d] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Email
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="sms"
-                      disabled={secondaryTabDisabled}
-                      className="relative rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-[#12181d] shadow-none data-[state=active]:border-[#0058a3] data-[state=active]:text-[#0058a3] data-[state=inactive]:border-b data-[state=inactive]:border-[#e4e6e9] data-[state=inactive]:text-[#12181d] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {secondaryChannelLabel}
-                    </TabsTrigger>
+                    {visibleChannelTabs.map((tab) => (
+                      <TabsTrigger
+                        key={tab}
+                        value={tab}
+                        className="relative rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-[#12181d] shadow-none data-[state=active]:border-[#0058a3] data-[state=active]:text-[#0058a3] data-[state=inactive]:border-b data-[state=inactive]:border-[#e4e6e9] data-[state=inactive]:text-[#12181d] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {getChannelTabLabel(tab)}
+                      </TabsTrigger>
+                    ))}
                   </TabsList>
                 </div>
 
@@ -430,9 +422,7 @@ export function AddAutomationForm() {
 
                 <TabsContent value="sms" className="mt-0 space-y-3 focus-visible:outline-none" tabIndex={-1}>
                     <div className="flex items-start justify-between gap-4">
-                      <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">
-                        {isDashboardDelivery(deliveryMethod) ? 'Dashboard' : 'SMS'}
-                      </h2>
+                      <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">SMS</h2>
                       <Button
                         type="button"
                         variant="outline"
@@ -473,6 +463,102 @@ export function AddAutomationForm() {
                     <p className="text-sm text-[#5c5c5c]">
                       {smsMessage.length} characters | Text messages are limited to 160 characters.
                     </p>
+                  </TabsContent>
+
+                  <TabsContent
+                    value="dashboard"
+                    className="mt-0 space-y-3 focus-visible:outline-none"
+                    tabIndex={-1}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">
+                        Dashboard Notification
+                      </h2>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        intent="primary"
+                        size="sm"
+                        className="h-8 shrink-0 gap-1.5 rounded-md border-[#0058a3] px-3 text-[#0058a3]"
+                        onClick={() =>
+                          toast.message(
+                            'Edit notification: update the message in the compose area (prototype).',
+                          )
+                        }
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden />
+                        Edit notification
+                      </Button>
+                    </div>
+                    <div className="grid min-h-[220px] w-full overflow-hidden rounded-lg border border-[#a5aeb4] bg-white sm:grid-cols-2">
+                      <div className="flex flex-col border-[#a5aeb4] sm:border-r">
+                        <div className="min-h-0 flex-1 p-3">
+                          <Textarea
+                            id={`${id}-dashboard-compose`}
+                            value={dashboardMessage}
+                            onChange={(e) => setDashboardMessage(e.target.value)}
+                            placeholder="Add a dashboard notification to get started!"
+                            className="min-h-[180px] w-full resize-y rounded-md border-0 bg-transparent p-0 text-sm text-[#12181d] shadow-none focus-visible:ring-0"
+                            aria-label="Dashboard notification message"
+                            spellCheck
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-col bg-[#f2f2f2] p-3">
+                        <p className="text-[11px] font-normal leading-4 tracking-[0.055px] text-[#515f6b]">
+                          Preview
+                        </p>
+                        <div className="mt-2 flex min-h-[160px] items-start">
+                          <div className="w-full max-w-md rounded-lg border border-[#d9d9d9] bg-white p-3 text-left text-sm text-[#12181d] shadow-sm">
+                            <p className="text-xs font-medium text-[#515f6b]">Notification</p>
+                            <p className="mt-2 text-sm text-[#12181d]">
+                              {dashboardMessage.trim() ? dashboardMessage : 'Preview will appear here.'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="letter" className="mt-0 space-y-3 focus-visible:outline-none" tabIndex={-1}>
+                    <div className="flex items-start justify-between gap-4">
+                      <h2 className="text-lg font-semibold leading-6 tracking-tight text-[#1d2c38]">Letter</h2>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        intent="primary"
+                        size="sm"
+                        className="h-8 shrink-0 gap-1.5 rounded-md border-[#0058a3] px-3 text-[#0058a3]"
+                        onClick={() => toast.message('Edit letter: update the body in the compose area (prototype).')}
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden />
+                        Edit letter
+                      </Button>
+                    </div>
+                    <div className="grid min-h-[220px] w-full overflow-hidden rounded-lg border border-[#a5aeb4] bg-white sm:grid-cols-2">
+                      <div className="flex flex-col border-[#a5aeb4] sm:border-r">
+                        <div className="min-h-0 flex-1 p-3">
+                          <Textarea
+                            id={`${id}-letter-compose`}
+                            value={letterBody}
+                            onChange={(e) => setLetterBody(e.target.value)}
+                            placeholder="Add letter copy to get started."
+                            className="min-h-[180px] w-full resize-y rounded-md border-0 bg-transparent p-0 text-sm text-[#12181d] shadow-none focus-visible:ring-0"
+                            aria-label="Letter body"
+                            spellCheck
+                          />
+                        </div>
+                      </div>
+                      <div className="flex min-h-0 flex-col bg-[#f2f2f2] p-3">
+                        <p className="text-[11px] font-normal leading-4 tracking-[0.055px] text-[#515f6b]">Preview</p>
+                        <LetterDocumentPreview
+                          variant="figma"
+                          body={letterBody}
+                          emptyHint="Letter copy will appear in the body of this message."
+                          className="bg-white"
+                        />
+                      </div>
+                    </div>
                   </TabsContent>
                 </Tabs>
 
