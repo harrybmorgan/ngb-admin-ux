@@ -746,8 +746,11 @@ type PlanTotalCosts = Record<CoverageTierKey, string>
 type ContributionSetRow = {
   id: string
   groupIds: string[]
+  /** Which side the user is entering in the third column: employer $/% or employee $/%. The other side is derived from total. */
+  contributionInputParty: 'employer' | 'employee'
   contributionType: 'dollar' | 'percent'
   applySameToAllTiers: boolean
+  /** Amounts the user types for the side selected by `contributionInputParty` (dollar, or that party’s % of premium). */
   employerByTier: PlanTotalCosts
 }
 
@@ -771,6 +774,7 @@ function defaultContributionSet(): ContributionSetRow {
   return {
     id: newContributionSetId(),
     groupIds: ['full-time'],
+    contributionInputParty: 'employer',
     contributionType: 'dollar',
     applySameToAllTiers: false,
     employerByTier: emptyTierCosts(),
@@ -804,9 +808,11 @@ function normalizeContributionSet(raw: unknown): ContributionSetRow {
     ? o.groupIds.filter((x): x is string => typeof x === 'string')
     : []
   const contributionType = o.contributionType === 'percent' ? 'percent' : 'dollar'
+  const contributionInputParty = o.contributionInputParty === 'employee' ? 'employee' : 'employer'
   return {
     id: typeof o.id === 'string' && o.id.length > 0 ? o.id : newContributionSetId(),
     groupIds: groupIds.length > 0 ? groupIds : ['full-time'],
+    contributionInputParty,
     contributionType,
     applySameToAllTiers: o.applySameToAllTiers === true,
     employerByTier: normalizeEmployerByTier(o.employerByTier),
@@ -860,11 +866,18 @@ function parsePercentInput(s: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-function formatUsd(n: number): string {
-  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+/** Formats a signed currency line; negatives render as -$X.XX (not $-X.XX). */
+function formatContributionDollars(n: number): string {
+  const abs = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  if (n < 0) return `-$${abs}`
+  return `$${abs}`
 }
 
-/** Employee share from total premium and employer input (dollar ER amount or ER % of premium). */
+/**
+ * Complementary share in dollars: total premium minus the entered $ or the entered % of premium
+ * (second argument is the side stored in the row, historically employer; same math for either party).
+ * Over-allocation (e.g. more than 100% of premium or dollars above the tier total) yields a negative amount.
+ */
 function employeeContributionDisplay(
   totalStr: string,
   employerStr: string,
@@ -875,11 +888,11 @@ function employeeContributionDisplay(
   if (mode === 'dollar') {
     const er = parseMoneyInput(employerStr)
     if (er === null) return '—'
-    return `$${formatUsd(Math.max(0, total - er))}`
+    return formatContributionDollars(total - er)
   }
   const p = parsePercentInput(employerStr)
   if (p === null) return '—'
-  return `$${formatUsd(Math.max(0, (total * (100 - p)) / 100))}`
+  return formatContributionDollars((total * (100 - p)) / 100)
 }
 
 type SandboxVerifyCheckResult = 'pass' | 'warning' | 'fail'
@@ -4305,6 +4318,7 @@ export default function SetupWizardPage() {
               const editSet = editPc.contributionSets.find((s) => s.id === contributionEditSheet.setId)
               if (!editSet) return null
               const setIdx = editPc.contributionSets.findIndex((s) => s.id === contributionEditSheet.setId)
+              const inputEmployer = editSet.contributionInputParty === 'employer'
               const patchSet = (next: ContributionSetRow) => {
                 setDraft((d) => {
                   const pc =
@@ -4382,7 +4396,28 @@ export default function SetupWizardPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <p className="text-xs font-medium text-foreground">Employer contribution</p>
+                      <p className="text-xs font-medium text-foreground">Enter amounts for</p>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant={editSet.contributionInputParty === 'employer' ? 'solid' : 'outline'}
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={() => patchSet({ ...editSet, contributionInputParty: 'employer' })}
+                        >
+                          Employer
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={editSet.contributionInputParty === 'employee' ? 'solid' : 'outline'}
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={() => patchSet({ ...editSet, contributionInputParty: 'employee' })}
+                        >
+                          Employee
+                        </Button>
+                      </div>
+                      <p className="text-xs font-medium text-foreground">Dollar or percent of premium</p>
                       <div className="flex gap-2">
                         <Button
                           type="button"
@@ -4428,8 +4463,8 @@ export default function SetupWizardPage() {
                       <span className="text-sm leading-snug">
                         <span className="font-medium text-foreground">Apply same value to all tiers</span>
                         <span className="mt-0.5 block text-xs text-muted-foreground">
-                          One employer input is copied to every coverage tier; employee share still uses each tier&apos;s
-                          total.
+                          One input (employer or employee) is copied to every coverage tier; the other side still uses
+                          each tier&apos;s total.
                         </span>
                       </span>
                     </label>
@@ -4439,9 +4474,13 @@ export default function SetupWizardPage() {
                       {editSet.applySameToAllTiers ? (
                         <FloatLabel
                           label={
-                            editSet.contributionType === 'dollar'
-                              ? 'Employer contribution (all tiers)'
-                              : 'Employer % of premium (all tiers)'
+                            inputEmployer
+                              ? editSet.contributionType === 'dollar'
+                                ? 'Employer contribution (all tiers)'
+                                : 'Employer % of premium (all tiers)'
+                              : editSet.contributionType === 'dollar'
+                                ? 'Employee contribution (all tiers)'
+                                : 'Employee % of premium (all tiers)'
                           }
                           id={`contrib-sheet-same-${editSet.id}`}
                           className="bg-background"
@@ -4466,60 +4505,113 @@ export default function SetupWizardPage() {
                           <TableRow>
                             <TableHead className="w-[28%]">Coverage tier</TableHead>
                             <TableHead>Total</TableHead>
-                            <TableHead>{editSet.contributionType === 'dollar' ? 'Employer ($)' : 'Employer (%)'}</TableHead>
-                            <TableHead>Employee</TableHead>
+                            <TableHead>
+                              {inputEmployer
+                                ? editSet.contributionType === 'dollar'
+                                  ? 'Employer ($)'
+                                  : 'Employer (%)'
+                                : 'Employer ($)'}
+                            </TableHead>
+                            <TableHead>
+                              {inputEmployer
+                                ? 'Employee'
+                                : editSet.contributionType === 'dollar'
+                                  ? 'Employee ($)'
+                                  : 'Employee (%)'}
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {COVERAGE_TIER_KEYS.map((tierKey) => (
-                            <TableRow key={tierKey}>
-                              <TableCell className="font-medium text-foreground">
-                                {COVERAGE_TIER_LABELS[tierKey]}
-                              </TableCell>
-                              <TableCell className="tabular-nums text-xs text-muted-foreground">
-                                {editPc.totalCosts[tierKey].trim() !== ''
-                                  ? editPc.totalCosts[tierKey]
-                                  : '—'}
-                              </TableCell>
-                              <TableCell>
-                                {editSet.applySameToAllTiers ? (
-                                  <span className="text-xs text-muted-foreground">
-                                    {editSet.employerByTier.ee_only.trim() !== ''
-                                      ? editSet.contributionType === 'dollar'
-                                        ? editSet.employerByTier.ee_only
-                                        : `${editSet.employerByTier.ee_only}%`
-                                      : '—'}
-                                  </span>
-                                ) : (
-                                  <FloatLabel
-                                    label={editSet.contributionType === 'dollar' ? '$' : '%'}
-                                    id={`contrib-${editSet.id}-${tierKey}`}
-                                    className="bg-background text-xs"
-                                    inputMode="decimal"
-                                    value={editSet.employerByTier[tierKey]}
-                                    onChange={(e) =>
-                                      patchSet({
-                                        ...editSet,
-                                        employerByTier: {
-                                          ...editSet.employerByTier,
-                                          [tierKey]: e.target.value,
-                                        },
-                                      })
-                                    }
-                                  />
-                                )}
-                              </TableCell>
-                              <TableCell className="tabular-nums text-xs font-medium text-foreground">
-                                {employeeContributionDisplay(
-                                  editPc.totalCosts[tierKey],
-                                  editSet.applySameToAllTiers
-                                    ? editSet.employerByTier.ee_only
-                                    : editSet.employerByTier[tierKey],
-                                  editSet.contributionType,
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                          {COVERAGE_TIER_KEYS.map((tierKey) => {
+                            const inputVal = editSet.applySameToAllTiers
+                              ? editSet.employerByTier.ee_only
+                              : editSet.employerByTier[tierKey]
+                            const otherDisplay = employeeContributionDisplay(
+                              editPc.totalCosts[tierKey],
+                              inputVal,
+                              editSet.contributionType,
+                            )
+                            return (
+                              <TableRow key={tierKey}>
+                                <TableCell className="font-medium text-foreground">
+                                  {COVERAGE_TIER_LABELS[tierKey]}
+                                </TableCell>
+                                <TableCell className="tabular-nums text-xs text-muted-foreground">
+                                  {editPc.totalCosts[tierKey].trim() !== '' ? editPc.totalCosts[tierKey] : '—'}
+                                </TableCell>
+                                <TableCell>
+                                  {inputEmployer ? (
+                                    editSet.applySameToAllTiers ? (
+                                      <span className="text-xs text-muted-foreground">
+                                        {editSet.employerByTier.ee_only.trim() !== ''
+                                          ? editSet.contributionType === 'dollar'
+                                            ? editSet.employerByTier.ee_only
+                                            : `${editSet.employerByTier.ee_only}%`
+                                          : '—'}
+                                      </span>
+                                    ) : (
+                                      <FloatLabel
+                                        label={editSet.contributionType === 'dollar' ? '$' : '%'}
+                                        id={`contrib-${editSet.id}-${tierKey}`}
+                                        className="bg-background text-xs"
+                                        inputMode="decimal"
+                                        value={editSet.employerByTier[tierKey]}
+                                        onChange={(e) =>
+                                          patchSet({
+                                            ...editSet,
+                                            employerByTier: {
+                                              ...editSet.employerByTier,
+                                              [tierKey]: e.target.value,
+                                            },
+                                          })
+                                        }
+                                      />
+                                    )
+                                  ) : (
+                                    <span className="tabular-nums text-xs font-medium text-foreground">
+                                      {otherDisplay}
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell
+                                  className={
+                                    inputEmployer
+                                      ? 'tabular-nums text-xs font-medium text-foreground'
+                                      : 'p-2'
+                                  }
+                                >
+                                  {inputEmployer ? (
+                                    otherDisplay
+                                  ) : editSet.applySameToAllTiers ? (
+                                    <span className="text-xs text-muted-foreground">
+                                      {editSet.employerByTier.ee_only.trim() !== ''
+                                        ? editSet.contributionType === 'dollar'
+                                          ? editSet.employerByTier.ee_only
+                                          : `${editSet.employerByTier.ee_only}%`
+                                        : '—'}
+                                    </span>
+                                  ) : (
+                                    <FloatLabel
+                                      label={editSet.contributionType === 'dollar' ? '$' : '%'}
+                                      id={`contrib-ee-${editSet.id}-${tierKey}`}
+                                      className="bg-background text-xs"
+                                      inputMode="decimal"
+                                      value={editSet.employerByTier[tierKey]}
+                                      onChange={(e) =>
+                                        patchSet({
+                                          ...editSet,
+                                          employerByTier: {
+                                            ...editSet.employerByTier,
+                                            [tierKey]: e.target.value,
+                                          },
+                                        })
+                                      }
+                                    />
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
                         </TableBody>
                       </Table>
                     </div>
